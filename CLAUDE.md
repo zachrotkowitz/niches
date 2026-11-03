@@ -9,6 +9,8 @@ The founder has little coding experience and wants to be involved: explain decis
 - **First version is a working demo** to show and test the idea.
 - **Launch niche: Cooking.** Art, Photography and Gym are in the app as "coming soon". Gym is undecided because of body-image risk; if kept, goals track performance and habits (not weight), stats are hideable, and before/after photos sit behind a tap.
 - **Feeds:** each niche feed shows *every* post in that niche, newest first, and ends with "You're caught up in Cooking". A "Following" filter comes later. One post belongs to exactly one niche. Remember the user's last niche.
+- **Feed layout:** both a single-column Posts layout and a Pinterest-style Grid, with a Posts/Grid switch. Tapping a grid tile opens the normal post view (cheers, comments) with a back button to the grid.
+- **Each niche has its own color — a must.** Cooking is basil green (#1E6B47); Art ultramarine; Photography amber; Gym raspberry. Switching niche re-tints the app. Mockups: https://claude.ai/artifact/7T9p36YdKk7gkBDfeQe6sm (founder approved the look; expect more feedback on real prototypes).
 - **Profiles:** one profile per person with niche tabs (All · Cooking · Art ...).
 - **Likes:** hidden from everyone except the poster. Replacement feedback: comments, a one-tap cheer, "saved to N collections". No leaderboards or follower-count ranking.
 - **Posts:** photos, text and video. Video is tap-to-play, no autoplay, no swipe-to-next feed, 60–90s cap.

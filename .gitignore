@@ -9,3 +9,14 @@ web-build/
 .DS_Store
 # impeccable downloads a platform binary on first use
 .claude/skills/impeccable/scripts/bin/
+expo-env.d.ts
+.metro-health-check*
+*.tsbuildinfo
+/ios
+/android
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
