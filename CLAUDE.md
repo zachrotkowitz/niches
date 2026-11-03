@@ -34,6 +34,13 @@ Expo (React Native, Expo Router) for iOS, Android and web from one codebase; Sup
 6. Safety basics: report, block, in-app account deletion, community guidelines (incl. AI-art and eating-disorder rules)
 7. Share to Niches, Instagram/TikTok import, short video
 
+## Where the build is
+
+- Steps 1–2 done, plus a first pass of step 3: the Expo SDK 58 app (branch `app-skeleton`) has 18+ sign-up, tabs, niche switcher with per-niche colors, Cooking feed (Posts/Grid, real end, older posts behind a tap), post screen with back button, cheers/saves/comments with author-only stats, create post/progress/question, Saved, Profile, Discover with niche requests.
+- Data is on-device only (`src/lib/store.tsx`, AsyncStorage) with demo content in `src/lib/seed.ts`. Next: Supabase behind the same store actions, then real photo upload, boards, goals.
+- This cloud environment blocks docs.expo.dev and Expo's version API: use `EXPO_OFFLINE=1 npx expo install <pkg>` and read types in `node_modules` for API details. `npx expo lint` can't fetch its config here.
+- Smoke-test by exporting web (`CI=1 EXPO_OFFLINE=1 npx expo export -p web`), serving `dist/` with an SPA fallback, and driving it with Playwright at 390×844.
+
 ## Reference material
 
 - `docs/research/` — research report and notes (Gen Z attitudes, case studies, humane design, import feasibility, cold start and safety, tech stack). Read the report before making product decisions.

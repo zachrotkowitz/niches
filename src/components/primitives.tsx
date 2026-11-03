@@ -35,7 +35,7 @@ export function MediaPlaceholder({ post, height, radius = 0, showLabel = true }:
         </View>
       ) : null}
       {isVideo && post.durationSec ? (
-        <View style={[styles.duration, showLabel ? null : { right: undefined, left: 8, top: 8, bottom: undefined }]}>
+        <View style={showLabel ? styles.duration : styles.durationCorner}>
           {showLabel ? null : <PlayIcon size={9} color="#FFFFFF" />}
           <Text style={styles.durationText}>{formatDuration(post.durationSec)}</Text>
         </View>
@@ -85,6 +85,7 @@ const styles = StyleSheet.create({
   mediaLabel: { position: 'absolute', left: 12, bottom: 12, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, maxWidth: '80%' },
   mediaLabelText: { color: colors.text, fontSize: 12, fontWeight: '500' },
   duration: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(20,22,26,0.78)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  durationCorner: { position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(20,22,26,0.78)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   durationText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   button: { minHeight: TOUCH + 4, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   buttonText: { fontSize: 15, fontWeight: '600' },
