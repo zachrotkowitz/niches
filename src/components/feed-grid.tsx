@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BookmarkIcon } from '@/components/icons';
+import { useSwipeBlocked } from '@/components/niche-swipe';
 import { MediaPlaceholder } from '@/components/primitives';
 import { useNiches, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -57,6 +58,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[post.niche];
   const saved = !!state.saves[post.id];
+  const swiping = useSwipeBlocked();
   const title = tileTitle(post);
   const height = tileHeight(post);
   const inset = nicheBorder ? NICHE_BORDER : 0;
@@ -68,7 +70,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
         accessibilityRole="button"
         accessibilityLabel={`Open ${niche.label} post: ${title}`}
         disabled={!interactive}
-        onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })}
+        onPress={() => !swiping() && router.push({ pathname: '/post/[id]', params: { id: post.id } })}
         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
         <View style={[frame, { overflow: 'hidden' }]}>
           {post.kind === 'text' ? (
@@ -87,7 +89,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
           accessibilityRole="button"
           accessibilityLabel={saved ? 'Saved' : 'Save'}
           accessibilityState={{ selected: saved }}
-          onPress={() => actions.toggleSave(post.id)}
+          onPress={() => !swiping() && actions.toggleSave(post.id)}
           hitSlop={4}
           style={[styles.save, { backgroundColor: saved ? niche.accent : 'rgba(255,255,255,0.94)', top: height - 46 - inset, right: 6 + inset }]}>
           <BookmarkIcon size={17} filled={saved} color={saved ? '#FFFFFF' : colors.text} />

@@ -68,8 +68,8 @@ export default function PostScreen() {
               <Text style={styles.privateTitle}>Only you can see these numbers</Text>
             </View>
             <View style={styles.statRow}>
-              <Stat value={post.hideCheers ? null : stats.cheers} label="cheers" />
-              <Stat value={stats.saves} label="saved it" />
+              <Stat value={post.hideCheers ? null : stats.cheers} label="likes" />
+              <Stat value={stats.saves} label="saves" />
               <Stat value={stats.comments} label="comments" />
             </View>
             <Text style={styles.privateNote}>Everyone else just sees your post. No public like counts, ever.</Text>

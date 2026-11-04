@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BellIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
@@ -9,16 +9,20 @@ import { useNiches, useStore, type FeedLayout } from '@/lib/store';
 import { colors, fonts, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
 /** The tinted header: wordmark, niche title, layout switch and niche chips. */
-export function NicheHeader() {
+export function NicheHeader({ position }: { position: SharedValue<number> }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, actions } = useStore();
   const NICHES = useNiches();
   const niche = NICHES[state.niche];
+  const { width } = useWindowDimensions();
+  const fields = NICHE_ORDER.map((id) => NICHES[id].field);
+  const stops = NICHE_ORDER.map((_, i) => i);
+  // Blend between niche colors as the pages slide under your finger.
+  const bg = useAnimatedStyle(() => ({ backgroundColor: interpolateColor(-position.get() / width, stops, fields) }));
 
   return (
-    // The niche color crossfades (150ms) instead of snapping when you switch niches.
-    <Animated.View style={[styles.header, { backgroundColor: niche.field, paddingTop: insets.top + 8, transitionProperty: 'backgroundColor', transitionDuration: 150, transitionTimingFunction: 'ease-out' }]}>
+    <Animated.View style={[styles.header, { paddingTop: insets.top + 8 }, bg]}>
       <View style={styles.topRow}>
         <Text style={[styles.wordmark, { color: niche.ink }]}>niches</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Notification digest" style={styles.iconButton}>

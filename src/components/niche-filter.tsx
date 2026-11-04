@@ -1,12 +1,12 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { useNiches } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 
 /**
  * Multi-select niche chips for mixed-niche screens (Discover, Saved).
- * Each chip carries its niche's color, so the chips double as the legend for
- * the colored borders on the posts below. Empty selection means "All".
+ * Each chip is outlined in its niche's color, matching the borders on the
+ * posts below, so the chips double as the legend. Empty selection means "All".
  */
 export function NicheFilter({ value, onChange, available = NICHE_ORDER }: { value: NicheId[]; onChange: (next: NicheId[]) => void; available?: NicheId[] }) {
   const niches = useNiches();
@@ -35,8 +35,8 @@ export function NicheFilter({ value, onChange, available = NICHE_ORDER }: { valu
             accessibilityState={{ checked: on }}
             accessibilityLabel={n.label}
             onPress={() => toggle(id)}
-            style={({ pressed }) => [styles.chip, on ? { backgroundColor: n.accent, borderColor: n.accent } : { borderColor: colors.border }, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-            <View style={[styles.swatch, { borderColor: on ? '#FFFFFF' : n.accent }]} />
+            // Same treatment as the posts: a border in the niche's color. Selected chips fill in.
+            style={({ pressed }) => [styles.chip, styles.nicheChip, { borderColor: n.accent }, on ? { backgroundColor: n.accent } : null, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
             <Text style={[styles.text, { color: on ? '#FFFFFF' : colors.textBody }]}>{n.label}</Text>
           </Pressable>
         );
@@ -48,7 +48,6 @@ export function NicheFilter({ value, onChange, available = NICHE_ORDER }: { valu
 const styles = StyleSheet.create({
   row: { gap: 8, paddingHorizontal: 20, paddingVertical: 4 },
   chip: { height: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF' },
-  // A tiny outlined square echoes the post borders this chip stands for.
-  swatch: { width: 12, height: 12, borderRadius: 3, borderWidth: 2.5 },
+  nicheChip: { borderWidth: 2.5 },
   text: { fontSize: 14, fontWeight: '600' },
 });

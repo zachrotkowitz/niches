@@ -26,6 +26,22 @@ export const SEED_USERS: User[] = [
   { id: 'u_omar', displayName: 'Omar Haddad', username: 'omar.shoots', avatarColor: '#5C3100', bio: 'Street and night photography. Founding creator, Photography.', foundingCreator: true },
 ];
 
+/** Who follows whom among the demo accounts: [follower, followed]. */
+export const SEED_FOLLOWS: [string, string][] = [
+  ['u_maya', 'u_dev'], ['u_maya', 'u_jules'], ['u_maya', 'u_lu'], ['u_maya', 'u_rosa'], ['u_maya', 'u_priya'],
+  ['u_dev', 'u_maya'], ['u_dev', 'u_jules'], ['u_dev', 'u_ana'],
+  ['u_jules', 'u_maya'], ['u_jules', 'u_dev'], ['u_jules', 'u_ana'], ['u_jules', 'u_priya'],
+  ['u_sam', 'u_maya'], ['u_sam', 'u_jules'], ['u_sam', 'u_theo'],
+  ['u_priya', 'u_maya'], ['u_priya', 'u_nadia'], ['u_priya', 'u_omar'], ['u_priya', 'u_lu'],
+  ['u_ana', 'u_jules'], ['u_ana', 'u_dev'],
+  ['u_theo', 'u_sam'], ['u_theo', 'u_ana'],
+  ['u_lu', 'u_maya'], ['u_lu', 'u_priya'], ['u_lu', 'u_jules'],
+  ['u_rosa', 'u_kenji'], ['u_rosa', 'u_maya'], ['u_rosa', 'u_nadia'],
+  ['u_kenji', 'u_rosa'], ['u_kenji', 'u_omar'],
+  ['u_nadia', 'u_omar'], ['u_nadia', 'u_rosa'], ['u_nadia', 'u_priya'],
+  ['u_omar', 'u_nadia'], ['u_omar', 'u_kenji'],
+];
+
 export function seedPosts(now: number): Post[] {
   return [
     // Cooking

@@ -159,7 +159,7 @@ export default function CreateScreen() {
           </View>
         </View>
 
-        <Text style={styles.hint}>Your post shows in the {niche.label} feed and on your profile. Only you will see how many people cheered or saved it.</Text>
+        <Text style={styles.hint}>Your post shows in the {niche.label} feed and on your profile. Only you will see how many people liked or saved it.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

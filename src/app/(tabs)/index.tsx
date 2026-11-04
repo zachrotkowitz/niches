@@ -1,32 +1,35 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useSharedValue } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
 import { CheckIcon } from '@/components/icons';
 import { NicheHeader } from '@/components/niche-header';
-import { NicheSwipe } from '@/components/niche-swipe';
+import { NichePager } from '@/components/niche-swipe';
 import { PostCard } from '@/components/post-card';
 import { Button, DisplayText } from '@/components/primitives';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { isVisible, useNiches, useStore } from '@/lib/store';
-import { colors, type Niche } from '@/lib/theme';
+import { colors, NICHE_ORDER, type Niche } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
 export default function HomeScreen() {
   const { state } = useStore();
-  const niche = useNiches()[state.niche];
+  const niches = useNiches();
+  // x offset of the row of niche pages; the header blends its color from it.
+  const position = useSharedValue(0);
 
   return (
     <View style={styles.screen}>
-      <NicheHeader />
-      <NicheSwipe>
-        {/* Remounts per niche: fresh scroll position and a short fade to mark the switch. */}
-        <Animated.View key={niche.id} entering={FadeIn.duration(150)} style={{ flex: 1 }}>
-          {niche.open ? <OpenFeed niche={niche} /> : <ComingSoon niche={niche} />}
-        </Animated.View>
-      </NicheSwipe>
+      <NicheHeader position={position} />
+      <NichePager
+        position={position}
+        renderPage={(id) => {
+          const niche = niches[id];
+          return niche.open ? <OpenFeed niche={niche} /> : <ComingSoon niche={niche} />;
+        }}
+      />
     </View>
   );
 }

@@ -57,6 +57,21 @@ export function PersonIcon({ size = 24, color = '#14161A', filled }: IconProps) 
   );
 }
 
+export function HeartIcon({ size = 21, color = '#3E444B', filled }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M12 20.3s-7.5-4.4-8.9-9.2C2.2 7.9 4.1 4.6 7.4 4.6c2 0 3.5 1.1 4.6 2.7 1.1-1.6 2.6-2.7 4.6-2.7 3.3 0 5.2 3.3 4.3 6.5-1.4 4.8-8.9 9.2-8.9 9.2z"
+        fill={filled ? color : 'none'}
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** @deprecated Likes use HeartIcon. */
 export function CheerIcon({ size = 21, color = '#3E444B' }: IconProps) {
   return (
     <Svg {...base(size)}>

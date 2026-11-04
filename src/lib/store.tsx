@@ -4,7 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 
-import { SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
+import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { NICHE_ORDER, resolveNiches, type NicheId } from './theme';
 import type { Comment, Post, PostKind, ReportReason, User } from './types';
 
@@ -238,6 +238,19 @@ export function postStats(state: State, post: Post) {
     saves: (post.seedSaves ?? 0) + (state.saves[post.id] ? 1 : 0),
     comments: state.comments.filter((c) => c.postId === post.id).length,
   };
+}
+
+/**
+ * Followers and following for any account, as user ids. Demo accounts follow
+ * each other (seed data); your own follows come from state.
+ */
+export function connections(state: State, userId: string) {
+  const meId = state.me?.id;
+  const following =
+    userId === meId ? Object.keys(state.following) : SEED_FOLLOWS.filter(([from]) => from === userId).map(([, to]) => to);
+  const followers = SEED_FOLLOWS.filter(([, to]) => to === userId).map(([from]) => from);
+  if (meId && userId !== meId && state.following[userId]) followers.push(meId);
+  return { followers, following };
 }
 
 /** Whether a post belongs in public feeds for this viewer. */

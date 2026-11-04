@@ -86,9 +86,9 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
         { label: 'Edit', detail: 'Change the caption or progress label.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id } })) },
         { label: 'Adjust preview', detail: 'Choose how this post looks in grids.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id, section: 'preview' } })) },
         {
-          label: post.hideCheers ? 'Show cheer count to me' : 'Hide cheer count',
-          detail: post.hideCheers ? 'See how many people cheered.' : 'Nobody else ever sees it. This hides it from you too.',
-          onPress: run(() => actions.updatePost(post.id, { hideCheers: !post.hideCheers }), post.hideCheers ? 'Cheer count shown to you' : 'Cheer count hidden'),
+          label: post.hideCheers ? 'Show like count to me' : 'Hide like count',
+          detail: post.hideCheers ? 'See how many people liked it.' : 'Nobody else ever sees it. This hides it from you too.',
+          onPress: run(() => actions.updatePost(post.id, { hideCheers: !post.hideCheers }), post.hideCheers ? 'Like count shown to you' : 'Like count hidden'),
         },
         {
           label: post.commentsOff ? 'Turn on commenting' : 'Turn off commenting',

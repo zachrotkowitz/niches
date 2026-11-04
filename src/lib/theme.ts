@@ -96,3 +96,76 @@ export const fonts = {
 
 /** Minimum tappable size (Apple HIG 44pt). */
 export const TOUCH = 44;
+
+/**
+ * Ready-made color schemes for the Color lab, each built on a color-theory
+ * idea. Palette ids refer to PALETTES above.
+ */
+export type Scheme = { id: string; name: string; theory: string; why: string; palettes: Record<NicheId, string> };
+
+export const SCHEMES: Scheme[] = [
+  {
+    id: 'original',
+    name: 'Original',
+    theory: 'Rectangle: two pairs of opposites',
+    why: 'Green sits opposite raspberry and blue-violet opposite amber on the color wheel, so all four niches feel balanced and are easy to tell apart.',
+    palettes: { cooking: 'basil', art: 'ultramarine', photography: 'amber', gym: 'raspberry' },
+  },
+  {
+    id: 'meaning',
+    name: 'By subject',
+    theory: 'Colors chosen for what each niche is about',
+    why: 'Tomato red is warm and appetizing, ultramarine is the classic painter’s blue, slate is the neutral gray of a darkroom, and basil green says health and growth without the aggression of red.',
+    palettes: { cooking: 'tomato', art: 'ultramarine', photography: 'slate', gym: 'basil' },
+  },
+  {
+    id: 'primaries',
+    name: 'Bold primaries',
+    theory: 'Triad: three colors evenly spaced',
+    why: 'Red, yellow and blue sit a third of the wheel apart, which reads as confident and playful. Green joins as the fourth so Gym has its own lane.',
+    palettes: { cooking: 'tomato', art: 'cobalt', photography: 'saffron', gym: 'basil' },
+  },
+  {
+    id: 'calm',
+    name: 'Calm cools',
+    theory: 'Analogous: neighbors on the wheel',
+    why: 'Olive, teal, blue and purple run side by side around the cool half of the wheel, so the app feels calm and cohesive. The trade-off: niches are a little harder to tell apart at a glance.',
+    palettes: { cooking: 'olive', art: 'eggplant', photography: 'teal', gym: 'cobalt' },
+  },
+  {
+    id: 'cozy',
+    name: 'Cozy warms',
+    theory: 'Analogous: warm neighbors',
+    why: 'Olive, saffron, tomato and raspberry run from yellow-green to pink, like a farmers market. Warm and inviting, but the niches blend together more than other schemes.',
+    palettes: { cooking: 'olive', art: 'raspberry', photography: 'saffron', gym: 'tomato' },
+  },
+];
+
+function hexToLab(hex: string): [number, number, number] {
+  const lin = [1, 3, 5].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  const [r, g, b] = lin;
+  const x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+  const y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  const z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
+/** How different two colors look to the eye (CIE76 ΔE; above ~25 reads as clearly different). */
+export function colorDistance(a: string, b: string): number {
+  const [l1, a1, b1] = hexToLab(a);
+  const [l2, a2, b2] = hexToLab(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+/** Rates how easily niches can be told apart when they sit side by side. */
+export function distinctness(accents: string[]): { label: string; score: number } {
+  let min = Infinity;
+  for (let i = 0; i < accents.length; i++) for (let j = i + 1; j < accents.length; j++) min = Math.min(min, colorDistance(accents[i], accents[j]));
+  if (!Number.isFinite(min)) min = 100;
+  const label = min >= 45 ? 'Very easy to tell apart' : min >= 28 ? 'Easy to tell apart' : min >= 18 ? 'Some niches look alike' : 'Niches look alike';
+  return { label, score: min };
+}

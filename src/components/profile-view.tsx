@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
-import { isVisible, useNiches, useStore } from '@/lib/store';
+import { connections, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
@@ -23,16 +23,23 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
   const nicheTabs = NICHE_ORDER.filter((id) => posts.some((p) => p.niche === id));
   const shown = tab === 'all' ? posts : posts.filter((p) => p.niche === tab);
   const following = !!state.following[user.id];
+  const { followers, following: follows } = connections(state, user.id);
+  const openList = (tab: 'followers' | 'following') => router.push({ pathname: '/connections/[id]', params: { id: user.id, tab } });
 
   return (
     <View>
       <View style={styles.head}>
         <View style={styles.identity}>
           <Avatar user={user} size={72} />
-          <View style={{ flex: 1, gap: 2 }}>
-            <DisplayText size={26}>{user.displayName}</DisplayText>
-            <Text style={styles.handle}>{user.username}</Text>
+          <View style={styles.counts}>
+            <Count value={posts.length} label={posts.length === 1 ? 'post' : 'posts'} />
+            <Count value={followers.length} label={followers.length === 1 ? 'follower' : 'followers'} onPress={() => openList('followers')} />
+            <Count value={follows.length} label="following" onPress={() => openList('following')} />
           </View>
+        </View>
+        <View style={{ gap: 2 }}>
+          <DisplayText size={24}>{user.displayName}</DisplayText>
+          <Text style={styles.handle}>{user.username}</Text>
         </View>
         {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
         {nicheTabs.length ? (
@@ -86,6 +93,20 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
   );
 }
 
+function Count({ value, label, onPress }: { value: number; label: string; onPress?: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={`${value} ${label}`}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.count, { opacity: pressed ? 0.6 : 1 }]}>
+      <Text style={styles.countValue}>{value}</Text>
+      <Text style={styles.countLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 /** Three-across square grid, as on Instagram profiles. */
 export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; nicheBorders?: boolean }) {
   const router = useRouter();
@@ -119,6 +140,10 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: 20, gap: 12 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   handle: { fontSize: 14, color: colors.textMuted },
+  counts: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  count: { minWidth: 64, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  countValue: { fontSize: 18, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+  countLabel: { fontSize: 13, color: colors.textMuted },
   bio: { fontSize: 15, lineHeight: 21, color: colors.text },
   nicheRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   nichePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },

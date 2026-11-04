@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BookmarkIcon, CheerIcon, CommentIcon, MoreIcon, PauseIcon, PlayIcon, TrendIcon } from '@/components/icons';
+import { BookmarkIcon, CommentIcon, HeartIcon, MoreIcon, PauseIcon, PlayIcon, TrendIcon } from '@/components/icons';
+import { useSwipeBlocked } from '@/components/niche-swipe';
 import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { timeAgo } from '@/lib/format';
@@ -16,12 +17,18 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[post.niche];
   const [menuOpen, setMenuOpen] = useState(false);
+  const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];
   const isMine = !!state.me && post.authorId === state.me.id;
   const cheered = !!state.cheers[post.id];
   const saved = !!state.saves[post.id];
-  const commentCount = postStats(state, post).comments;
+  const stats = postStats(state, post);
+  const commentCount = stats.comments;
+  // Only the author sees numbers (unless they hid the like count from themselves).
+  const likeLabel = isMine && !post.hideCheers ? `${stats.cheers} ${stats.cheers === 1 ? 'like' : 'likes'}` : cheered ? 'Liked' : 'Like';
+  const saveLabel = isMine ? `${stats.saves} ${stats.saves === 1 ? 'save' : 'saves'}` : saved ? 'Saved' : 'Save';
   const open = () => {
+    if (swiping()) return;
     if (!inDetail) router.push({ pathname: '/post/[id]', params: { id: post.id } });
   };
   const openAuthor = () => (isMine ? router.navigate('/profile') : router.push({ pathname: '/user/[id]', params: { id: post.authorId } }));
@@ -66,11 +73,11 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ selected: cheered }}
-          accessibilityLabel={cheered ? 'Cheered' : 'Cheer'}
-          onPress={() => actions.toggleCheer(post.id)}
+          accessibilityLabel={isMine ? `${likeLabel}${cheered ? ', you liked this' : ''}` : likeLabel}
+          onPress={() => !swiping() && actions.toggleCheer(post.id)}
           style={({ pressed }) => [styles.action, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
-          <CheerIcon color={cheered ? niche.accent : colors.textSecondary} />
-          <Text style={[styles.actionText, { color: cheered ? niche.accent : colors.textSecondary }]}>{cheered ? 'Cheered' : 'Cheer'}</Text>
+          <HeartIcon filled={cheered} color={cheered ? niche.accent : colors.textSecondary} />
+          <Text style={[styles.actionText, { color: cheered ? niche.accent : colors.textSecondary }]}>{likeLabel}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -87,11 +94,11 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ selected: saved }}
-          accessibilityLabel={saved ? 'Saved' : 'Save'}
-          onPress={() => actions.toggleSave(post.id)}
+          accessibilityLabel={isMine ? `${saveLabel}${saved ? ', you saved this' : ''}` : saveLabel}
+          onPress={() => !swiping() && actions.toggleSave(post.id)}
           style={({ pressed }) => [styles.action, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
           <BookmarkIcon size={20} filled={saved} color={saved ? niche.accent : colors.textSecondary} />
-          <Text style={[styles.actionText, { color: saved ? niche.accent : colors.textSecondary }]}>{saved ? 'Saved' : 'Save'}</Text>
+          <Text style={[styles.actionText, { color: saved ? niche.accent : colors.textSecondary }]}>{saveLabel}</Text>
         </Pressable>
       </View>
 

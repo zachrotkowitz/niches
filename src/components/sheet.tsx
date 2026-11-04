@@ -50,8 +50,9 @@ export function Sheet({ visible, onClose, title, items, children }: { visible: b
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,22,26,0.4)' },
-  sheet: { backgroundColor: colors.ground, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 8, gap: 4, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  // No dimming behind the sheet (founder feedback); a shadow separates it instead.
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  sheet: { backgroundColor: colors.ground, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: colors.hairline, shadowColor: '#14161A', shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: -6 }, elevation: 16, paddingHorizontal: 16, paddingTop: 8, gap: 4, width: '100%', maxWidth: 560, alignSelf: 'center' },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#D5D8D3', marginBottom: 8 },
   title: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textAlign: 'center', paddingBottom: 6 },
   item: { minHeight: TOUCH + 8, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 8, paddingVertical: 10, borderRadius: 12 },
