@@ -11,6 +11,12 @@ The founder has little coding experience and wants to be involved: explain decis
 - **Feeds:** each niche feed shows *every* post in that niche, newest first, and ends with "You're caught up in Cooking". A "Following" filter comes later. One post belongs to exactly one niche. Remember the user's last niche.
 - **Feed layout:** both a single-column Posts layout and a Pinterest-style Grid, with a Posts/Grid switch. Tapping a grid tile opens the normal post view (cheers, comments) with a back button to the grid.
 - **Each niche has its own color — a must.** Cooking is basil green (#1E6B47); Art ultramarine; Photography amber; Gym raspberry. Switching niche re-tints the app. Mockups: https://claude.ai/artifact/7T9p36YdKk7gkBDfeQe6sm (founder approved the look; expect more feedback on real prototypes).
+- **Niche marker outside Home:** on Discover and Saved (anywhere niches mix), each post gets a **border in its niche's color — border only, no label**. Keep the two tabs consistent.
+- **Discover** = find people to follow + "inspiration this week" across niches the user filters for, ordered by most saved in the last 7 days. Never show the counts. Home stays newest-first.
+- **Swipe left/right on Home switches niche** (Cooking → Art → Photography → Gym), colors change with it. Tabs stay tap-only.
+- **Demo has preview posts** from made-up founding creators in Art and Photography; those niches stay closed for posting. Gym has none.
+- **Post "⋯" menu, like Instagram:** own posts — edit, adjust grid preview, hide cheer count, turn off comments, archive, delete; others' posts — save, not interested, report, copy link.
+- **Niche colors are being explored:** a Color lab in Profile → Settings lets the founder try palettes per niche on device.
 - **Profiles:** one profile per person with niche tabs (All · Cooking · Art ...).
 - **Likes:** hidden from everyone except the poster. Replacement feedback: comments, a one-tap cheer, "saved to N collections". No leaderboards or follower-count ranking.
 - **Posts:** photos, text and video. Video is tap-to-play, no autoplay, no swipe-to-next feed, 60–90s cap.
@@ -34,9 +40,19 @@ Expo (React Native, Expo Router) for iOS, Android and web from one codebase; Sup
 6. Safety basics: report, block, in-app account deletion, community guidelines (incl. AI-art and eating-disorder rules)
 7. Share to Niches, Instagram/TikTok import, short video
 
+## Roadmap the founder asked for (Nov 2026)
+
+- **Phase A (demo polish):** post menu, Color lab, new Discover (people + inspiration), niche borders on Saved/Discover, swipe between niches.
+- **Phase B, Plans:** one feature covering meal scheduling (shareable with friends), group meals where invitees pick a dish and claim who brings which ingredient, and photo/art outings (what + where + when). Each plan public or private.
+- **Phase C, Shop ("Etsy meets Pinterest"):** users sell cookbooks, prints, artworks; listings attach to posts and are browsable per niche (Cooking, Photography, Art first). Demo checkout is pretend.
+- **Phase D, Creators:** verified "celebrity" profiles and premium chefs/artists who charge a subscription or one-time fee for their best content. Same model for other niches.
+- **More niches:** founder likes Gardening; wants other popular hobby suggestions.
+- C and D need real accounts (Supabase) and payments; mind Apple/Google rules on paid digital content.
+
 ## Where the build is
 
 - Steps 1–2 done, plus a first pass of step 3: the Expo SDK 58 app (branch `app-skeleton`) has 18+ sign-up, tabs, niche switcher with per-niche colors, Cooking feed (Posts/Grid, real end, older posts behind a tap), post screen with back button, cheers/saves/comments with author-only stats, create post/progress/question, Saved, Profile, Discover with niche requests.
+- Phase A done (Nov 2026): post ⋯ menu (`src/components/post-menu.tsx`, edit/preview screen `src/app/post/edit/[id].tsx`), Color lab (`src/app/settings/colors.tsx`; palettes in `src/lib/theme.ts`, every palette contrast-checked — screens must read colors via `useNiches()`, not the static `NICHES`), Discover with people/following/user profiles and weekly-saves inspiration, niche borders on Discover/Saved (and profile "All" tab), swipe between niches (`src/components/niche-swipe.tsx`, Gesture Handler v3 `usePanGesture`).
 - Data is on-device only (`src/lib/store.tsx`, AsyncStorage) with demo content in `src/lib/seed.ts`. Next: Supabase behind the same store actions, then real photo upload, boards, goals.
 - This cloud environment blocks docs.expo.dev and Expo's version API: use `EXPO_OFFLINE=1 npx expo install <pkg>` and read types in `node_modules` for API details. `npx expo lint` can't fetch its config here.
 - Smoke-test by exporting web (`CI=1 EXPO_OFFLINE=1 npx expo export -p web`), serving `dist/` with an SPA fallback, and driving it with Playwright at 390×844.

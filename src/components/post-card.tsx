@@ -3,34 +3,44 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BookmarkIcon, CheerIcon, CommentIcon, MoreIcon, PauseIcon, PlayIcon, TrendIcon } from '@/components/icons';
+import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { timeAgo } from '@/lib/format';
-import { postStats, useStore } from '@/lib/store';
-import { colors, NICHES, TOUCH } from '@/lib/theme';
+import { postStats, useNiches, useStore } from '@/lib/store';
+import { colors, TOUCH } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
 /** A post in the single-column feed, and the top of the post screen. */
-export function PostCard({ post, mediaHeight = 440, inDetail = false }: { post: Post; mediaHeight?: number; inDetail?: boolean }) {
+export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: { post: Post; mediaHeight?: number; inDetail?: boolean; onGone?: () => void }) {
   const router = useRouter();
   const { state, usersById, actions } = useStore();
-  const niche = NICHES[post.niche];
+  const niche = useNiches()[post.niche];
+  const [menuOpen, setMenuOpen] = useState(false);
   const author = usersById[post.authorId];
+  const isMine = !!state.me && post.authorId === state.me.id;
   const cheered = !!state.cheers[post.id];
   const saved = !!state.saves[post.id];
   const commentCount = postStats(state, post).comments;
   const open = () => {
     if (!inDetail) router.push({ pathname: '/post/[id]', params: { id: post.id } });
   };
+  const openAuthor = () => (isMine ? router.navigate('/profile') : router.push({ pathname: '/user/[id]', params: { id: post.authorId } }));
 
   return (
     <View style={[styles.card, inDetail ? null : styles.cardDivider]}>
       <View style={styles.head}>
-        <Avatar user={author} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.user} numberOfLines={1}>{author?.username ?? 'unknown'}</Text>
-          <Text style={styles.time}>{timeAgo(post.createdAt)}</Text>
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="More options" hitSlop={4} style={styles.iconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`View ${author?.username ?? 'author'}’s profile`} onPress={openAuthor} style={styles.author}>
+          <Avatar user={author} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.user} numberOfLines={1}>{author?.username ?? 'unknown'}</Text>
+            <Text style={styles.time}>
+              {timeAgo(post.createdAt)}
+              {post.editedAt ? ' · edited' : ''}
+              {post.archived ? ' · archived' : ''}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Post options" onPress={() => setMenuOpen(true)} hitSlop={4} style={styles.iconButton}>
           <MoreIcon />
         </Pressable>
       </View>
@@ -62,9 +72,16 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false }: { post: 
           <CheerIcon color={cheered ? niche.accent : colors.textSecondary} />
           <Text style={[styles.actionText, { color: cheered ? niche.accent : colors.textSecondary }]}>{cheered ? 'Cheered' : 'Cheer'}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`${commentCount} comments`} onPress={open} disabled={inDetail} style={styles.action}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={post.commentsOff ? 'Comments are off' : `${commentCount} comments`}
+          onPress={open}
+          disabled={inDetail}
+          style={styles.action}>
           <CommentIcon />
-          <Text style={[styles.actionText, { fontWeight: '500' }]}>{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</Text>
+          <Text style={[styles.actionText, { fontWeight: '500' }]}>
+            {post.commentsOff ? 'Comments off' : `${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`}
+          </Text>
         </Pressable>
         <View style={{ flex: 1 }} />
         <Pressable
@@ -77,6 +94,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false }: { post: 
           <Text style={[styles.actionText, { color: saved ? niche.accent : colors.textSecondary }]}>{saved ? 'Saved' : 'Save'}</Text>
         </Pressable>
       </View>
+
+      <PostMenu post={post} visible={menuOpen} onClose={() => setMenuOpen(false)} onGone={onGone} />
     </View>
   );
 }
@@ -106,6 +125,7 @@ const styles = StyleSheet.create({
   card: { paddingBottom: 6, backgroundColor: colors.ground },
   cardDivider: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 20, paddingRight: 8, paddingVertical: 12 },
+  author: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH },
   user: { fontSize: 15, fontWeight: '600', color: colors.text },
   time: { fontSize: 12, color: colors.textMuted },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },

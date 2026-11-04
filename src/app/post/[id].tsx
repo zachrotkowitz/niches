@@ -7,14 +7,15 @@ import { ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
 import { Avatar, Button } from '@/components/primitives';
 import { timeAgo } from '@/lib/format';
-import { postStats, useStore } from '@/lib/store';
-import { colors, fonts, NICHES, TOUCH } from '@/lib/theme';
+import { postStats, useNiches, useStore } from '@/lib/store';
+import { colors, fonts, TOUCH } from '@/lib/theme';
 
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, usersById, actions } = useStore();
+  const niches = useNiches();
   const [draft, setDraft] = useState('');
 
   const post = state.posts.find((p) => p.id === id);
@@ -29,11 +30,11 @@ export default function PostScreen() {
     );
   }
 
-  const niche = NICHES[post.niche];
+  const niche = niches[post.niche];
   const isMine = !!state.me && post.authorId === state.me.id;
   const stats = postStats(state, post);
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
-  const canSend = draft.trim().length > 0 && !!state.me;
+  const canSend = draft.trim().length > 0 && !!state.me && !post.commentsOff;
 
   const send = () => {
     if (!canSend || !state.me) return;
@@ -53,7 +54,12 @@ export default function PostScreen() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
-        <PostCard post={post} inDetail mediaHeight={320} />
+        {post.archived ? (
+          <View style={[styles.banner, { backgroundColor: niche.field }]}>
+            <Text style={[styles.bannerText, { color: niche.ink }]}>Archived. Only you can see this post.</Text>
+          </View>
+        ) : null}
+        <PostCard post={post} inDetail mediaHeight={320} onGone={goBack} />
 
         {isMine ? (
           <View style={styles.private} accessibilityLabel="Only you can see these numbers">
@@ -62,7 +68,7 @@ export default function PostScreen() {
               <Text style={styles.privateTitle}>Only you can see these numbers</Text>
             </View>
             <View style={styles.statRow}>
-              <Stat value={stats.cheers} label="cheers" />
+              <Stat value={post.hideCheers ? null : stats.cheers} label="cheers" />
               <Stat value={stats.saves} label="saved it" />
               <Stat value={stats.comments} label="comments" />
             </View>
@@ -71,8 +77,8 @@ export default function PostScreen() {
         ) : null}
 
         <View style={styles.comments}>
-          <Text style={styles.commentsTitle}>{comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
-          {comments.map((c) => {
+          <Text style={styles.commentsTitle}>{post.commentsOff ? 'Comments are turned off' : comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
+          {(post.commentsOff ? [] : comments).map((c) => {
             const author = usersById[c.authorId];
             return (
               <View key={c.id} style={styles.comment}>
@@ -89,6 +95,7 @@ export default function PostScreen() {
         </View>
       </ScrollView>
 
+      {post.commentsOff ? null : (
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TextInput
           value={draft}
@@ -111,14 +118,15 @@ export default function PostScreen() {
           <Text style={styles.sendText}>Post</Text>
         </Pressable>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({ value, label }: { value: number | null; label: string }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={styles.stat} accessibilityLabel={value === null ? `${label} hidden` : `${value} ${label}`}>
+      <Text style={[styles.statValue, value === null ? styles.statHidden : null]}>{value === null ? 'Hidden' : value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -136,7 +144,10 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', gap: 8 },
   stat: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, gap: 2 },
   statValue: { fontFamily: fonts.display, fontSize: 24, color: colors.text, fontVariant: ['tabular-nums'] },
+  statHidden: { fontSize: 17, lineHeight: 30, color: colors.textMuted },
   statLabel: { fontSize: 12, color: colors.textMuted },
+  banner: { marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  bannerText: { fontSize: 14, fontWeight: '600' },
   privateNote: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
   comments: { paddingHorizontal: 20, paddingTop: 18, gap: 16 },
   commentsTitle: { fontSize: 15, fontWeight: '700', color: colors.text },

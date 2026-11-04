@@ -1,21 +1,24 @@
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BellIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
-import { useStore, type FeedLayout } from '@/lib/store';
-import { colors, fonts, NICHE_ORDER, NICHES, TOUCH } from '@/lib/theme';
+import { useNiches, useStore, type FeedLayout } from '@/lib/store';
+import { colors, fonts, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
 /** The tinted header: wordmark, niche title, layout switch and niche chips. */
 export function NicheHeader() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, actions } = useStore();
+  const NICHES = useNiches();
   const niche = NICHES[state.niche];
 
   return (
-    <View style={[styles.header, { backgroundColor: niche.field, paddingTop: insets.top + 8 }]}>
+    // The niche color crossfades (150ms) instead of snapping when you switch niches.
+    <Animated.View style={[styles.header, { backgroundColor: niche.field, paddingTop: insets.top + 8, transitionProperty: 'backgroundColor', transitionDuration: 150, transitionTimingFunction: 'ease-out' }]}>
       <View style={styles.topRow}>
         <Text style={[styles.wordmark, { color: niche.ink }]}>niches</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Notification digest" style={styles.iconButton}>
@@ -53,7 +56,7 @@ export function NicheHeader() {
           <Text style={[styles.chipText, { color: '#4A514C', fontWeight: '500' }]}>+ Request a niche</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

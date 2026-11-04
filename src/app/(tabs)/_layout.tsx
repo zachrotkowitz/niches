@@ -2,11 +2,12 @@ import { Tabs } from 'expo-router/js-tabs';
 import { View } from 'react-native';
 
 import { BookmarkIcon, HomeIcon, PersonIcon, PlusIcon, SearchIcon } from '@/components/icons';
-import { useStore } from '@/lib/store';
-import { colors, NICHES } from '@/lib/theme';
+import { useNiches, useStore } from '@/lib/store';
+import { colors } from '@/lib/theme';
 
 export default function TabLayout() {
   const { state } = useStore();
+  const NICHES = useNiches();
   // The tab bar takes the color of the niche you're in.
   const accent = NICHES[state.niche].accent;
 

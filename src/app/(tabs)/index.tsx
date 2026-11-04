@@ -1,42 +1,54 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
 import { CheckIcon } from '@/components/icons';
 import { NicheHeader } from '@/components/niche-header';
+import { NicheSwipe } from '@/components/niche-swipe';
 import { PostCard } from '@/components/post-card';
 import { Button, DisplayText } from '@/components/primitives';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
-import { useStore } from '@/lib/store';
-import { colors, NICHES, type Niche } from '@/lib/theme';
+import { isVisible, useNiches, useStore } from '@/lib/store';
+import { colors, type Niche } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
 export default function HomeScreen() {
   const { state } = useStore();
-  const niche = NICHES[state.niche];
+  const niche = useNiches()[state.niche];
 
   return (
     <View style={styles.screen}>
       <NicheHeader />
-      {niche.open ? <OpenFeed key={niche.id} niche={niche} /> : <ComingSoon key={niche.id} niche={niche} />}
+      <NicheSwipe>
+        {/* Remounts per niche: fresh scroll position and a short fade to mark the switch. */}
+        <Animated.View key={niche.id} entering={FadeIn.duration(150)} style={{ flex: 1 }}>
+          {niche.open ? <OpenFeed niche={niche} /> : <ComingSoon niche={niche} />}
+        </Animated.View>
+      </NicheSwipe>
     </View>
   );
+}
+
+/** Every visible post in this niche, newest first, split at the 24-hour mark. */
+function useNicheFeed(niche: Niche) {
+  const { state } = useStore();
+  return useMemo(() => {
+    const now = Date.now();
+    const all = state.posts.filter((p) => p.niche === niche.id && isVisible(state, p)).sort((a, b) => b.createdAt - a.createdAt);
+    return {
+      fresh: all.filter((p) => now - p.createdAt < FRESH_WINDOW_MS),
+      older: all.filter((p) => now - p.createdAt >= FRESH_WINDOW_MS),
+      all,
+    };
+  }, [state, niche.id]);
 }
 
 function OpenFeed({ niche }: { niche: Niche }) {
   const { state } = useStore();
   const [showOlder, setShowOlder] = useState(false);
-
-  // Every post in this niche, newest first. No ranking.
-  const { fresh, older } = useMemo(() => {
-    const now = Date.now();
-    const all = state.posts.filter((p) => p.niche === niche.id).sort((a, b) => b.createdAt - a.createdAt);
-    return {
-      fresh: all.filter((p) => now - p.createdAt < FRESH_WINDOW_MS),
-      older: all.filter((p) => now - p.createdAt >= FRESH_WINDOW_MS),
-    };
-  }, [state.posts, niche.id]);
+  const { fresh, older } = useNicheFeed(niche);
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
@@ -104,39 +116,57 @@ function CaughtUp({ niche, count }: { niche: Niche; count: number }) {
           : `That’s all ${count} new ${count === 1 ? 'post' : 'posts'} since yesterday. Go make something, then come back and share it.`}
       </Text>
       <View style={{ gap: 8, marginTop: 4 }}>
-        <Button label="Open your boards" color={niche.accent} onPress={() => router.navigate('/saved')} />
+        <Button label="Open your saves" color={niche.accent} onPress={() => router.navigate('/saved')} />
         <Button label="Share what you made" tone="inverse" color={niche.ink} onPress={() => router.navigate('/create')} />
       </View>
     </View>
   );
 }
 
+/** Niches that aren't open yet: a notify button, plus a preview from founding creators if there is one. */
 function ComingSoon({ niche }: { niche: Niche }) {
   const router = useRouter();
   const { state, actions } = useStore();
   const notified = !!state.notify[niche.id];
+  const { all } = useNicheFeed(niche);
+
   return (
-    <ScrollView contentContainerStyle={styles.soonWrap}>
-      <DisplayText size={28} color={niche.ink}>
-        {niche.label} is coming soon
-      </DisplayText>
-      <Text style={styles.soonBody}>
-        We open a niche once its first creators are posting, so it never feels empty. Want to know the day {niche.label} opens?
-      </Text>
-      <Button
-        label={notified ? 'We’ll tell you when it opens' : 'Notify me'}
-        tone={notified ? 'inverse' : 'solid'}
-        color={notified ? niche.ink : niche.accent}
-        style={notified ? { borderWidth: 1, borderColor: colors.border } : null}
-        onPress={() => actions.toggleNotify(niche.id)}
-      />
-      <Button tone="ghost" label="Request a different niche" onPress={() => router.navigate('/discover')} />
+    <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <View style={styles.soonWrap}>
+        <DisplayText size={28} color={niche.ink}>
+          {niche.label} is coming soon
+        </DisplayText>
+        <Text style={styles.soonBody}>
+          We open a niche once its first creators are posting, so it never feels empty.
+          {all.length ? ' Here’s a preview from its founding creators.' : ''} Want to know the day {niche.label} opens?
+        </Text>
+        <Button
+          label={notified ? 'We’ll tell you when it opens' : 'Notify me'}
+          tone={notified ? 'inverse' : 'solid'}
+          color={notified ? niche.ink : niche.accent}
+          style={notified ? { borderWidth: 1, borderColor: colors.border } : null}
+          onPress={() => actions.toggleNotify(niche.id)}
+        />
+        {all.length ? null : <Button tone="ghost" label="Request a different niche" onPress={() => router.navigate('/discover')} />}
+      </View>
+
+      {all.length ? (
+        <>
+          <View style={styles.divider}>
+            <View style={styles.rule} />
+            <Text style={styles.dividerText}>Preview · founding creators</Text>
+            <View style={styles.rule} />
+          </View>
+          <FeedSection posts={all} layout={state.layout} />
+          <Text style={styles.endText}>That’s the whole preview. Posting opens soon.</Text>
+        </>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: colors.ground, overflow: 'hidden' },
   metaBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   metaText: { fontSize: 13, color: colors.textMuted },
   caughtUp: { margin: 20, padding: 22, paddingTop: 28, borderRadius: 24, gap: 14 },
@@ -147,6 +177,6 @@ const styles = StyleSheet.create({
   rule: { flex: 1, height: 1, backgroundColor: '#E3E5E1' },
   dividerText: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
   endText: { textAlign: 'center', fontSize: 14, color: colors.textMuted, paddingVertical: 24 },
-  soonWrap: { padding: 20, paddingTop: 28, gap: 14 },
+  soonWrap: { padding: 20, paddingTop: 24, gap: 14 },
   soonBody: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
 });

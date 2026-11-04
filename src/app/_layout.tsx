@@ -3,7 +3,10 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { ToastProvider } from '@/components/toast';
 
 import { StoreProvider, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -14,14 +17,18 @@ const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: c
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StoreProvider>
-        <ThemeProvider value={theme}>
-          <StatusBar style="dark" />
-          <RootStack />
-        </ThemeProvider>
-      </StoreProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StoreProvider>
+          <ThemeProvider value={theme}>
+            <ToastProvider>
+              <StatusBar style="dark" />
+              <RootStack />
+            </ToastProvider>
+          </ThemeProvider>
+        </StoreProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -42,6 +49,9 @@ function RootStack() {
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="post/edit/[id]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="user/[id]" />
+        <Stack.Screen name="settings/colors" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="welcome" />

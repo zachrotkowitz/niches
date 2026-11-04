@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CameraIcon, CheckIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
-import { useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, NICHES, TOUCH, type NicheId } from '@/lib/theme';
+import { useNiches, useStore } from '@/lib/store';
+import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 import type { PostKind } from '@/lib/types';
 
 type Kind = 'post' | 'progress' | 'question';
@@ -18,6 +18,7 @@ export default function CreateScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, actions } = useStore();
+  const NICHES = useNiches();
   const [kind, setKind] = useState<Kind>('post');
   const [caption, setCaption] = useState('');
   const [goal, setGoal] = useState('');

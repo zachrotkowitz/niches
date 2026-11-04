@@ -1,18 +1,26 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedGrid } from '@/components/feed-grid';
+import { NicheFilter } from '@/components/niche-filter';
 import { Button, DisplayText } from '@/components/primitives';
-import { useStore } from '@/lib/store';
-import { colors, NICHES } from '@/lib/theme';
+import { useNiches, useStore } from '@/lib/store';
+import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state } = useStore();
-  const niche = NICHES[state.niche];
-  const saved = state.posts.filter((p) => state.saves[p.id]);
+  const niches = useNiches();
+  const [filter, setFilter] = useState<NicheId[]>([]);
+  const niche = niches[state.niche];
+
+  // Saved posts stay here even if you hid them from feeds; archived ones are the author's to hide.
+  const saved = state.posts.filter((p) => state.saves[p.id] && !p.archived);
+  const savedNiches = NICHE_ORDER.filter((id) => saved.some((p) => p.niche === id));
+  const shown = filter.length ? saved.filter((p) => filter.includes(p.niche)) : saved;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}>
@@ -30,11 +38,18 @@ export default function SavedScreen() {
       {saved.length === 0 ? (
         <View style={[styles.empty, { backgroundColor: niche.field }]}>
           <Text style={[styles.emptyTitle, { color: niche.ink }]}>Nothing saved yet</Text>
-          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Tap Save on any post and it lands here. Boards to organize them are next.</Text>
-          <Button label="Browse Cooking" color={niche.accent} onPress={() => router.navigate('/')} />
+          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Tap Save on any post and it lands here, outlined in its niche’s color. Boards to organize them are next.</Text>
+          <Button label={`Browse ${niche.label}`} color={niche.accent} onPress={() => router.navigate('/')} />
         </View>
       ) : (
-        <FeedGrid posts={saved} />
+        <>
+          {savedNiches.length > 1 ? (
+            <View style={{ marginTop: 10 }}>
+              <NicheFilter value={filter} onChange={setFilter} available={savedNiches} />
+            </View>
+          ) : null}
+          <FeedGrid posts={shown} nicheBorders />
+        </>
       )}
     </ScrollView>
   );
