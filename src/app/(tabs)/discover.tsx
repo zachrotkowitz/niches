@@ -3,11 +3,13 @@ import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Badges } from '@/components/creator';
 import { FeedGrid } from '@/components/feed-grid';
 import { SearchIcon } from '@/components/icons';
 import { NicheFilter } from '@/components/niche-filter';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
 import { ListingGrid } from '@/components/shop';
+import { formatPrice } from '@/lib/shop';
 import { SEED_USERS } from '@/lib/seed';
 import { inspirationThisWeek, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
@@ -43,6 +45,9 @@ export default function DiscoverScreen() {
     .sort((a, b) => Number(!!state.following[a.id]) - Number(!!state.following[b.id]));
 
   const inspiration = inspirationThisWeek(state, filter);
+  const router = useRouter();
+  // Premium creators posting in the filtered niches.
+  const creators = SEED_USERS.filter((u) => u.membership && u.id !== state.me?.id && (nichesByUser[u.id] ?? []).some((n) => allowed.has(n)));
   // Shop picks: best-selling listings in the filtered niches.
   const shopPicks = state.listings
     .filter((l) => allowed.has(l.niche) && l.sellerId !== state.me?.id && l.stock !== 0)
@@ -83,6 +88,36 @@ export default function DiscoverScreen() {
         <View style={{ marginTop: 12 }}>
           <NicheFilter value={filter} onChange={actions.setDiscoverNiches} />
         </View>
+
+        {!q && creators.length ? (
+          <>
+            <Text style={styles.section}>Featured creators</Text>
+            <Text style={styles.sectionSub}>Verified cooks and artists. Join for their members-only posts.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.people}>
+              {creators.map((u) => {
+                const n = niches[(nichesByUser[u.id] ?? ['cooking'])[0]];
+                return (
+                  <Pressable
+                    key={u.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${u.displayName}${u.verified ? ', verified' : ''}. ${u.membership?.tagline}. ${formatPrice(u.membership!.priceCents)} a month`}
+                    onPress={() => router.push({ pathname: '/user/[id]', params: { id: u.id } })}
+                    style={({ pressed }) => [styles.creator, { backgroundColor: n.field, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+                    <Avatar user={u} size={48} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={[styles.creatorName, { color: n.ink }]} numberOfLines={1}>{u.displayName}</Text>
+                      <Badges user={u} size={14} />
+                    </View>
+                    <Text style={[styles.creatorTagline, { color: n.inkSoft }]} numberOfLines={2}>{u.membership?.tagline}</Text>
+                    <Text style={[styles.creatorPrice, { color: n.ink }]}>
+                      {state.memberships[u.id] ? 'You’re a member' : `${formatPrice(u.membership!.priceCents)}/mo`}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        ) : null}
 
         <Text style={styles.section}>{q ? `People matching “${query.trim()}”` : 'People to follow'}</Text>
         {people.length === 0 ? (
@@ -148,7 +183,10 @@ function PersonCard({ user, nicheIds }: { user: User; nicheIds: NicheId[] }) {
     <View style={styles.card}>
       <Pressable accessibilityRole="button" accessibilityLabel={`View ${user.displayName}’s profile`} onPress={() => router.push({ pathname: '/user/[id]', params: { id: user.id } })} style={styles.cardTop}>
         <Avatar user={user} size={56} />
-        <Text style={styles.cardName} numberOfLines={1}>{user.displayName}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, maxWidth: '100%' }}>
+          <Text style={[styles.cardName, { marginTop: 0, flexShrink: 1 }]} numberOfLines={1}>{user.displayName}</Text>
+          <Badges user={user} size={14} />
+        </View>
         <Text style={styles.cardHandle} numberOfLines={1}>{user.username}</Text>
         <View style={styles.cardNiches} accessibilityLabel={`Posts in ${nicheIds.map((n) => niches[n].label).join(', ')}`}>
           {nicheIds.map((n) => (
@@ -179,6 +217,10 @@ const styles = StyleSheet.create({
   section: { fontSize: 19, fontWeight: '700', color: colors.text, paddingHorizontal: 20, marginTop: 26 },
   sectionSub: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 20, marginTop: 4, lineHeight: 19 },
   none: { fontSize: 15, color: colors.textMuted, paddingHorizontal: 20, paddingTop: 10 },
+  creator: { width: 190, padding: 14, borderRadius: 20, gap: 6 },
+  creatorName: { fontSize: 15, fontWeight: '800', flexShrink: 1 },
+  creatorTagline: { fontSize: 13, lineHeight: 17 },
+  creatorPrice: { fontSize: 14, fontWeight: '800', marginTop: 2 },
   people: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
   card: { width: 168, padding: 14, borderRadius: 20, backgroundColor: colors.surface, gap: 12, justifyContent: 'space-between' },
   cardTop: { alignItems: 'center', gap: 4 },

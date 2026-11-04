@@ -97,6 +97,27 @@ export function BellIcon({ size = 22, color = '#14161A' }: IconProps) {
   );
 }
 
+/** Verified check in a scalloped seal. */
+export function VerifiedIcon({ size = 16, color = '#1D64D8' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path
+        d="M12 2.5l2.2 1.6 2.7-.2 1 2.5 2.4 1.3-.4 2.7 1.2 2.4-1.9 2-.1 2.7-2.6.8-1.4 2.3-2.7-.4L12 21.5l-2.2-1.6-2.7.4-1.4-2.3-2.6-.8-.1-2.7-1.9-2 1.2-2.4-.4-2.7 2.4-1.3 1-2.5 2.7.2z"
+        fill={color}
+      />
+      <Path d="m8.3 12.2 2.4 2.4 5-5" fill="none" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function StarIcon({ size = 12, color = '#14161A' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill={color} />
+    </Svg>
+  );
+}
+
 export function BagIcon({ size = 22, color = '#14161A', filled }: IconProps) {
   return (
     <Svg {...base(size)}>

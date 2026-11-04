@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BookmarkIcon } from '@/components/icons';
+import { BookmarkIcon, LockIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
 import { MediaPlaceholder } from '@/components/primitives';
-import { useNiches, useStore } from '@/lib/store';
+import { hasAccess, useNiches, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Post, PreviewShape } from '@/lib/types';
 
@@ -59,6 +59,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
   const niche = useNiches()[post.niche];
   const saved = !!state.saves[post.id];
   const swiping = useSwipeBlocked();
+  const locked = !hasAccess(state, post);
   const title = tileTitle(post);
   const height = tileHeight(post);
   const inset = nicheBorder ? NICHE_BORDER : 0;
@@ -80,6 +81,14 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
           ) : (
             <MediaPlaceholder post={post} height={height - inset * 2} radius={nicheBorder ? 15 : 16} showLabel={false} />
           )}
+          {locked ? (
+            <View style={styles.lockVeil}>
+              <View style={styles.lockPill}>
+                <LockIcon size={12} color="#FFFFFF" />
+                <Text style={styles.lockText}>Members</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
         <Text style={styles.title} numberOfLines={2}>{title}</Text>
         <Text style={styles.user} numberOfLines={1}>{usersById[post.authorId]?.username}</Text>
@@ -107,5 +116,8 @@ const styles = StyleSheet.create({
   textTileText: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
   title: { fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.text, marginTop: 6, paddingHorizontal: 2 },
   user: { fontSize: 12, color: colors.textMuted, marginTop: 2, paddingHorizontal: 2 },
+  lockVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,22,26,0.5)', alignItems: 'center', justifyContent: 'center' },
+  lockPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(20,22,26,0.8)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  lockText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   save: { position: 'absolute', width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
 });

@@ -2,13 +2,14 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BookmarkIcon, CommentIcon, HeartIcon, MoreIcon, PauseIcon, PlayIcon, TrendIcon } from '@/components/icons';
+import { LockedPanel, NameWithBadges } from '@/components/creator';
+import { BookmarkIcon, CommentIcon, HeartIcon, LockIcon, MoreIcon, PauseIcon, PlayIcon, StarIcon, TrendIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
 import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
 import { timeAgo } from '@/lib/format';
-import { postStats, useNiches, useStore } from '@/lib/store';
+import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
@@ -21,6 +22,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];
   const isMine = !!state.me && post.authorId === state.me.id;
+  // Members-only posts are locked for anyone who isn't a member and hasn't unlocked them.
+  const locked = !hasAccess(state, post);
   const cheered = !!state.cheers[post.id];
   const saved = !!state.saves[post.id];
   const stats = postStats(state, post);
@@ -40,7 +43,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         <Pressable accessibilityRole="button" accessibilityLabel={`View ${author?.username ?? 'author'}’s profile`} onPress={openAuthor} style={styles.author}>
           <Avatar user={author} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.user} numberOfLines={1}>{author?.username ?? 'unknown'}</Text>
+            <NameWithBadges user={author} style={styles.user} />
             <Text style={styles.time}>
               {timeAgo(post.createdAt)}
               {post.editedAt ? ' · edited' : ''}
@@ -53,12 +56,21 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         </Pressable>
       </View>
 
-      {post.kind === 'photo' ? (
+      {locked && post.kind !== 'text' ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Members-only post. Open to see options" onPress={open} disabled={inDetail}>
+          <View style={[styles.lockedMedia, { height: Math.round(mediaHeight * 0.55), backgroundColor: post.mediaColor ?? niche.field }]}>
+            <View style={styles.lockedVeil} />
+            <LockIcon size={28} color="#FFFFFF" />
+            <Text style={styles.lockedMediaText}>Members only</Text>
+          </View>
+        </Pressable>
+      ) : null}
+      {!locked && post.kind === 'photo' ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>
           <MediaPlaceholder post={post} height={mediaHeight} />
         </Pressable>
       ) : null}
-      {post.kind === 'video' ? <VideoPlaceholder post={post} height={mediaHeight} /> : null}
+      {!locked && post.kind === 'video' ? <VideoPlaceholder post={post} height={mediaHeight} /> : null}
 
       <Pressable onPress={open} disabled={inDetail} accessibilityRole={inDetail ? undefined : 'button'} accessibilityLabel={inDetail ? undefined : 'Open post'} style={styles.body}>
         {post.progressLabel ? (
@@ -67,11 +79,22 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
             <Text style={[styles.tagText, { color: niche.ink }]}>Progress · {post.progressLabel}</Text>
           </View>
         ) : null}
-        <Text style={[styles.caption, post.kind === 'text' ? styles.captionLarge : null]}>{post.caption}</Text>
+        {post.premium && !locked ? (
+          <View style={[styles.tag, { backgroundColor: niche.field }]}>
+            <StarIcon size={11} color={niche.ink} />
+            <Text style={[styles.tagText, { color: niche.ink }]}>{isMine ? 'Members only' : 'Members only · unlocked for you'}</Text>
+          </View>
+        ) : null}
+        <Text style={[styles.caption, post.kind === 'text' ? styles.captionLarge : null]} numberOfLines={locked ? 2 : undefined}>
+          {post.caption}
+        </Text>
       </Pressable>
+
+      {locked ? <LockedPanel post={post} author={author} /> : null}
 
       <ShopThisBar postId={post.id} />
 
+      {locked ? <View style={{ height: 10 }} /> : (
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
@@ -104,6 +127,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           <Text style={[styles.actionText, { color: saved ? niche.accent : colors.textSecondary }]}>{saveLabel}</Text>
         </Pressable>
       </View>
+      )}
 
       <PostMenu post={post} visible={menuOpen} onClose={() => setMenuOpen(false)} onGone={onGone} />
     </View>
@@ -147,6 +171,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingTop: 4 },
   action: { minHeight: TOUCH, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  lockedMedia: { alignItems: 'center', justifyContent: 'center', gap: 8, overflow: 'hidden' },
+  lockedVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,22,26,0.55)' },
+  lockedMediaText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   playWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   play: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
 });

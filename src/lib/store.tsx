@@ -4,11 +4,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 
+import type { CreatorApplication } from './creators';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { NICHE_ORDER, resolveNiches, type NicheId } from './theme';
-import type { Comment, Post, PostKind, ReportReason, User } from './types';
+import type { Comment, Membership, Post, PostKind, ReportReason, User } from './types';
 
 const STORAGE_KEY = 'niches:demo:v1';
 
@@ -17,7 +18,7 @@ export type FeedLayout = 'posts' | 'grid';
 export type Me = User & { birthDate: string };
 
 /** Fields the author can change from the post menu or the edit screen. */
-export type PostPatch = Partial<Pick<Post, 'caption' | 'progressLabel' | 'archived' | 'commentsOff' | 'hideCheers' | 'previewShape' | 'previewTitle' | 'editedAt'>>;
+export type PostPatch = Partial<Pick<Post, 'caption' | 'progressLabel' | 'archived' | 'commentsOff' | 'hideCheers' | 'previewShape' | 'previewTitle' | 'editedAt' | 'premium' | 'unlockCents'>>;
 
 type State = {
   hydrated: boolean;
@@ -48,6 +49,13 @@ type State = {
   savedListings: Record<string, true>;
   cart: CartItem[];
   orders: Order[];
+  /** Creators you're a member of, with the time you joined. */
+  memberships: Record<string, number>;
+  /** Members-only posts you unlocked one at a time. */
+  unlocks: Record<string, true>;
+  creatorApplication: CreatorApplication | null;
+  /** Demo: pretend members of your own membership. */
+  demoMembers: number;
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -76,7 +84,12 @@ type Action =
   | { type: 'deleteListing'; id: string }
   | { type: 'setCart'; cart: CartItem[] }
   | { type: 'placeOrders'; orders: Order[] }
-  | { type: 'setOrderStatus'; id: string; status: OrderStatus };
+  | { type: 'setOrderStatus'; id: string; status: OrderStatus }
+  | { type: 'setMembership'; creatorId: string; on: boolean }
+  | { type: 'unlock'; postId: string }
+  | { type: 'setApplication'; application: CreatorApplication | null }
+  | { type: 'updateMe'; patch: Partial<Me> }
+  | { type: 'setDemoMembers'; n: number };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -103,6 +116,10 @@ function freshState(): Persisted {
     savedListings: {},
     cart: [],
     orders: [],
+    memberships: {},
+    unlocks: {},
+    creatorApplication: null,
+    demoMembers: 0,
   };
 }
 
@@ -199,6 +216,20 @@ function reducer(state: State, action: Action): State {
       );
       return { ...state, listings, orders: [...action.orders, ...state.orders] };
     }
+    case 'setMembership': {
+      const memberships = { ...state.memberships };
+      if (action.on) memberships[action.creatorId] = Date.now();
+      else delete memberships[action.creatorId];
+      return { ...state, memberships };
+    }
+    case 'unlock':
+      return { ...state, unlocks: { ...state.unlocks, [action.postId]: true } };
+    case 'setApplication':
+      return { ...state, creatorApplication: action.application };
+    case 'updateMe':
+      return state.me ? { ...state, me: { ...state.me, ...action.patch } } : state;
+    case 'setDemoMembers':
+      return { ...state, demoMembers: Math.max(0, action.n) };
     case 'setOrderStatus':
       return { ...state, orders: state.orders.map((o) => (o.id === action.id ? { ...o, status: action.status } : o)) };
   }
@@ -369,12 +400,24 @@ function useStoreValue() {
         };
         dispatch({ type: 'placeOrders', orders: [order] });
       },
+      joinMembership: (creatorId: string) => dispatch({ type: 'setMembership', creatorId, on: true }),
+      cancelMembership: (creatorId: string) => dispatch({ type: 'setMembership', creatorId, on: false }),
+      unlockPost: (postId: string) => dispatch({ type: 'unlock', postId }),
+      applyToCreate: (input: Omit<CreatorApplication, 'status' | 'at'>) =>
+        dispatch({ type: 'setApplication', application: { ...input, status: 'pending', at: Date.now() } }),
+      /** Demo stand-in for the founder approving an invite. */
+      approveMyApplication(application: CreatorApplication | null) {
+        dispatch({ type: 'setApplication', application: application ? { ...application, status: 'approved' } : null });
+        dispatch({ type: 'updateMe', patch: { membership: { priceCents: 399, tagline: 'Behind the scenes of everything I make', perks: ['Members-only posts', 'Full recipes and process notes'] } } });
+      },
+      updateMyMembership: (membership: Membership) => dispatch({ type: 'updateMe', patch: { membership } }),
+      setDemoMembers: (n: number) => dispatch({ type: 'setDemoMembers', n }),
       setOrderStatus: (id: string, status: OrderStatus) => dispatch({ type: 'setOrderStatus', id, status }),
       chooseDish: (id: string, ideaId: string | undefined) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, chosenDishId: ideaId }) }),
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });
       },
-      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; progressLabel?: string }): string {
+      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; progressLabel?: string; premium?: boolean; unlockCents?: number }): string {
         const id = makeId('p');
         dispatch({ type: 'addPost', post: { id, createdAt: Date.now(), ...input } });
         return id;
@@ -426,6 +469,12 @@ export function connections(state: State, userId: string) {
   const followers = SEED_FOLLOWS.filter(([, to]) => to === userId).map(([from]) => from);
   if (meId && userId !== meId && state.following[userId]) followers.push(meId);
   return { followers, following };
+}
+
+/** Whether this viewer can see a post's full content (members-only posts are locked otherwise). */
+export function hasAccess(state: State, post: Post) {
+  if (!post.premium) return true;
+  return post.authorId === state.me?.id || !!state.memberships[post.authorId] || !!state.unlocks[post.id];
 }
 
 /** Whether a post belongs in public feeds for this viewer. */

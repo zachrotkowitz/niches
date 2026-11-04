@@ -3,11 +3,13 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
+import { Badges, MembershipCard } from '@/components/creator';
+import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
 import { isoDay } from '@/lib/plans';
-import { connections, isVisible, useNiches, useStore } from '@/lib/store';
+import { connections, hasAccess, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
@@ -47,10 +49,21 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           </View>
         </View>
         <View style={{ gap: 2 }}>
-          <DisplayText size={24}>{user.displayName}</DisplayText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <DisplayText size={24}>{user.displayName}</DisplayText>
+            <Badges user={user} size={20} />
+          </View>
           <Text style={styles.handle}>{user.username}</Text>
         </View>
         {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
+        {user.membership ? (
+          <MembershipCard
+            creator={user}
+            accent={niches[nicheTabs[0] ?? state.niche].accent}
+            field={niches[nicheTabs[0] ?? state.niche].field}
+            ink={niches[nicheTabs[0] ?? state.niche].ink}
+          />
+        ) : null}
         {nicheTabs.length ? (
           <View style={styles.nicheRow}>
             {nicheTabs.map((id) => (
@@ -138,6 +151,7 @@ function Count({ value, label, onPress }: { value: number; label: string; onPres
 export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; nicheBorders?: boolean }) {
   const router = useRouter();
   const niches = useNiches();
+  const { state } = useStore();
   return (
     <View style={styles.grid}>
       {posts.map((p) => {
@@ -156,6 +170,11 @@ export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; ni
             ) : (
               <MediaPlaceholder post={p} height={nicheBorders ? 122 : 128} showLabel={false} />
             )}
+            {!hasAccess(state, p) ? (
+              <View style={styles.lockVeil} accessibilityLabel="Members only">
+                <LockIcon size={18} color="#FFFFFF" />
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -185,6 +204,7 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingTop: 2 },
   cell: { width: '33%', flexGrow: 1, maxWidth: '33.4%', height: 128, overflow: 'hidden' },
+  lockVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,22,26,0.5)', alignItems: 'center', justifyContent: 'center' },
   textCell: { flex: 1, padding: 10, justifyContent: 'flex-end' },
   textCellText: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
   empty: { margin: 20, padding: 20, borderRadius: 20, backgroundColor: colors.surface, gap: 10 },

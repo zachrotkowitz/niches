@@ -14,6 +14,18 @@ export type User = {
   bio?: string;
   /** Demo-only marker for made-up founding creators in not-yet-open niches. */
   foundingCreator?: boolean;
+  /** Blue check: identity confirmed and notable (e.g. a celebrity cook). Invite-only. */
+  verified?: boolean;
+  /** Premium creator: can charge for members-only content. Invite-only. */
+  membership?: Membership;
+};
+
+/** What a premium creator offers members. */
+export type Membership = {
+  /** Monthly price in cents. */
+  priceCents: number;
+  tagline: string;
+  perks: string[];
 };
 
 export type Comment = {
@@ -56,6 +68,10 @@ export type Post = {
   /** Title shown under the grid tile. Defaults to the media label or caption. */
   previewTitle?: string;
   editedAt?: number;
+  /** Members-only: locked for anyone who isn't a member (or hasn't unlocked it). */
+  premium?: boolean;
+  /** Optional one-time price to unlock just this post, in cents. */
+  unlockCents?: number;
 };
 
 export type ReportReason = 'spam' | 'harassment' | 'harmful' | 'stolen' | 'other';

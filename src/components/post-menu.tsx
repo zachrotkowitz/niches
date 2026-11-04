@@ -95,6 +95,15 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
           detail: post.commentsOff ? 'People can comment again.' : 'Hides comments and stops new ones.',
           onPress: run(() => actions.updatePost(post.id, { commentsOff: !post.commentsOff }), post.commentsOff ? 'Comments turned on' : 'Comments turned off'),
         },
+        ...(state.me?.membership
+          ? [
+              {
+                label: post.premium ? 'Make visible to everyone' : 'Make members-only',
+                detail: post.premium ? 'Anyone can see the full post.' : 'Only your members see it. Others get a locked preview.',
+                onPress: run(() => actions.updatePost(post.id, { premium: !post.premium }), post.premium ? 'Visible to everyone' : 'Now members-only'),
+              },
+            ]
+          : []),
         {
           label: post.archived ? 'Show on profile' : 'Archive',
           detail: post.archived ? 'Put it back in feeds and on your profile.' : 'Hide it from feeds and your profile. Only you can find it, in Profile.',

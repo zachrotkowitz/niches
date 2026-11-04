@@ -7,7 +7,7 @@ import { ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
 import { Avatar, Button } from '@/components/primitives';
 import { timeAgo } from '@/lib/format';
-import { postStats, useNiches, useStore } from '@/lib/store';
+import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, fonts, TOUCH } from '@/lib/theme';
 
 export default function PostScreen() {
@@ -34,7 +34,8 @@ export default function PostScreen() {
   const isMine = !!state.me && post.authorId === state.me.id;
   const stats = postStats(state, post);
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
-  const canSend = draft.trim().length > 0 && !!state.me && !post.commentsOff;
+  const locked = !hasAccess(state, post);
+  const canSend = draft.trim().length > 0 && !!state.me && !post.commentsOff && !locked;
 
   const send = () => {
     if (!canSend || !state.me) return;
@@ -77,8 +78,8 @@ export default function PostScreen() {
         ) : null}
 
         <View style={styles.comments}>
-          <Text style={styles.commentsTitle}>{post.commentsOff ? 'Comments are turned off' : comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
-          {(post.commentsOff ? [] : comments).map((c) => {
+          <Text style={styles.commentsTitle}>{locked ? 'Comments are for members' : post.commentsOff ? 'Comments are turned off' : comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
+          {(post.commentsOff || locked ? [] : comments).map((c) => {
             const author = usersById[c.authorId];
             return (
               <View key={c.id} style={styles.comment}>
@@ -95,7 +96,7 @@ export default function PostScreen() {
         </View>
       </ScrollView>
 
-      {post.commentsOff ? null : (
+      {post.commentsOff || locked ? null : (
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TextInput
           value={draft}

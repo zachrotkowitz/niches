@@ -58,6 +58,28 @@ export default function ProfileScreen() {
             )}
 
             <Text style={[styles.settingsTitle, { marginTop: 24 }]}>Settings</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push(me.membership ? '/creators/studio' : '/creators/apply')} style={styles.linkRow}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.rowLabel}>{me.membership ? 'Creator studio' : 'Become a creator'}</Text>
+                <Text style={styles.rowValue}>
+                  {me.membership ? 'Price, perks and earnings for your membership.' : state.creatorApplication ? 'Invite requested. We’ll let you know.' : 'Invite-only. Get verified or charge for members-only posts.'}
+                </Text>
+              </View>
+              <View style={{ transform: [{ rotate: '180deg' }] }}>
+                <ChevronLeftIcon size={18} color={colors.textMuted} />
+              </View>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/creators/memberships')} style={styles.linkRow}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.rowLabel}>Memberships</Text>
+                <Text style={styles.rowValue}>
+                  {Object.keys(state.memberships).length ? `Member of ${Object.keys(state.memberships).length} ${Object.keys(state.memberships).length === 1 ? 'creator' : 'creators'}` : 'Creators you support, and posts you unlocked.'}
+                </Text>
+              </View>
+              <View style={{ transform: [{ rotate: '180deg' }] }}>
+                <ChevronLeftIcon size={18} color={colors.textMuted} />
+              </View>
+            </Pressable>
             <Pressable accessibilityRole="button" onPress={() => router.push('/settings/colors')} style={styles.linkRow}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={styles.rowLabel}>Color lab</Text>

@@ -8,7 +8,7 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
 /** Bump when seed content changes, so existing installs pick up new demo posts. */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export const SEED_USERS: User[] = [
   { id: 'u_maya', displayName: 'Maya Okafor', username: 'maya.cooks', avatarColor: '#7A4E9E', bio: 'Learning fresh pasta one bad batch at a time. Also paint on Sundays.' },
@@ -20,9 +20,12 @@ export const SEED_USERS: User[] = [
   { id: 'u_theo', displayName: 'Theo Green', username: 'theo.green', avatarColor: '#5B6B2E', bio: 'Herbs, oils and a small balcony garden.' },
   { id: 'u_lu', displayName: 'Lu Chen', username: 'lu.cooks', avatarColor: '#6B5B95', bio: 'Cooking for friends is the whole point.' },
   // Founding creators previewing niches that aren't open yet.
-  { id: 'u_rosa', displayName: 'Rosa Vega', username: 'rosa.paints', avatarColor: '#3B3FCB', bio: 'Watercolor and gouache. Founding creator, Art.', foundingCreator: true },
+  { id: 'u_rosa', displayName: 'Rosa Vega', username: 'rosa.paints', avatarColor: '#3B3FCB', bio: 'Watercolor and gouache. Founding creator, Art.', foundingCreator: true, membership: { priceCents: 499, tagline: 'Watch every painting come together', perks: ['Full-length process videos', 'My palette and paper for each piece', 'Monthly paint-along'] } },
   { id: 'u_kenji', displayName: 'Kenji Mori', username: 'kenji.ink', avatarColor: '#23267A', bio: 'Ink sketches of everyday streets. Founding creator, Art.', foundingCreator: true },
-  { id: 'u_nadia', displayName: 'Nadia Brooks', username: 'nadia.frames', avatarColor: '#9A5200', bio: '35mm and golden hour. Founding creator, Photography.', foundingCreator: true },
+  { id: 'u_nadia', displayName: 'Nadia Brooks', username: 'nadia.frames', avatarColor: '#9A5200', bio: '35mm and golden hour. Founding creator, Photography.', foundingCreator: true, membership: { priceCents: 399, tagline: 'Shoot and edit along with me', perks: ['Raw files from my best frames', 'Edit breakdowns, start to finish', 'First look at new print drops'] } },
+  // Invite-only creators (demo). Fictional people, not real celebrities.
+  { id: 'u_ines', displayName: 'Inès Duarte', username: 'chef.ines', avatarColor: '#7A2E2E', bio: 'Chef and owner of a tiny 20-seat bistro. I teach the techniques restaurants don’t write down.', verified: true, membership: { priceCents: 599, tagline: 'Cook like you work the line', perks: ['A members-only recipe video every week', 'Full recipe cards with weights and timings', 'Monthly live cook-along'] } },
+  { id: 'u_dax', displayName: 'Dax Romero', username: 'daxcooks', avatarColor: '#1F3A5F', bio: 'Actor, very serious home cook. Yes, I make everything myself.', verified: true, membership: { priceCents: 399, tagline: 'What I actually cook at home', perks: ['The recipes from my set trailer', 'Sunday batch-cook videos', 'Ask-me-anything every month'] } },
   { id: 'u_omar', displayName: 'Omar Haddad', username: 'omar.shoots', avatarColor: '#5C3100', bio: 'Street and night photography. Founding creator, Photography.', foundingCreator: true },
 ];
 
@@ -40,6 +43,9 @@ export const SEED_FOLLOWS: [string, string][] = [
   ['u_kenji', 'u_rosa'], ['u_kenji', 'u_omar'],
   ['u_nadia', 'u_omar'], ['u_nadia', 'u_rosa'], ['u_nadia', 'u_priya'],
   ['u_omar', 'u_nadia'], ['u_omar', 'u_kenji'],
+  ['u_maya', 'u_ines'], ['u_dev', 'u_ines'], ['u_jules', 'u_ines'], ['u_lu', 'u_ines'], ['u_priya', 'u_ines'], ['u_ana', 'u_ines'],
+  ['u_sam', 'u_dax'], ['u_theo', 'u_dax'], ['u_lu', 'u_dax'], ['u_ana', 'u_dax'], ['u_maya', 'u_dax'],
+  ['u_ines', 'u_jules'], ['u_dax', 'u_ines'],
 ];
 
 export function seedPosts(now: number): Post[] {
@@ -55,6 +61,14 @@ export function seedPosts(now: number): Post[] {
     { id: 'p_risotto', authorId: 'u_lu', niche: 'cooking', kind: 'photo', createdAt: now - 20 * HOUR, mediaColor: '#2B2B2E', mediaLabel: 'Squid ink risotto', caption: 'Squid ink risotto for a friend’s birthday. Teeth were black, nobody cared.', seedCheers: 26, seedSaves: 11 },
     { id: 'p_gnocchi', authorId: 'u_priya', niche: 'cooking', kind: 'photo', createdAt: now - 30 * HOUR, mediaColor: '#B9783F', mediaLabel: 'Brown butter gnocchi', caption: 'Brown butter gnocchi, a 20-minute weeknight win.', seedCheers: 34, seedSaves: 27 },
     { id: 'p_ravioli', authorId: 'u_maya', niche: 'cooking', kind: 'photo', createdAt: now - 6 * DAY, mediaColor: '#E0A43A', mediaLabel: 'Ricotta and lemon ravioli', progressLabel: 'Fresh pasta, week 2', caption: 'Ricotta and lemon ravioli. Two burst. The rest were perfect.', seedCheers: 19, seedSaves: 6 },
+
+    // Verified and premium creators
+    { id: 'p_ines_sauce', authorId: 'u_ines', niche: 'cooking', kind: 'photo', createdAt: now - 2 * HOUR, mediaColor: '#A33B2B', mediaLabel: 'Pan sauce, mounted with butter', caption: 'The one thing that makes home cooking taste like a restaurant: a pan sauce. Deglaze, reduce, cold butter off the heat. Every time.', seedCheers: 210, seedSaves: 180 },
+    { id: 'p_ines_shortrib', authorId: 'u_ines', niche: 'cooking', kind: 'video', createdAt: now - 6 * HOUR, mediaColor: '#4A1F1A', mediaLabel: 'Three-day short rib, full walkthrough', durationSec: 88, caption: 'Members: my three-day short rib, start to finish. Brine, braise, press, glaze. Full recipe card in the comments.', premium: true, unlockCents: 299, seedCheers: 96, seedSaves: 120 },
+    { id: 'p_dax_eggs', authorId: 'u_dax', niche: 'cooking', kind: 'photo', createdAt: now - 4 * HOUR, mediaColor: '#E7C66A', mediaLabel: 'Soft scrambled eggs on toast', caption: 'Call time was 5am, so: soft scrambled eggs, chives, too much butter. No regrets.', seedCheers: 340, seedSaves: 95 },
+    { id: 'p_dax_trailer', authorId: 'u_dax', niche: 'cooking', kind: 'photo', createdAt: now - 18 * HOUR, mediaColor: '#3E5C3A', mediaLabel: 'Meal prep in a trailer kitchenette', caption: 'Members: what I actually eat on set, all five lunches for the week, and how I cook them on one burner.', premium: true, unlockCents: 199, seedCheers: 150, seedSaves: 88 },
+    { id: 'p_art_process', authorId: 'u_rosa', niche: 'art', kind: 'video', createdAt: now - 20 * HOUR, mediaColor: '#4B5CC4', mediaLabel: 'Harbor at dusk, full painting process', durationSec: 90, caption: 'Members: the full process for Harbor at Dusk, from first wash to the last lift. Palette list included.', premium: true, unlockCents: 249, seedCheers: 40, seedSaves: 52 },
+    { id: 'p_photo_raw', authorId: 'u_nadia', niche: 'photography', kind: 'photo', createdAt: now - 30 * HOUR, mediaColor: '#B86E2E', mediaLabel: 'Before and after: golden hour edit', caption: 'Members: raw file and my full edit for the golden hour frame. Every slider, explained.', premium: true, seedCheers: 33, seedSaves: 41 },
 
     // Art (preview from founding creators)
     { id: 'p_art_harbor', authorId: 'u_rosa', niche: 'art', kind: 'photo', createdAt: now - 2 * HOUR, mediaColor: '#5A6FD0', mediaLabel: 'Harbor at dusk, watercolor', caption: 'Harbor at dusk. Let the sky bleed into the water and stopped before I fixed it.', seedCheers: 52, seedSaves: 38 },
@@ -84,6 +98,9 @@ export function seedComments(now: number): Comment[] {
     { id: 'c8', postId: 'p_sourdough', authorId: 'u_maya', text: 'That ear! What flour?', createdAt: now - 40 * MIN },
     { id: 'c9', postId: 'p_art_q', authorId: 'u_kenji', text: 'Cold press. Hot press is gorgeous but unforgiving with loose washes.', createdAt: now - 20 * HOUR },
     { id: 'c10', postId: 'p_photo_q', authorId: 'u_nadia', text: '35mm. You can always crop, you can’t step back in a small room.', createdAt: now - 2 * DAY },
+    { id: 'c12', postId: 'p_ines_shortrib', authorId: 'u_ines', text: 'Recipe card: 2 kg bone-in short rib. Day 1: dry brine, 1.5% salt by weight. Day 2: sear hard, braise at 150°C for 4 hours in stock, wine and aromatics; chill pressed under a tray. Day 3: portion, reduce the braising liquid to a glaze, warm through and baste.', createdAt: now - 5 * HOUR },
+    { id: 'c13', postId: 'p_ines_shortrib', authorId: 'u_jules', text: 'The pressing step is the secret. Never going back.', createdAt: now - 3 * HOUR },
+    { id: 'c14', postId: 'p_dax_trailer', authorId: 'u_dax', text: 'Monday: chicken thighs and rice. Tuesday: lentil soup. Wednesday: the leftover thighs in tacos. Thursday: eggs, always eggs. Friday: whatever craft services forgot.', createdAt: now - 17 * HOUR },
     { id: 'c11', postId: 'p_art_harbor', authorId: 'u_maya', text: 'Stopping early is the hardest part. This is beautiful.', createdAt: now - 1 * HOUR },
   ];
 }

@@ -25,6 +25,7 @@ export default function CreateScreen() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [nicheId] = useState<NicheId>('cooking');
   const [postedId, setPostedId] = useState<string | null>(null);
+  const [membersOnly, setMembersOnly] = useState(false);
 
   const niche = NICHES[nicheId];
   const needsPhoto = kind !== 'question';
@@ -41,6 +42,7 @@ export default function CreateScreen() {
       mediaColor: postKind === 'photo' ? photo ?? undefined : undefined,
       mediaLabel: postKind === 'photo' ? caption.trim().split(/[.!?\n]/)[0].slice(0, 40) : undefined,
       progressLabel: kind === 'progress' ? goal.trim() : undefined,
+      premium: membersOnly && !!state.me.membership ? true : undefined,
     });
     actions.setNiche(nicheId);
     setPostedId(id);
@@ -143,6 +145,17 @@ export default function CreateScreen() {
         </View>
 
         <View style={{ gap: 10 }}>
+          {state.me?.membership ? (
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: membersOnly }} onPress={() => setMembersOnly(!membersOnly)} style={[styles.membersRow, membersOnly ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.membersTitle}>Members only</Text>
+                <Text style={styles.membersSub}>Only your members can see it. Everyone else sees a locked preview.</Text>
+              </View>
+              <View style={[styles.switchTrack, membersOnly ? { backgroundColor: niche.accent } : null]}>
+                <View style={[styles.switchKnob, membersOnly ? { transform: [{ translateX: 18 }] } : null]} />
+              </View>
+            </Pressable>
+          ) : null}
           <Text style={styles.label}>Post to one niche</Text>
           <View style={styles.niches}>
             {NICHE_ORDER.map((id) => {
@@ -175,6 +188,11 @@ const styles = StyleSheet.create({
   share: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   form: { padding: 20, gap: 18 },
+  membersRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 8 },
+  membersTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  membersSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
+  switchTrack: { width: 46, height: 28, borderRadius: 14, backgroundColor: '#D5D8D3', padding: 3 },
+  switchKnob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
   planLink: { minHeight: TOUCH + 4, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   planLinkText: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   segment: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: '#F0F1EE' },

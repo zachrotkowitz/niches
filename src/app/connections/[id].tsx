@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon } from '@/components/icons';
+import { NameWithBadges } from '@/components/creator';
 import { Avatar } from '@/components/primitives';
 import { connections, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -75,7 +76,7 @@ export default function ConnectionsScreen() {
                   style={styles.person}>
                   <Avatar user={u} size={44} />
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.name} numberOfLines={1}>{u.username}</Text>
+                    <NameWithBadges user={u} style={styles.name} />
                     <Text style={styles.sub} numberOfLines={1}>{u.displayName}</Text>
                   </View>
                 </Pressable>
