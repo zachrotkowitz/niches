@@ -52,6 +52,9 @@ function RootStack() {
         <Stack.Screen name="post/edit/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="user/[id]" />
         <Stack.Screen name="connections/[id]" />
+        <Stack.Screen name="plans/index" />
+        <Stack.Screen name="plans/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="plans/[id]" />
         <Stack.Screen name="settings/colors" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>

@@ -97,6 +97,15 @@ export function BellIcon({ size = 22, color = '#14161A' }: IconProps) {
   );
 }
 
+export function CalendarIcon({ size = 22, color = '#14161A' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Rect x={3.5} y={5} width={17} height={15.5} rx={2.5} fill="none" stroke={color} strokeWidth={1.8} />
+      <Path d="M3.5 10h17M8 3v4M16 3v4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function MoreIcon({ size = 20, color = '#5B6168' }: IconProps) {
   return (
     <Svg {...base(size)}>

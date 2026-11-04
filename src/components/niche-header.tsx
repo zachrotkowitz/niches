@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import Animated, { interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BellIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
+import { BellIcon, CalendarIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
 import { useNiches, useStore, type FeedLayout } from '@/lib/store';
 import { colors, fonts, NICHE_ORDER, TOUCH } from '@/lib/theme';
@@ -25,9 +25,14 @@ export function NicheHeader({ position }: { position: SharedValue<number> }) {
     <Animated.View style={[styles.header, { paddingTop: insets.top + 8 }, bg]}>
       <View style={styles.topRow}>
         <Text style={[styles.wordmark, { color: niche.ink }]}>niches</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Notification digest" style={styles.iconButton}>
-          <BellIcon color={niche.ink} />
-        </Pressable>
+        <View style={{ flexDirection: 'row' }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Plans" onPress={() => router.push('/plans')} style={styles.iconButton}>
+            <CalendarIcon color={niche.ink} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Notification digest" style={styles.iconButton}>
+            <BellIcon color={niche.ink} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.titleRow}>

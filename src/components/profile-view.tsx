@@ -3,7 +3,9 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
+import { PlanCard } from '@/components/plan-card';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
+import { isoDay } from '@/lib/plans';
 import { connections, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
@@ -24,6 +26,11 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
   const shown = tab === 'all' ? posts : posts.filter((p) => p.niche === tab);
   const following = !!state.following[user.id];
   const { followers, following: follows } = connections(state, user.id);
+  // Your own upcoming plans, or the public plans someone else is hosting.
+  const today = isoDay();
+  const plans = state.plans
+    .filter((p) => p.date >= today && (isMe ? p.ownerId === user.id || p.invitees.includes(user.id) || !!p.rsvps[user.id] : p.ownerId === user.id && p.visibility === 'public'))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const openList = (tab: 'followers' | 'following') => router.push({ pathname: '/connections/[id]', params: { id: user.id, tab } });
 
   return (
@@ -61,6 +68,22 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           />
         )}
       </View>
+
+      {plans.length ? (
+        <View style={styles.plans}>
+          <View style={styles.plansHead}>
+            <Text style={styles.plansTitle}>{isMe ? 'Your upcoming plans' : 'Upcoming plans'}</Text>
+            {isMe ? (
+              <Pressable accessibilityRole="button" onPress={() => router.push('/plans')} style={styles.seeAll}>
+                <Text style={styles.seeAllText}>See all</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {plans.slice(0, 2).map((p) => (
+            <PlanCard key={p.id} plan={p} />
+          ))}
+        </View>
+      ) : null}
 
       <View accessibilityRole="tablist" style={styles.tabs}>
         {(['all', ...nicheTabs] as Tab[]).map((t) => {
@@ -148,6 +171,11 @@ const styles = StyleSheet.create({
   nicheRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   nichePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   nichePillText: { fontSize: 12, fontWeight: '700' },
+  plans: { paddingHorizontal: 20, marginTop: 20, gap: 10 },
+  plansHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  plansTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  seeAll: { minHeight: 36, justifyContent: 'center', paddingLeft: 12 },
+  seeAllText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
   tabs: { flexDirection: 'row', marginTop: 18, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   tab: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
   tabText: { fontSize: 14, fontWeight: '600' },

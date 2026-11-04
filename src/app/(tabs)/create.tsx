@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CameraIcon, CheckIcon } from '@/components/icons';
+import { CalendarIcon, CameraIcon, CheckIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
@@ -88,6 +88,10 @@ export default function CreateScreen() {
       </View>
 
       <ScrollView style={{ flex: 1, backgroundColor: colors.ground }} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/plans/new', params: { niche: nicheId } })} style={[styles.planLink, { backgroundColor: niche.field }]}>
+          <CalendarIcon size={20} color={niche.ink} />
+          <Text style={[styles.planLinkText, { color: niche.ink }]}>Planning something instead? Make a plan</Text>
+        </Pressable>
         <View accessibilityRole="radiogroup" accessibilityLabel="Post type" style={styles.segment}>
           {kinds.map((k) => {
             const selected = k.id === kind;
@@ -171,6 +175,8 @@ const styles = StyleSheet.create({
   share: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   form: { padding: 20, gap: 18 },
+  planLink: { minHeight: TOUCH + 4, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  planLinkText: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   segment: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: '#F0F1EE' },
   segmentOption: { flex: 1, minHeight: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   segmentSelected: { backgroundColor: '#FFFFFF', shadowColor: '#14161A', shadowOpacity: 0.14, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },

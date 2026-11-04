@@ -4,6 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 
+import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { NICHE_ORDER, resolveNiches, type NicheId } from './theme';
 import type { Comment, Post, PostKind, ReportReason, User } from './types';
@@ -39,6 +40,7 @@ type State = {
   palettes: Partial<Record<NicheId, string>>;
   /** Niches shown on Discover. Empty means all. */
   discoverNiches: NicheId[];
+  plans: Plan[];
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -57,7 +59,10 @@ type Action =
   | { type: 'toggleNotify'; niche: NicheId }
   | { type: 'requestNiche'; name: string }
   | { type: 'setPalette'; niche: NicheId; paletteId: string | null }
-  | { type: 'setDiscoverNiches'; niches: NicheId[] };
+  | { type: 'setDiscoverNiches'; niches: NicheId[] }
+  | { type: 'addPlan'; plan: Plan }
+  | { type: 'mapPlan'; id: string; fn: (plan: Plan) => Plan }
+  | { type: 'deletePlan'; id: string };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -78,6 +83,7 @@ function freshState(): Persisted {
     nicheRequests: [],
     palettes: {},
     discoverNiches: [],
+    plans: seedPlans(now),
   };
 }
 
@@ -143,6 +149,12 @@ function reducer(state: State, action: Action): State {
     }
     case 'setDiscoverNiches':
       return { ...state, discoverNiches: action.niches };
+    case 'addPlan':
+      return { ...state, plans: [...state.plans, action.plan] };
+    case 'mapPlan':
+      return { ...state, plans: state.plans.map((p) => (p.id === action.id ? action.fn(p) : p)) };
+    case 'deletePlan':
+      return { ...state, plans: state.plans.filter((p) => p.id !== action.id) };
   }
 }
 
@@ -196,6 +208,65 @@ function useStoreValue() {
       report: (postId: string, reason: ReportReason) => dispatch({ type: 'report', postId, reason }),
       setPalette: (niche: NicheId, paletteId: string | null) => dispatch({ type: 'setPalette', niche, paletteId }),
       setDiscoverNiches: (niches: NicheId[]) => dispatch({ type: 'setDiscoverNiches', niches }),
+      createPlan(input: Omit<Plan, 'id' | 'createdAt' | 'rsvps' | 'dishIdeas' | 'items'> & { items?: string[]; dishIdeas?: string[] }): string {
+        const id = makeId('plan');
+        const { items = [], dishIdeas = [], ...rest } = input;
+        dispatch({
+          type: 'addPlan',
+          plan: {
+            ...rest,
+            id,
+            createdAt: Date.now(),
+            rsvps: {},
+            items: items.map((name) => ({ id: makeId('i'), name })),
+            dishIdeas: dishIdeas.map((name) => ({ id: makeId('d'), name, by: rest.ownerId, votes: [rest.ownerId] })),
+          },
+        });
+        return id;
+      },
+      deletePlan: (id: string) => dispatch({ type: 'deletePlan', id }),
+      updatePlan: (id: string, patch: Partial<Pick<Plan, 'title' | 'date' | 'time' | 'location' | 'notes' | 'visibility' | 'invitees'>>) =>
+        dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, ...patch }) }),
+      rsvp: (id: string, userId: string, answer: Rsvp | null) =>
+        dispatch({
+          type: 'mapPlan',
+          id,
+          fn: (p) => {
+            const rsvps = { ...p.rsvps };
+            if (answer) rsvps[userId] = answer;
+            else delete rsvps[userId];
+            return { ...p, rsvps };
+          },
+        }),
+      /** Claim an item ("I'll bring it"), or give it back if you already claimed it. */
+      toggleClaim: (id: string, itemId: string, userId: string) =>
+        dispatch({
+          type: 'mapPlan',
+          id,
+          fn: (p) => ({
+            ...p,
+            items: p.items.map((it): PlanItem =>
+              it.id !== itemId ? it : it.claimedBy === userId ? { id: it.id, name: it.name } : it.claimedBy ? it : { ...it, claimedBy: userId },
+            ),
+          }),
+        }),
+      addItem: (id: string, name: string, claimedBy?: string) =>
+        dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, items: [...p.items, { id: makeId('i'), name, claimedBy }] }) }),
+      removeItem: (id: string, itemId: string) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, items: p.items.filter((i) => i.id !== itemId) }) }),
+      addDishIdea: (id: string, name: string, by: string) =>
+        dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, dishIdeas: [...p.dishIdeas, { id: makeId('d'), name, by, votes: [by] }] }) }),
+      toggleVote: (id: string, ideaId: string, userId: string) =>
+        dispatch({
+          type: 'mapPlan',
+          id,
+          fn: (p) => ({
+            ...p,
+            dishIdeas: p.dishIdeas.map((d): DishIdea =>
+              d.id !== ideaId ? d : { ...d, votes: d.votes.includes(userId) ? d.votes.filter((v) => v !== userId) : [...d.votes, userId] },
+            ),
+          }),
+        }),
+      chooseDish: (id: string, ideaId: string | undefined) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, chosenDishId: ideaId }) }),
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });
       },
