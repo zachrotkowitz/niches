@@ -97,6 +97,23 @@ export function BellIcon({ size = 22, color = '#14161A' }: IconProps) {
   );
 }
 
+export function BagIcon({ size = 22, color = '#14161A', filled }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M5 8h14l-1 12.2a1 1 0 0 1-1 .8H7a1 1 0 0 1-1-.8z" fill={filled ? color : 'none'} stroke={color} strokeWidth={1.8} strokeLinejoin="round" />
+      <Path d="M9 10V7a3 3 0 0 1 6 0v3" fill="none" stroke={filled ? '#FFFFFF' : color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function DownloadIcon({ size = 14, color = '#14161A' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function CalendarIcon({ size = 22, color = '#14161A' }: IconProps) {
   return (
     <Svg {...base(size)}>

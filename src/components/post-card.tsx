@@ -6,6 +6,7 @@ import { BookmarkIcon, CommentIcon, HeartIcon, MoreIcon, PauseIcon, PlayIcon, Tr
 import { useSwipeBlocked } from '@/components/niche-swipe';
 import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
+import { ShopThisBar } from '@/components/shop';
 import { timeAgo } from '@/lib/format';
 import { postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -68,6 +69,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         ) : null}
         <Text style={[styles.caption, post.kind === 'text' ? styles.captionLarge : null]}>{post.caption}</Text>
       </Pressable>
+
+      <ShopThisBar postId={post.id} />
 
       <View style={styles.actions}>
         <Pressable

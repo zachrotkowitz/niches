@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BellIcon, CalendarIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
+import { SHOP_NICHES } from '@/lib/shop';
 import { useNiches, useStore, type FeedLayout } from '@/lib/store';
 import { colors, fonts, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
@@ -37,7 +38,7 @@ export function NicheHeader({ position }: { position: SharedValue<number> }) {
 
       <View style={styles.titleRow}>
         <DisplayText color={niche.ink}>{niche.label}</DisplayText>
-        {niche.open ? <LayoutSwitch value={state.layout} onChange={actions.setLayout} ink={niche.ink} inkSoft={niche.inkSoft} /> : null}
+        {niche.open && !(state.homeMode === 'shop' && SHOP_NICHES.includes(niche.id)) ? <LayoutSwitch value={state.layout} onChange={actions.setLayout} ink={niche.ink} inkSoft={niche.inkSoft} /> : null}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="tablist" accessibilityLabel="Niches">

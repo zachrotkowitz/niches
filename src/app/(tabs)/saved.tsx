@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FeedGrid } from '@/components/feed-grid';
 import { NicheFilter } from '@/components/niche-filter';
 import { Button, DisplayText } from '@/components/primitives';
+import { ListingGrid } from '@/components/shop';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 
@@ -19,8 +20,10 @@ export default function SavedScreen() {
 
   // Saved posts stay here even if you hid them from feeds; archived ones are the author's to hide.
   const saved = state.posts.filter((p) => state.saves[p.id] && !p.archived);
-  const savedNiches = NICHE_ORDER.filter((id) => saved.some((p) => p.niche === id));
+  const savedListings = state.listings.filter((l) => state.savedListings[l.id]);
+  const savedNiches = NICHE_ORDER.filter((id) => saved.some((p) => p.niche === id) || savedListings.some((l) => l.niche === id));
   const shown = filter.length ? saved.filter((p) => filter.includes(p.niche)) : saved;
+  const shownListings = filter.length ? savedListings.filter((l) => filter.includes(l.niche)) : savedListings;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}>
@@ -34,23 +37,29 @@ export default function SavedScreen() {
         <Text style={styles.importBody}>Coming in a later build: your Instagram collections become boards, and your TikTok favorites land in an inbox to sort.</Text>
       </View>
 
-      <Text style={styles.section}>All saves · {saved.length}</Text>
-      {saved.length === 0 ? (
+      {savedNiches.length > 1 ? (
+        <View style={{ marginTop: 18 }}>
+          <NicheFilter value={filter} onChange={setFilter} available={savedNiches} />
+        </View>
+      ) : null}
+
+      {saved.length || !savedListings.length ? <Text style={styles.section}>Posts · {shown.length}</Text> : null}
+      {saved.length === 0 && savedListings.length ? null : saved.length === 0 ? (
         <View style={[styles.empty, { backgroundColor: niche.field }]}>
           <Text style={[styles.emptyTitle, { color: niche.ink }]}>Nothing saved yet</Text>
-          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Tap Save on any post and it lands here, outlined in its niche’s color. Boards to organize them are next.</Text>
+          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Tap Save on any post or shop listing and it lands here, outlined in its niche’s color. Boards to organize them are next.</Text>
           <Button label={`Browse ${niche.label}`} color={niche.accent} onPress={() => router.navigate('/')} />
         </View>
       ) : (
-        <>
-          {savedNiches.length > 1 ? (
-            <View style={{ marginTop: 10 }}>
-              <NicheFilter value={filter} onChange={setFilter} available={savedNiches} />
-            </View>
-          ) : null}
-          <FeedGrid posts={shown} nicheBorders />
-        </>
+        <FeedGrid posts={shown} nicheBorders />
       )}
+
+      {savedListings.length ? (
+        <>
+          <Text style={styles.section}>From the shops · {shownListings.length}</Text>
+          <ListingGrid listings={shownListings} nicheBorders />
+        </>
+      ) : null}
     </ScrollView>
   );
 }

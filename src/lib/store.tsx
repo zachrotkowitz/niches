@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
+import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { NICHE_ORDER, resolveNiches, type NicheId } from './theme';
 import type { Comment, Post, PostKind, ReportReason, User } from './types';
@@ -41,6 +42,12 @@ type State = {
   /** Niches shown on Discover. Empty means all. */
   discoverNiches: NicheId[];
   plans: Plan[];
+  /** Home shows each niche's feed or its shop. */
+  homeMode: 'feed' | 'shop';
+  listings: Listing[];
+  savedListings: Record<string, true>;
+  cart: CartItem[];
+  orders: Order[];
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -62,7 +69,14 @@ type Action =
   | { type: 'setDiscoverNiches'; niches: NicheId[] }
   | { type: 'addPlan'; plan: Plan }
   | { type: 'mapPlan'; id: string; fn: (plan: Plan) => Plan }
-  | { type: 'deletePlan'; id: string };
+  | { type: 'deletePlan'; id: string }
+  | { type: 'setHomeMode'; mode: 'feed' | 'shop' }
+  | { type: 'toggleSavedListing'; id: string }
+  | { type: 'addListing'; listing: Listing }
+  | { type: 'deleteListing'; id: string }
+  | { type: 'setCart'; cart: CartItem[] }
+  | { type: 'placeOrders'; orders: Order[] }
+  | { type: 'setOrderStatus'; id: string; status: OrderStatus };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -84,6 +98,11 @@ function freshState(): Persisted {
     palettes: {},
     discoverNiches: [],
     plans: seedPlans(now),
+    homeMode: 'feed',
+    listings: seedListings(now),
+    savedListings: {},
+    cart: [],
+    orders: [],
   };
 }
 
@@ -155,6 +174,33 @@ function reducer(state: State, action: Action): State {
       return { ...state, plans: state.plans.map((p) => (p.id === action.id ? action.fn(p) : p)) };
     case 'deletePlan':
       return { ...state, plans: state.plans.filter((p) => p.id !== action.id) };
+    case 'setHomeMode':
+      return { ...state, homeMode: action.mode };
+    case 'toggleSavedListing': {
+      const next = { ...state.savedListings };
+      if (next[action.id]) delete next[action.id];
+      else next[action.id] = true;
+      return { ...state, savedListings: next };
+    }
+    case 'addListing':
+      return { ...state, listings: [action.listing, ...state.listings] };
+    case 'deleteListing':
+      return { ...state, listings: state.listings.filter((l) => l.id !== action.id), cart: state.cart.filter((c) => c.listingId !== action.id) };
+    case 'setCart':
+      return { ...state, cart: action.cart };
+    case 'placeOrders': {
+      // Count sales and reduce stock for each listing bought.
+      const bought: Record<string, number> = {};
+      for (const o of action.orders) for (const l of o.lines) bought[l.listingId] = (bought[l.listingId] ?? 0) + l.qty;
+      const listings = state.listings.map((l) =>
+        bought[l.id]
+          ? { ...l, sold: l.sold + bought[l.id], stock: l.stock === undefined ? undefined : Math.max(0, l.stock - bought[l.id]) }
+          : l,
+      );
+      return { ...state, listings, orders: [...action.orders, ...state.orders] };
+    }
+    case 'setOrderStatus':
+      return { ...state, orders: state.orders.map((o) => (o.id === action.id ? { ...o, status: action.status } : o)) };
   }
 }
 
@@ -266,6 +312,64 @@ function useStoreValue() {
             ),
           }),
         }),
+      setHomeMode: (mode: 'feed' | 'shop') => dispatch({ type: 'setHomeMode', mode }),
+      toggleSavedListing: (id: string) => dispatch({ type: 'toggleSavedListing', id }),
+      createListing(input: Omit<Listing, 'id' | 'createdAt' | 'sold'>): string {
+        const id = makeId('l');
+        dispatch({ type: 'addListing', listing: { ...input, id, createdAt: Date.now(), sold: 0 } });
+        return id;
+      },
+      deleteListing: (id: string) => dispatch({ type: 'deleteListing', id }),
+      setCart: (cart: CartItem[]) => dispatch({ type: 'setCart', cart }),
+      /** Demo checkout: one order per seller, nothing is charged. */
+      checkout(buyerId: string, cart: CartItem[], listings: Listing[], shipTo?: string): Order[] {
+        const bySeller: Record<string, Order> = {};
+        for (const item of cart) {
+          const l = listings.find((x) => x.id === item.listingId);
+          if (!l) continue;
+          const o = (bySeller[l.sellerId] ??= {
+            id: makeId('o'),
+            buyerId,
+            sellerId: l.sellerId,
+            lines: [],
+            subtotalCents: 0,
+            shippingCents: 0,
+            feeCents: 0,
+            status: 'paid',
+            shipTo,
+            createdAt: Date.now(),
+          });
+          o.lines.push({ listingId: l.id, title: l.title, priceCents: l.priceCents, qty: item.qty, format: l.format });
+          o.subtotalCents += l.priceCents * item.qty;
+          // One shipping charge per item type, like most small shops.
+          o.shippingCents += l.format === 'physical' ? (l.shippingCents ?? 0) : 0;
+        }
+        const orders = Object.values(bySeller).map((o) => ({
+          ...o,
+          feeCents: feeFor(o.subtotalCents),
+          status: o.lines.every((l) => l.format === 'digital') ? ('ready' as const) : ('paid' as const),
+        }));
+        dispatch({ type: 'placeOrders', orders });
+        dispatch({ type: 'setCart', cart: [] });
+        return orders;
+      },
+      /** Demo only: pretend a demo account bought one of your listings. */
+      simulateSale(listing: Listing, buyerId: string) {
+        const order: Order = {
+          id: makeId('o'),
+          buyerId,
+          sellerId: listing.sellerId,
+          lines: [{ listingId: listing.id, title: listing.title, priceCents: listing.priceCents, qty: 1, format: listing.format }],
+          subtotalCents: listing.priceCents,
+          shippingCents: listing.format === 'physical' ? listing.shippingCents ?? 0 : 0,
+          feeCents: feeFor(listing.priceCents),
+          status: listing.format === 'digital' ? 'ready' : 'paid',
+          shipTo: listing.format === 'physical' ? 'Demo buyer, 123 Example St, Springfield' : undefined,
+          createdAt: Date.now(),
+        };
+        dispatch({ type: 'placeOrders', orders: [order] });
+      },
+      setOrderStatus: (id: string, status: OrderStatus) => dispatch({ type: 'setOrderStatus', id, status }),
       chooseDish: (id: string, ideaId: string | undefined) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, chosenDishId: ideaId }) }),
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });

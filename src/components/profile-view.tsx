@@ -4,13 +4,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { PlanCard } from '@/components/plan-card';
+import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
 import { isoDay } from '@/lib/plans';
 import { connections, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
-type Tab = 'all' | NicheId;
+type Tab = 'all' | NicheId | 'shop';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
 export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
@@ -23,7 +24,8 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
     .filter((p) => p.authorId === user.id && (isMe ? !p.archived : isVisible(state, p)))
     .sort((a, b) => b.createdAt - a.createdAt);
   const nicheTabs = NICHE_ORDER.filter((id) => posts.some((p) => p.niche === id));
-  const shown = tab === 'all' ? posts : posts.filter((p) => p.niche === tab);
+  const listings = state.listings.filter((l) => l.sellerId === user.id);
+  const shown = tab === 'all' ? posts : tab === 'shop' ? [] : posts.filter((p) => p.niche === tab);
   const following = !!state.following[user.id];
   const { followers, following: follows } = connections(state, user.id);
   // Your own upcoming plans, or the public plans someone else is hosting.
@@ -86,17 +88,19 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
       ) : null}
 
       <View accessibilityRole="tablist" style={styles.tabs}>
-        {(['all', ...nicheTabs] as Tab[]).map((t) => {
+        {(['all', ...nicheTabs, ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? colors.text : 'transparent' }]}>
-              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : niches[t].label}</Text>
+              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : niches[t].label}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      {shown.length === 0 ? (
+      {tab === 'shop' ? (
+        <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />
+      ) : shown.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>No posts yet</Text>
           {isMe ? (

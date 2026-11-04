@@ -7,6 +7,7 @@ import { FeedGrid } from '@/components/feed-grid';
 import { SearchIcon } from '@/components/icons';
 import { NicheFilter } from '@/components/niche-filter';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
+import { ListingGrid } from '@/components/shop';
 import { SEED_USERS } from '@/lib/seed';
 import { inspirationThisWeek, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
@@ -42,6 +43,11 @@ export default function DiscoverScreen() {
     .sort((a, b) => Number(!!state.following[a.id]) - Number(!!state.following[b.id]));
 
   const inspiration = inspirationThisWeek(state, filter);
+  // Shop picks: best-selling listings in the filtered niches.
+  const shopPicks = state.listings
+    .filter((l) => allowed.has(l.niche) && l.sellerId !== state.me?.id && l.stock !== 0)
+    .sort((a, b) => b.sold - a.sold)
+    .slice(0, 6);
 
   const submit = () => {
     const name = request.trim();
@@ -96,6 +102,14 @@ export default function DiscoverScreen() {
         ) : (
           <FeedGrid posts={inspiration} nicheBorders />
         )}
+
+        {shopPicks.length ? (
+          <>
+            <Text style={styles.section}>From the shops</Text>
+            <Text style={styles.sectionSub}>Cookbooks, prints and art from people in these niches.</Text>
+            <ListingGrid listings={shopPicks} nicheBorders />
+          </>
+        ) : null}
 
         <View style={styles.request}>
           <Text style={styles.requestTitle}>Missing a niche?</Text>

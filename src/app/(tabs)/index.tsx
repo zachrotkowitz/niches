@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
@@ -9,6 +9,8 @@ import { NicheHeader } from '@/components/niche-header';
 import { NichePager } from '@/components/niche-swipe';
 import { PostCard } from '@/components/post-card';
 import { Button, DisplayText } from '@/components/primitives';
+import { NicheShop } from '@/components/shop';
+import { SHOP_NICHES } from '@/lib/shop';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type Niche } from '@/lib/theme';
@@ -27,7 +29,17 @@ export default function HomeScreen() {
         position={position}
         renderPage={(id) => {
           const niche = niches[id];
-          return niche.open ? <OpenFeed niche={niche} /> : <ComingSoon niche={niche} />;
+          const hasShop = SHOP_NICHES.includes(id);
+          const top = hasShop ? <FeedShopSwitch niche={niche} /> : null;
+          if (hasShop && state.homeMode === 'shop') {
+            return (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+                {top}
+                <NicheShop niche={niche} />
+              </ScrollView>
+            );
+          }
+          return niche.open ? <OpenFeed niche={niche} top={top} /> : <ComingSoon niche={niche} top={top} />;
         }}
       />
     </View>
@@ -48,13 +60,36 @@ function useNicheFeed(niche: Niche) {
   }, [state, niche.id]);
 }
 
-function OpenFeed({ niche }: { niche: Niche }) {
+/** Feed | Shop switch at the top of niches that have a shop. */
+function FeedShopSwitch({ niche }: { niche: Niche }) {
+  const { state, actions } = useStore();
+  return (
+    <View accessibilityRole="tablist" style={styles.modeRow}>
+      {(['feed', 'shop'] as const).map((m) => {
+        const on = state.homeMode === m;
+        return (
+          <Pressable
+            key={m}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            onPress={() => actions.setHomeMode(m)}
+            style={[styles.modeTab, { borderBottomColor: on ? niche.accent : 'transparent' }]}>
+            <Text style={[styles.modeText, { color: on ? niche.ink : colors.textMuted }]}>{m === 'feed' ? 'Feed' : 'Shop'}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function OpenFeed({ niche, top }: { niche: Niche; top?: ReactNode }) {
   const { state } = useStore();
   const [showOlder, setShowOlder] = useState(false);
   const { fresh, older } = useNicheFeed(niche);
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
+      {top}
       <View style={styles.metaBar}>
         <Text style={styles.metaText}>Newest first</Text>
         <Text style={styles.metaText}>{fresh.length} new since yesterday</Text>
@@ -127,7 +162,7 @@ function CaughtUp({ niche, count }: { niche: Niche; count: number }) {
 }
 
 /** Niches that aren't open yet: a notify button, plus a preview from founding creators if there is one. */
-function ComingSoon({ niche }: { niche: Niche }) {
+function ComingSoon({ niche, top }: { niche: Niche; top?: ReactNode }) {
   const router = useRouter();
   const { state, actions } = useStore();
   const notified = !!state.notify[niche.id];
@@ -135,6 +170,7 @@ function ComingSoon({ niche }: { niche: Niche }) {
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      {top}
       <View style={styles.soonWrap}>
         <DisplayText size={28} color={niche.ink}>
           {niche.label} is coming soon
@@ -170,6 +206,9 @@ function ComingSoon({ niche }: { niche: Niche }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground, overflow: 'hidden' },
+  modeRow: { flexDirection: 'row', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  modeTab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2.5 },
+  modeText: { fontSize: 15, fontWeight: '700' },
   metaBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   metaText: { fontSize: 13, color: colors.textMuted },
   caughtUp: { margin: 20, padding: 22, paddingTop: 28, borderRadius: 24, gap: 14 },
