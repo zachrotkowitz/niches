@@ -477,6 +477,15 @@ export function hasAccess(state: State, post: Post) {
   return post.authorId === state.me?.id || !!state.memberships[post.authorId] || !!state.unlocks[post.id];
 }
 
+/**
+ * Whether a post appears in niche feeds and Discover for this viewer.
+ * Members-only posts show there only to people who can open them; everyone
+ * else finds them on the creator's profile (founder decision, Nov 2026).
+ */
+export function inFeeds(state: State, post: Post) {
+  return isVisible(state, post) && hasAccess(state, post);
+}
+
 /** Whether a post belongs in public feeds for this viewer. */
 export function isVisible(state: State, post: Post) {
   return !post.archived && !state.hiddenPosts[post.id];
@@ -489,7 +498,7 @@ export function isVisible(state: State, post: Post) {
 export function inspirationThisWeek(state: State, niches: NicheId[], now = Date.now()) {
   const allowed = new Set(niches.length ? niches : NICHE_ORDER);
   return state.posts
-    .filter((p) => allowed.has(p.niche) && isVisible(state, p) && now - p.createdAt < WEEK_MS && p.authorId !== state.me?.id)
+    .filter((p) => allowed.has(p.niche) && inFeeds(state, p) && now - p.createdAt < WEEK_MS && p.authorId !== state.me?.id)
     .map((p) => ({ post: p, score: postStats(state, p).saves }))
     .sort((a, b) => b.score - a.score || b.post.createdAt - a.post.createdAt)
     .map((x) => x.post);

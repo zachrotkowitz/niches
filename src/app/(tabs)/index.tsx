@@ -12,7 +12,7 @@ import { Button, DisplayText } from '@/components/primitives';
 import { NicheShop } from '@/components/shop';
 import { SHOP_NICHES } from '@/lib/shop';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
-import { isVisible, useNiches, useStore } from '@/lib/store';
+import { inFeeds, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type Niche } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
@@ -51,7 +51,7 @@ function useNicheFeed(niche: Niche) {
   const { state } = useStore();
   return useMemo(() => {
     const now = Date.now();
-    const all = state.posts.filter((p) => p.niche === niche.id && isVisible(state, p)).sort((a, b) => b.createdAt - a.createdAt);
+    const all = state.posts.filter((p) => p.niche === niche.id && inFeeds(state, p)).sort((a, b) => b.createdAt - a.createdAt);
     return {
       fresh: all.filter((p) => now - p.createdAt < FRESH_WINDOW_MS),
       older: all.filter((p) => now - p.createdAt >= FRESH_WINDOW_MS),
