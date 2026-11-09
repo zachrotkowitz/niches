@@ -155,7 +155,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { paddingHorizontal: 6 },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   earnings: { padding: 16, borderRadius: 18, gap: 6 },

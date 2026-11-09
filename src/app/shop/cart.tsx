@@ -9,6 +9,7 @@ import { CheckIcon, ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
 import { FEE_RATE, formatPrice, type Listing, type Order } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
+import { listingPhoto } from '@/lib/demo-photos';
 import { colors, TOUCH } from '@/lib/theme';
 
 type Step = 'cart' | 'checkout' | 'done';
@@ -105,7 +106,7 @@ export default function CartScreen() {
                     return (
                       <View key={listing.id} style={styles.line}>
                         <Pressable accessibilityRole="button" accessibilityLabel={`Open ${listing.title}`} onPress={() => router.push({ pathname: '/shop/[id]', params: { id: listing.id } })} style={[styles.thumb, { backgroundColor: listing.mediaColor, overflow: 'hidden' }]}>
-                          {listing.imageUri ? <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                          {listingPhoto(listing) ? <Image source={listingPhoto(listing)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
                         </Pressable>
                         <View style={{ flex: 1, gap: 2 }}>
                           <Text style={styles.lineTitle} numberOfLines={2}>{listing.title}</Text>
@@ -187,7 +188,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 15, color: colors.text, fontVariant: ['tabular-nums'] },
   bold: { fontWeight: '800', color: colors.text, fontSize: 17 },
   feeNote: { fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 4 },
-  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: colors.hairline },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: 'transparent', borderTopWidth: 1, borderTopColor: colors.hairline },
   doneCheck: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   demoBanner: { alignSelf: 'flex-start', backgroundColor: colors.note, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   demoText: { fontSize: 14, fontWeight: '700', color: '#5C4A00' },

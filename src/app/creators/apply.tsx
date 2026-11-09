@@ -118,7 +118,7 @@ function Perk({ icon, title, body }: { icon: React.ReactNode; title: string; bod
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { paddingHorizontal: 6 },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   lead: { fontSize: 16, lineHeight: 23, color: colors.textSecondary },

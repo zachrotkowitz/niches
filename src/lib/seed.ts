@@ -8,7 +8,7 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
 /** Bump when seed content changes, so existing installs pick up new demo posts. */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 export const SEED_USERS: User[] = [
   { id: 'u_maya', displayName: 'Maya Okafor', username: 'maya.cooks', avatarColor: '#7A4E9E', bio: 'Learning fresh pasta one bad batch at a time. Also paint on Sundays.' },
@@ -75,7 +75,7 @@ export function seedPosts(now: number): Post[] {
     { id: 'p_art_street', authorId: 'u_kenji', niche: 'art', kind: 'photo', createdAt: now - 9 * HOUR, mediaColor: '#2D3142', mediaLabel: 'Ink sketch of a corner store', caption: 'Corner store on 5th, ten-minute ink sketch. No pencil first.', seedCheers: 31, seedSaves: 21 },
     { id: 'p_art_q', authorId: 'u_rosa', niche: 'art', kind: 'text', createdAt: now - 26 * HOUR, caption: 'Watercolor people: cold press or hot press for loose florals? I keep going back and forth.', seedCheers: 14 },
     { id: 'p_art_lemons', authorId: 'u_maya', niche: 'art', kind: 'photo', createdAt: now - 3 * DAY, mediaColor: '#E5C14A', mediaLabel: 'Gouache lemons', progressLabel: '10 small paintings, #7', caption: 'Painting #7 of 10: gouache lemons. The shadows finally look purple, not gray.', seedCheers: 22, seedSaves: 9 },
-    { id: 'p_art_figure', authorId: 'u_kenji', niche: 'art', kind: 'photo', createdAt: now - 4 * DAY, mediaColor: '#8C5E58', mediaLabel: 'Two-minute figure studies', caption: 'Two-minute figure studies from Thursday’s drop-in class.', seedCheers: 18, seedSaves: 25 },
+    { id: 'p_art_figure', authorId: 'u_kenji', niche: 'art', kind: 'photo', createdAt: now - 4 * DAY, mediaColor: '#8C5E58', mediaLabel: 'Watercolor pet portrait', caption: 'Quick watercolor portrait of my neighbor’s chihuahua. Forty minutes, one sitting, zero cooperation.', seedCheers: 18, seedSaves: 25 },
 
     // Photography (preview from founding creators)
     { id: 'p_photo_golden', authorId: 'u_nadia', niche: 'photography', kind: 'photo', createdAt: now - 4 * HOUR, mediaColor: '#D98A3D', mediaLabel: 'Golden hour on a 35mm roll', caption: 'Last frame on the roll, golden hour, Portra 400. Worth the wait for the lab.', seedCheers: 47, seedSaves: 44 },

@@ -10,6 +10,7 @@ import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
 import { useSurface } from '@/components/surface';
+import { postAspect } from '@/lib/demo-photos';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -27,7 +28,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   // Real photos keep their own shape (between 4:5 portrait and 5:4 landscape), like Instagram.
   // On a flooded screen photos sit inset with rounded corners, like prints on colored paper.
   const mediaWidth = Math.min(width, 640) - (surface.flood ? 32 : 0);
-  const photoHeight = post.imageUri && post.imageAspect ? Math.round(mediaWidth * Math.min(1.25, Math.max(0.8, post.imageAspect))) : mediaHeight;
+  const aspect = postAspect(post);
+  const photoHeight = aspect ? Math.round(mediaWidth * Math.min(1.25, Math.max(0.8, aspect))) : mediaHeight;
   const inset = surface.flood ? styles.mediaInset : null;
   const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];

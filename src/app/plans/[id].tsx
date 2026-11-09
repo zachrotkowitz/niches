@@ -284,7 +284,7 @@ export default function PlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   hero: { paddingBottom: 22 },
   nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },

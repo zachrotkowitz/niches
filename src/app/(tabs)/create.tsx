@@ -121,7 +121,7 @@ export default function CreateScreen() {
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1, backgroundColor: colors.ground }} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1, backgroundColor: 'transparent' }} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/plans/new', params: { niche: nicheId } })} style={[styles.planLink, { backgroundColor: niche.field }]}>
           <CalendarIcon size={20} color={niche.ink} />
           <Text style={[styles.planLinkText, { color: niche.ink }]}>Planning something instead? Make a plan</Text>
@@ -242,7 +242,7 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: colors.ground },
+  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: 'transparent' },
   navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
   share: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },

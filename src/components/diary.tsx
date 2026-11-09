@@ -6,6 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { LockIcon, PlusIcon } from '@/components/icons';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef, type LogEntry } from '@/lib/diary';
+import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import { dayLabel } from '@/lib/plans';
 import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { useNiches, useStore } from '@/lib/store';
@@ -64,7 +65,7 @@ export function DiaryRow({ log, showPrivacy = false }: { log: LogEntry; showPriv
       onPress={() => router.push({ pathname: '/log/[id]', params: { id: log.id } })}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}>
       <View style={[styles.thumb, { backgroundColor: log.mediaColor ?? niche.field }]}>
-        {log.imageUri ? <Image source={{ uri: log.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+        {logPhoto(log) ? <Image source={logPhoto(log)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{log.title}</Text>
@@ -84,10 +85,10 @@ export function useFavoriteItem(ref: FavoriteRef) {
   const { state } = useStore();
   if (ref.kind === 'log') {
     const l = state.logs.find((x) => x.id === ref.id);
-    return l ? { title: l.title, imageUri: l.imageUri, color: l.mediaColor, href: { pathname: '/log/[id]' as const, params: { id: l.id } } } : null;
+    return l ? { title: l.title, image: logPhoto(l), color: l.mediaColor, href: { pathname: '/log/[id]' as const, params: { id: l.id } } } : null;
   }
   const p = state.posts.find((x) => x.id === ref.id);
-  return p ? { title: p.mediaLabel ?? p.caption, imageUri: p.imageUri, color: p.mediaColor, href: { pathname: '/post/[id]' as const, params: { id: p.id } } } : null;
+  return p ? { title: p.mediaLabel ?? p.caption, image: postPhoto(p), color: p.mediaColor, href: { pathname: '/post/[id]' as const, params: { id: p.id } } } : null;
 }
 
 function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId }) {
@@ -99,7 +100,7 @@ function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={item.title} onPress={() => router.push(item.href)} style={{ flex: 1, gap: 4 }}>
       <View style={[styles.tile, { backgroundColor: item.color ?? n.field }]}>
-        {item.imageUri ? <Image source={{ uri: item.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+        {item.image ? <Image source={item.image} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
       </View>
       <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
     </Pressable>

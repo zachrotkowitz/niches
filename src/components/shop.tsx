@@ -9,6 +9,7 @@ import { useSwipeBlocked } from '@/components/niche-swipe';
 import { Button, DisplayText } from '@/components/primitives';
 import { CATEGORIES, formatPrice, type Listing } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
+import { listingPhoto } from '@/lib/demo-photos';
 import { colors, TOUCH, type Niche } from '@/lib/theme';
 
 const HEIGHTS = [210, 170, 240, 190, 220, 180];
@@ -37,7 +38,7 @@ export function ListingTile({ listing, nicheBorder = false }: { listing: Listing
         onPress={() => !swiping() && router.push({ pathname: '/shop/[id]', params: { id: listing.id } })}
         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
         <View style={[{ height, borderRadius: nicheBorder ? 18 : 16, overflow: 'hidden', backgroundColor: listing.mediaColor }, nicheBorder ? { borderWidth: NICHE_BORDER, borderColor: niche.accent } : null]}>
-          {listing.imageUri ? <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${listing.title}`} /> : null}
+          {listingPhoto(listing) ? <Image source={listingPhoto(listing)} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${listing.title}`} /> : null}
           <View style={styles.price}>
             <Text style={styles.priceText}>{formatPrice(listing.priceCents)}</Text>
           </View>

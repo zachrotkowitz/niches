@@ -210,7 +210,7 @@ function PersonCard({ user, nicheIds }: { user: User; nicheIds: NicheId[] }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   head: { paddingHorizontal: 20, gap: 8 },
   sub: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
   search: { marginTop: 8, minHeight: TOUCH + 2, borderRadius: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 },

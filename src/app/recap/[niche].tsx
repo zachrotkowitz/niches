@@ -12,6 +12,7 @@ import { useFavoriteItem } from '@/components/diary';
 import { Avatar, Button } from '@/components/primitives';
 import { useToast } from '@/components/toast';
 import { diaryWords, type FavoriteRef } from '@/lib/diary';
+import { logPhoto } from '@/lib/demo-photos';
 import { buildRecap, MONTHS, MONTHS_LONG, recapText, type Recap } from '@/lib/recap';
 import { dayLabel } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
@@ -299,7 +300,7 @@ function buildPages(
             Your go-to
           </Animated.Text>
           <Animated.View entering={rise(1)} style={[styles.swatch, { backgroundColor: top.log.mediaColor ?? n.accent }]}>
-            {top.log.imageUri ? <Image source={{ uri: top.log.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+            {logPhoto(top.log) ? <Image source={logPhoto(top.log)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
           </Animated.View>
           <Animated.Text entering={rise(2)} style={[styles.h0, { color: '#FFFFFF' }]}>
             {top.title}
@@ -337,7 +338,7 @@ function buildPages(
             {r.fiveStars.slice(0, 6).map((l) => (
               <View key={l.id} style={styles.tileWrap}>
                 <View style={[styles.tile, { backgroundColor: l.mediaColor ?? n.field }]}>
-                  {l.imageUri ? <Image source={{ uri: l.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                  {logPhoto(l) ? <Image source={logPhoto(l)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
                 </View>
                 <Text style={styles.tileTitle} numberOfLines={2}>{l.title}</Text>
               </View>
@@ -496,7 +497,7 @@ function FavoriteSwatch({ refItem, fallback }: { refItem: FavoriteRef; fallback:
   return (
     <View style={{ flex: 1, gap: 4 }}>
       <View style={[styles.favTile, { backgroundColor: item?.color ?? fallback }]}>
-        {item?.imageUri ? <Image source={{ uri: item.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+        {item?.image ? <Image source={item.image} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
       </View>
       <Text style={styles.favTitle} numberOfLines={1}>{item?.title ?? ''}</Text>
     </View>

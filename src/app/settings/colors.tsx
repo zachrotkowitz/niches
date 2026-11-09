@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   basics: { marginHorizontal: 20, marginTop: 8, padding: 16, borderRadius: 14, backgroundColor: colors.surface, gap: 14 },
   basicTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
   basicBody: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { paddingHorizontal: 6, paddingBottom: 4 },
   back: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingRight: 12 },
   backText: { fontSize: 17, color: colors.text },

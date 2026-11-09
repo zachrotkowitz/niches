@@ -86,7 +86,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, paddingRight: 16 },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   newButton: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: colors.text, flexDirection: 'row', alignItems: 'center', gap: 6 },

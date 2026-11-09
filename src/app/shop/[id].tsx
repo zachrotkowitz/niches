@@ -13,6 +13,7 @@ import { useToast } from '@/components/toast';
 import { SEED_USERS } from '@/lib/seed';
 import { FEE_RATE, feeFor, formatLine, formatPrice } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
+import { listingPhoto } from '@/lib/demo-photos';
 import { colors, TOUCH } from '@/lib/theme';
 
 export default function ListingScreen() {
@@ -72,8 +73,8 @@ export default function ListingScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View accessible accessibilityRole="image" accessibilityLabel={`Photo: ${listing.mediaLabel}`} style={[styles.hero, { backgroundColor: listing.mediaColor }]}>
-          {listing.imageUri ? (
-            <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+          {listingPhoto(listing) ? (
+            <Image source={listingPhoto(listing)} contentFit="cover" style={StyleSheet.absoluteFill} />
           ) : (
             <View style={styles.heroLabel}>
               <Text style={styles.heroLabelText}>Photo · {listing.mediaLabel}</Text>
@@ -212,8 +213,8 @@ export default function ListingScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
-  nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
+  nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, backgroundColor: 'transparent' },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   hero: { height: 340, justifyContent: 'flex-end' },
   heroLabel: { margin: 12, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   sellerBoxTitle: { fontSize: 16, fontWeight: '700' },
   sellerBoxBody: { fontSize: 14, lineHeight: 20 },
   moreTitle: { fontSize: 18, fontWeight: '700', color: colors.text, paddingHorizontal: 20 },
-  buyBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.ground, borderTopWidth: 1, borderTopColor: colors.hairline },
+  buyBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 12, backgroundColor: 'transparent', borderTopWidth: 1, borderTopColor: colors.hairline },
   saveButton: { width: TOUCH + 4, height: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   stepper: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: colors.border, height: TOUCH + 4 },
   step: { width: 34, height: TOUCH + 4, alignItems: 'center', justifyContent: 'center' },

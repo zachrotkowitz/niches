@@ -92,7 +92,7 @@ export default function SavedScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   head: { paddingHorizontal: 20, gap: 8 },
   sub: { fontSize: 15, color: colors.textMuted },
   wantSub: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 20, marginTop: 4 },

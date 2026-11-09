@@ -18,12 +18,14 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: niche.ink,
         tabBarInactiveTintColor: niche.inkSoft,
-        tabBarStyle: { borderTopColor: niche.line, backgroundColor: niche.mid },
+        // Mixed-niche tabs (Discover, Post, Saved) use the pale tint; Home and Profile override with the flood.
+        tabBarStyle: { borderTopColor: niche.line, backgroundColor: niche.field },
+        sceneStyle: { backgroundColor: niche.field },
         tabBarLabelStyle: { fontSize: 10, fontFamily: BODY_FONTS['600'] },
       }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color, focused }) => <HomeIcon color={String(color)} filled={focused} /> }}
+        options={{ title: 'Home', tabBarStyle: { borderTopColor: niche.line, backgroundColor: niche.mid }, tabBarIcon: ({ color, focused }) => <HomeIcon color={String(color)} filled={focused} /> }}
       />
       <Tabs.Screen
         name="discover"
@@ -48,7 +50,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: ({ color, focused }) => <PersonIcon color={String(color)} filled={focused} /> }}
+        options={{ title: 'Profile', tabBarStyle: { borderTopColor: niche.line, backgroundColor: niche.mid }, tabBarIcon: ({ color, focused }) => <PersonIcon color={String(color)} filled={focused} /> }}
       />
     </Tabs>
   );

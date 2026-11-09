@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type 
 import { Text } from '@/components/text';
 
 import { CameraIcon, PlayIcon } from '@/components/icons';
+import { postPhoto } from '@/lib/demo-photos';
 import { formatDuration } from '@/lib/format';
 import { colors, fonts, TOUCH } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
@@ -33,10 +34,12 @@ export function Avatar({ user, size = 34 }: { user: User | undefined; size?: num
 /** A post's photo, or a labeled color block standing in for it when there's no real image yet. */
 export function MediaPlaceholder({ post, height, radius = 0, showLabel = true }: { post: Post; height: number; radius?: number; showLabel?: boolean }) {
   const isVideo = post.kind === 'video';
-  if (post.imageUri && !isVideo) {
+  // Your own photo, or the bundled demo photo for seed posts.
+  const photo = postPhoto(post);
+  if (photo && !isVideo) {
     return (
       <Image
-        source={{ uri: post.imageUri }}
+        source={photo}
         accessibilityLabel={post.mediaLabel ? `Photo: ${post.mediaLabel}` : 'Photo'}
         accessible
         contentFit="cover"
@@ -51,8 +54,10 @@ export function MediaPlaceholder({ post, height, radius = 0, showLabel = true }:
       accessibilityRole="image"
       accessibilityLabel={`${isVideo ? 'Video' : 'Photo'}: ${post.mediaLabel ?? 'untitled'}`}
       style={{ height, borderRadius: radius, backgroundColor: post.mediaColor ?? '#C9CDC6', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      {/* A video shows its demo photo as the still frame until you tap play. */}
+      {photo ? <Image source={photo} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
       {!isVideo && showLabel ? <CameraIcon /> : null}
-      {showLabel ? (
+      {showLabel && !photo ? (
         <View style={styles.mediaLabel}>
           <Text style={styles.mediaLabelText} numberOfLines={1}>
             {isVideo ? 'Video' : 'Photo'} · {post.mediaLabel}

@@ -6,11 +6,13 @@ import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/toast';
+import { logPhoto, postPhoto } from '@/lib/demo-photos';
+import type { Photo } from '@/lib/demo-photos';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef } from '@/lib/diary';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
-type Option = { ref: FavoriteRef; title: string; sub: string; imageUri?: string; color?: string };
+type Option = { ref: FavoriteRef; title: string; sub: string; image?: Photo; color?: string };
 
 /** Pick your Top 4 for a niche, from your diary, your posts and posts you saved. */
 export default function FavoritesScreen() {
@@ -31,19 +33,19 @@ export default function FavoritesScreen() {
       title: `From your ${words.diary.toLowerCase()}`,
       items: state.logs
         .filter((l) => l.userId === meId && l.niche === niche)
-        .map((l) => ({ ref: { kind: 'log', id: l.id }, title: l.title, sub: `${l.rating}★ · ${l.date}`, imageUri: l.imageUri, color: l.mediaColor })),
+        .map((l) => ({ ref: { kind: 'log', id: l.id }, title: l.title, sub: `${l.rating}★ · ${l.date}`, image: logPhoto(l), color: l.mediaColor })),
     },
     {
       title: 'Your posts',
       items: state.posts
         .filter((p) => p.authorId === meId && p.niche === niche && p.kind !== 'text' && !p.archived)
-        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: 'Your post', imageUri: p.imageUri, color: p.mediaColor })),
+        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: 'Your post', image: postPhoto(p), color: p.mediaColor })),
     },
     {
       title: 'Posts you saved',
       items: state.posts
         .filter((p) => state.saves[p.id] && p.niche === niche && p.kind !== 'text' && p.authorId !== meId)
-        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: `by ${usersById[p.authorId]?.username}`, imageUri: p.imageUri, color: p.mediaColor })),
+        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: `by ${usersById[p.authorId]?.username}`, image: postPhoto(p), color: p.mediaColor })),
     },
   ];
   const empty = options.every((g) => !g.items.length);
@@ -95,7 +97,7 @@ export default function FavoritesScreen() {
                       onPress={() => toggle(o.ref)}
                       style={styles.cell}>
                       <View style={[styles.thumb, { backgroundColor: o.color ?? n.field }, on ? { borderColor: n.accent } : null]}>
-                        {o.imageUri ? <Image source={{ uri: o.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                        {o.image ? <Image source={o.image} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
                         {on ? (
                           <View style={[styles.num, { backgroundColor: n.accent }]}>
                             <Text style={styles.numText}>{pos + 1}</Text>
@@ -122,7 +124,7 @@ export default function FavoritesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   navButton: { minWidth: 80, minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 12 },
   navText: { fontSize: 17 },

@@ -16,7 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastProvider } from '@/components/toast';
 
-import { StoreProvider, useStore } from '@/lib/store';
+import { StoreProvider, useNiches, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -42,6 +42,7 @@ export default function RootLayout() {
 
 function RootStack() {
   const { state } = useStore();
+  const niches = useNiches();
   const [fontsLoaded, fontError] = useFonts({
     InstrumentSerif_400Regular,
     InstrumentSerif_400Regular_Italic,
@@ -61,7 +62,9 @@ function RootStack() {
 
   const signedIn = !!state.me;
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    // Screens that mix niches sit on the palest tint of the niche you're in;
+    // niche screens (Home, posts, profiles, goals) paint their own stronger flood.
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: signedIn ? niches[state.niche].field : colors.ground } }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="post/[id]" />

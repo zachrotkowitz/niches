@@ -79,7 +79,7 @@ export default function MembershipsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { paddingHorizontal: 6 },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   sub: { fontSize: 15, lineHeight: 21, color: colors.textMuted },

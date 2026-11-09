@@ -137,8 +137,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
+  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: 'transparent' },
   navButton: { minWidth: 80, minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 12 },
   navText: { fontSize: 17 },
   navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },

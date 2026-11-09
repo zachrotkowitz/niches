@@ -159,6 +159,12 @@ function migrate(saved: Partial<Persisted>): Persisted {
     const haveComments = new Set(merged.comments.map((c) => c.id));
     merged.posts = [...merged.posts, ...fresh.posts.filter((p) => !havePosts.has(p.id) && !deleted.has(p.id))];
     merged.comments = [...merged.comments, ...fresh.comments.filter((c) => !haveComments.has(c.id) && !deleted.has(c.postId))];
+    // Demo posts whose words changed (v4: one art post now matches its demo photo).
+    const freshById = new Map(fresh.posts.map((p) => [p.id, p]));
+    merged.posts = merged.posts.map((p) => {
+      const f = freshById.get(p.id);
+      return f && p.authorId !== merged.me?.id ? { ...p, caption: f.caption, mediaLabel: f.mediaLabel } : p;
+    });
     merged.seedVersion = SEED_VERSION;
   }
   return merged;

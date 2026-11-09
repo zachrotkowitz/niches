@@ -81,7 +81,7 @@ export default function NewGoalScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: 'transparent' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.nav, { paddingTop: insets.top + 6 }]}>
         <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/goals'))} style={styles.navButton}>
           <Text style={[styles.navText, { color: niche.accent }]}>Cancel</Text>

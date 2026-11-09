@@ -13,6 +13,7 @@ import { useToast } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { dayLabel } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
+import { logPhoto } from '@/lib/demo-photos';
 import { colors, TOUCH } from '@/lib/theme';
 
 /** One diary entry. The owner can change who sees it, share it, add it to their Top 4, or delete it. */
@@ -73,7 +74,7 @@ export default function LogScreen() {
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         <View style={[styles.hero, { backgroundColor: log.mediaColor ?? niche.field }]}>
-          {log.imageUri ? <Image source={{ uri: log.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${log.title}`} /> : null}
+          {logPhoto(log) ? <Image source={logPhoto(log)} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${log.title}`} /> : null}
         </View>
         <View style={styles.body}>
           <Text style={[styles.kicker, { color: niche.ink, backgroundColor: niche.field }]}>
@@ -160,7 +161,7 @@ export default function LogScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   hero: { height: 300, overflow: 'hidden' },

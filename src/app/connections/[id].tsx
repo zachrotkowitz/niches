@@ -101,7 +101,7 @@ export default function ConnectionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
   back: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 17, fontWeight: '600', color: colors.text },
