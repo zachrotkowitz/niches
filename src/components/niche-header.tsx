@@ -27,7 +27,8 @@ export function NicheHeader({ position }: { position: SharedValue<number> }) {
   const bg = useAnimatedStyle(() => ({ backgroundColor: interpolateColor(-position.get() / width, stops, mids) }));
   // Long names ("Photography") shrink to fit on one line.
   const titleSize = Math.min(64, Math.floor((Math.min(width, 640) - 40) / (niche.label.length * 0.46)));
-  const showLayout = niche.open && !(state.homeMode === 'shop' && SHOP_NICHES.includes(niche.id));
+  // Posts/Grid on every niche (including Gym's preview); hidden only while a niche's Shop is showing.
+  const showLayout = !(state.homeMode === 'shop' && SHOP_NICHES.includes(niche.id));
 
   return (
     <Animated.View style={[styles.header, { paddingTop: insets.top + 6 }, bg]}>

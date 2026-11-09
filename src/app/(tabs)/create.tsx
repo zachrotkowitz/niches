@@ -29,13 +29,6 @@ export default function CreateScreen() {
   const [goal, setGoal] = useState('');
   // The goal a progress post belongs to; null means "just name it" (free text).
   const [goalId, setGoalId] = useState<string | null>(null);
-  // Opening from a goal's "Progress post" button preselects it.
-  useEffect(() => {
-    if (params.goalId) {
-      setKind('progress');
-      setGoalId(params.goalId);
-    }
-  }, [params.goalId]);
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
   const choosePhoto = async () => {
@@ -47,10 +40,24 @@ export default function CreateScreen() {
       setPicking(false);
     }
   };
-  const [nicheId] = useState<NicheId>('cooking');
+  // Post to the niche you're in, if it's open for posting; tap another chip to change.
+  const [nicheId, setNicheId] = useState<NicheId>(NICHES[state.niche].open ? state.niche : 'cooking');
   const [postedId, setPostedId] = useState<string | null>(null);
   const [membersOnly, setMembersOnly] = useState(false);
 
+  // The Post tab stays open in the background, so follow the niche you switch to on Home.
+  useEffect(() => {
+    if (NICHES[state.niche].open) setNicheId(state.niche);
+  }, [state.niche, NICHES]);
+  // Opening from a goal's "Progress post" button preselects it (and its niche).
+  useEffect(() => {
+    if (!params.goalId) return;
+    const g = state.goals.find((x) => x.id === params.goalId);
+    if (g && NICHES[g.niche].open) setNicheId(g.niche);
+    setKind('progress');
+    setGoalId(params.goalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.goalId]);
   const niche = NICHES[nicheId];
   const needsPhoto = kind !== 'question';
   const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
@@ -196,7 +203,7 @@ export default function CreateScreen() {
             onChangeText={setCaption}
             multiline
             maxLength={2000}
-            placeholder={kind === 'question' ? 'Ask the Cooking niche anything' : 'What did you make?'}
+            placeholder={kind === 'question' ? `Ask the ${niche.label} niche anything` : nicheId === 'photography' ? 'What did you shoot?' : 'What did you make?'}
             placeholderTextColor="#6B7178"
             style={[styles.input, styles.textarea]}
             selectionColor={niche.accent}
@@ -221,15 +228,19 @@ export default function CreateScreen() {
               const n = NICHES[id];
               const selected = id === nicheId;
               return (
-                <View
+                <Pressable
                   key={id}
-                  accessible
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected, disabled: !n.open }}
-                  style={[styles.nicheChip, selected ? { backgroundColor: n.accent, borderColor: n.accent } : { backgroundColor: '#F7F8F5', borderColor: '#E3E5E1' }]}>
+                  disabled={!n.open}
+                  onPress={() => {
+                    setNicheId(id);
+                    setGoalId(null);
+                  }}
+                  style={[styles.nicheChip, selected ? { backgroundColor: n.accent, borderColor: n.accent } : { backgroundColor: '#FFFFFF', borderColor: n.open ? n.accent : '#E3E5E1' }]}>
                   {selected ? <CheckIcon size={15} strokeWidth={2.6} /> : null}
-                  <Text style={[styles.nicheChipText, { color: selected ? '#FFFFFF' : '#6B7178' }]}>{n.open ? n.label : `${n.label} · soon`}</Text>
-                </View>
+                  <Text style={[styles.nicheChipText, { color: selected ? '#FFFFFF' : n.open ? n.ink : '#6B7178' }]}>{n.open ? n.label : `${n.label} · soon`}</Text>
+                </Pressable>
               );
             })}
           </View>

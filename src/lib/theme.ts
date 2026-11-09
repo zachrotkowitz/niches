@@ -61,8 +61,9 @@ type NicheBase = { id: NicheId; label: string; paletteId: string; open: boolean 
 
 const NICHE_BASE: Record<NicheId, NicheBase> = {
   cooking: { id: 'cooking', label: 'Cooking', paletteId: 'basil', open: true },
-  art: { id: 'art', label: 'Art', paletteId: 'ultramarine', open: false },
-  photography: { id: 'photography', label: 'Photography', paletteId: 'amber', open: false },
+  // Art and Photography opened for posting (founder, Nov 2026). Gym is still coming soon.
+  art: { id: 'art', label: 'Art', paletteId: 'ultramarine', open: true },
+  photography: { id: 'photography', label: 'Photography', paletteId: 'amber', open: true },
   gym: { id: 'gym', label: 'Gym', paletteId: 'raspberry', open: false },
 };
 

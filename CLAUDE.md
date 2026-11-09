@@ -7,16 +7,16 @@ The founder has little coding experience and wants to be involved: explain decis
 ## Decisions so far
 
 - **First version is a working demo** to show and test the idea.
-- **Launch niche: Cooking.** Art, Photography and Gym are in the app as "coming soon". **Gym stays** (decided Nov 2026); goals track performance and habits (not weight), stats are hideable, and before/after photos sit behind a tap. Gardening is the leading candidate for the next niche, then Knitting & Crochet.
+- **Launch niche: Cooking.** **Art and Photography are open for posting** (founder, Nov 9 2026); Gym is still "coming soon". **Gym stays** (decided Nov 2026); goals track performance and habits (not weight), stats are hideable, and before/after photos sit behind a tap. Gardening is the leading candidate for the next niche, then Knitting & Crochet.
 - **Feeds:** each niche feed shows *every* post in that niche, newest first, and ends with "You're caught up in Cooking". A "Following" filter comes later. One post belongs to exactly one niche. Remember the user's last niche.
-- **Feed layout:** both a single-column Posts layout and a Pinterest-style Grid, with a Posts/Grid switch. Tapping a grid tile opens the normal post view (cheers, comments) with a back button to the grid.
+- **Feed layout:** both a single-column Posts layout and a Pinterest-style Grid, with a Posts/Grid switch on every niche (hidden only while a niche's Shop is showing). Tapping a grid tile opens the normal post view (cheers, comments) with a back button to the grid.
 - **Each niche has its own color — a must.** Cooking is basil green (#1E6B47); Art ultramarine; Photography amber; Gym raspberry. Switching niche re-tints the app. Mockups: https://claude.ai/artifact/7T9p36YdKk7gkBDfeQe6sm (founder approved the look; expect more feedback on real prototypes).
 - **Niche marker outside Home:** on Discover and Saved (anywhere niches mix), each post gets a **border in its niche's color — border only, no label**. Keep the two tabs consistent.
 - **Discover** = find people to follow + "inspiration this week" across niches the user filters for, ordered by most saved in the last 7 days. Never show the counts. Home stays newest-first.
 - **Sheets/menus don't dim the screen behind them** (founder feedback).
 - **Swipe left/right on Home switches niche like turning a page:** the next niche's feed slides in alongside the current one under your finger; header color blends between niches as you drag. Filter chips on Discover/Saved show their niche by a colored border (like the posts), not a swatch.
   Order: Cooking → Art → Photography → Gym. Tabs stay tap-only.
-- **Demo has preview posts** from made-up founding creators in Art and Photography; those niches stay closed for posting. Gym has none.
+- **Demo has posts** from made-up founding creators in Art and Photography; the Post tab lets you pick Cooking, Art or Photography (it follows the niche you're in). Gym has none.
 - **Post "⋯" menu, like Instagram:** own posts — edit, adjust grid preview, hide cheer count, turn off comments, archive, delete; others' posts — save, not interested, report, copy link.
 - **Look: "Soft Flood" (founder's pick, Nov 2026, plain background, no dots).** Canvas with all options: https://claude.ai/artifact/WcSK5feoqtRFASzgGTprDw. A dusty mid-tone of the niche color (`niche.mid`, accent mixed 34% with white) fills screens that belong to one niche (Home, a post, profiles, a goal); text there is the niche ink, never the accent. Screens that mix niches (Discover, Saved, Plans, Post, forms) sit on the palest tint of the current niche (`niche.field`, via the navigators' `contentStyle`/`sceneStyle`) so niche borders still read; the tab bar matches the screen (mid on Home/Profile, field elsewhere). Founder asked for this tint, Nov 2026. Headlines are Instrument Serif (italic for niche names and moments like "You're caught up."), body is Schibsted Grotesk.
 - **Goals confirmed (Nov 2026):** private by default like the diary; weekly streaks with rest weeks always available.
@@ -53,10 +53,6 @@ Expo (React Native, Expo Router) for iOS, Android and web from one codebase; Sup
 - **Phase D, Creators:** verified "celebrity" profiles and premium chefs/artists who charge a subscription or one-time fee for their best content. Same model for other niches. **Invite-only at first** (founder approves), open applications later. **Members-only posts appear in niche feeds and Discover only for people who can open them** (members, unlockers, the author); everyone else sees them locked on the creator's profile (`inFeeds()` in store). **Niches takes 5% of creator earnings** (founder confirmed Nov 2026; same as the Shop).
 - **More niches:** founder likes Gardening; wants other popular hobby suggestions.
 - C and D need real accounts (Supabase) and payments; mind Apple/Google rules on paid digital content.
-
-## Reminders for the founder
-
-- **Remind the founder about Saved boards + "Share to Niches" at the start of the next working session** (they asked on Nov 9, 2026). Share to Niches needs a development build (EAS), not Expo Go; walk them through it. Remove this line once it's been raised.
 
 ## Where the build is
 
