@@ -8,7 +8,7 @@ import { CheckIcon, ChevronLeftIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
 import { useToast } from '@/components/toast';
 import { useNiches, useStore } from '@/lib/store';
-import { colors, DEFAULT_PALETTE, distinctness, NICHE_ORDER, PALETTES, PALETTES_BY_ID, SCHEMES, TOUCH, type NicheId, type Scheme } from '@/lib/theme';
+import { APP_GROUNDS, colors, DEFAULT_PALETTE, distinctness, NICHE_ORDER, PALETTES, PALETTES_BY_ID, SCHEMES, TOUCH, type NicheId, type Scheme } from '@/lib/theme';
 
 /**
  * Color lab: try a different palette for each niche and see the whole app
@@ -55,6 +55,28 @@ export default function ColorLabScreen() {
             </View>
             <Text style={styles.meterText}>{activeScheme ? `${activeScheme.name} · ` : 'Custom · '}{tellApart.label}</Text>
           </View>
+        </View>
+
+        <Text style={styles.section}>App background</Text>
+        <Text style={styles.groundSub}>For everything that isn’t a niche feed: Profile, Discover, Saved, Post and Plans. Niche feeds keep their own colors.</Text>
+        <View style={styles.grounds} accessibilityRole="radiogroup">
+          {APP_GROUNDS.map((g) => {
+            const on = g.id === state.appGround;
+            return (
+              <Pressable
+                key={g.id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => {
+                  actions.setAppGround(g.id);
+                  toast(`${g.name} background`);
+                }}
+                style={[styles.groundOption, { backgroundColor: g.ground, borderColor: on ? g.text : g.line }]}>
+                <Text style={[styles.groundName, { color: g.text }]}>{g.name}</Text>
+                <Text style={[styles.groundNote, { color: g.muted }]}>{on ? 'In use' : 'Tap to try'}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <Text style={styles.section}>Color schemes</Text>
@@ -178,6 +200,11 @@ function Basic({ title, body }: { title: string; body: string }) {
 }
 
 const styles = StyleSheet.create({
+  groundSub: { fontSize: 14, lineHeight: 20, color: colors.textMuted, paddingHorizontal: 20, marginTop: 4 },
+  grounds: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  groundOption: { flex: 1, minHeight: 76, borderRadius: 16, borderWidth: 2, padding: 12, justifyContent: 'space-between' },
+  groundName: { fontSize: 16, fontWeight: '700' },
+  groundNote: { fontSize: 12, fontWeight: '600' },
   meter: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.surface },
   meterDots: { flexDirection: 'row', gap: 4 },
   meterDot: { width: 14, height: 14, borderRadius: 7 },

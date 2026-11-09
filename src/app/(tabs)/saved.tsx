@@ -10,7 +10,7 @@ import { Button, DisplayText } from '@/components/primitives';
 import { ListingGrid } from '@/components/shop';
 import { MediaPlaceholder } from '@/components/primitives';
 import { diaryWords } from '@/lib/diary';
-import { useNiches, useStore } from '@/lib/store';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 
 export default function SavedScreen() {
@@ -18,6 +18,7 @@ export default function SavedScreen() {
   const router = useRouter();
   const { state } = useStore();
   const niches = useNiches();
+  const ground = useAppGround();
   const [filter, setFilter] = useState<NicheId[]>([]);
   const niche = niches[state.niche];
 
@@ -72,10 +73,11 @@ export default function SavedScreen() {
 
       {saved.length || (!savedListings.length && !wanted.length) ? <Text style={styles.section}>Posts · {shown.length}</Text> : null}
       {saved.length === 0 && (savedListings.length || wanted.length) ? null : saved.length === 0 ? (
-        <View style={[styles.empty, { backgroundColor: niche.field }]}>
-          <Text style={[styles.emptyTitle, { color: niche.ink }]}>Nothing saved yet</Text>
-          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Tap Save on any post or shop listing and it lands here, outlined in its niche’s color. Boards to organize them are next.</Text>
-          <Button label={`Browse ${niche.label}`} color={niche.accent} onPress={() => router.navigate('/')} />
+        // Saved isn't a niche screen, so its empty state doesn't take the last niche's color.
+        <View style={[styles.empty, { backgroundColor: '#FFFFFF' }]}>
+          <Text style={[styles.emptyTitle, { color: ground.text }]}>Nothing saved yet</Text>
+          <Text style={[styles.emptyBody, { color: ground.body }]}>Tap Save on any post or shop listing and it lands here, outlined in its niche’s color. Boards to organize them are next.</Text>
+          <Button label="Browse your feeds" color={ground.text} onPress={() => router.navigate('/')} />
         </View>
       ) : (
         <FeedGrid posts={shown} nicheBorders />

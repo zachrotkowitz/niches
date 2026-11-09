@@ -238,3 +238,35 @@ export function distinctness(accents: string[]): { label: string; score: number 
   const label = min >= 45 ? 'Very easy to tell apart' : min >= 28 ? 'Easy to tell apart' : min >= 18 ? 'Some niches look alike' : 'Niches look alike';
   return { label, score: min };
 }
+
+/**
+ * The app's own background for everything that isn't a niche feed (Profile,
+ * Discover, Saved, Post, Plans, forms), so those screens feel the same whichever
+ * niche you were last in (founder, Nov 2026). Every option keeps ink, accent and
+ * muted text at WCAG AA for all palettes. Picked in the Color lab.
+ */
+export type AppGround = { id: string; name: string; ground: string; text: string; body: string; muted: string; line: string };
+
+export const APP_GROUNDS: AppGround[] = [
+  { id: 'cream', name: 'Cream', ground: '#F7F1E6', text: '#1F1A14', body: '#3B342C', muted: '#655B4F', line: 'rgba(31,26,20,0.12)' },
+  { id: 'blush', name: 'Blush', ground: '#F6E7E2', text: '#24181A', body: '#41302F', muted: '#6B5552', line: 'rgba(36,24,26,0.12)' },
+  { id: 'oat', name: 'Oat', ground: '#EFE8DC', text: '#1F1A14', body: '#3B342C', muted: '#605649', line: 'rgba(31,26,20,0.13)' },
+];
+
+export const DEFAULT_APP_GROUND = 'cream';
+
+export function appGround(id: string | undefined): AppGround {
+  return APP_GROUNDS.find((g) => g.id === id) ?? APP_GROUNDS[0];
+}
+
+const groundCache = new WeakMap<AppGround, Surface>();
+
+/** Colors for components sitting on the app background. */
+export function groundSurface(g: AppGround): Surface {
+  let s = groundCache.get(g);
+  if (!s) {
+    s = { flood: false, ground: g.ground, text: g.text, body: g.body, muted: g.muted, line: g.line, raised: '#FFFFFF', active: (n) => n.accent };
+    groundCache.set(g, s);
+  }
+  return s;
+}

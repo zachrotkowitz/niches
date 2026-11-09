@@ -11,7 +11,7 @@ import { sampleFavorites, sampleYear } from './recap';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
-import { NICHE_ORDER, resolveNiches, type NicheId } from './theme';
+import { appGround, DEFAULT_APP_GROUND, NICHE_ORDER, resolveNiches, type NicheId } from './theme';
 import type { Comment, Membership, Post, PostKind, ReportReason, User } from './types';
 
 const STORAGE_KEY = 'niches:demo:v1';
@@ -67,6 +67,8 @@ type State = {
   favorites: Record<string, Partial<Record<NicheId, FavoriteRef[]>>>;
   /** Goals, yours and demo accounts'. */
   goals: Goal[];
+  /** Background for non-niche screens (Color lab). */
+  appGround: string;
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -111,7 +113,8 @@ type Action =
   | { type: 'mapGoal'; id: string; fn: (goal: Goal) => Goal }
   | { type: 'deleteGoal'; id: string }
   | { type: 'addSample'; logs: LogEntry[]; goals: Goal[]; userId: string }
-  | { type: 'removeSample' };
+  | { type: 'removeSample' }
+  | { type: 'setAppGround'; id: string };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -146,6 +149,7 @@ function freshState(): Persisted {
     wantList: {},
     favorites: seedFavorites(),
     goals: seedGoals(now),
+    appGround: DEFAULT_APP_GROUND,
   };
 }
 
@@ -277,6 +281,8 @@ function reducer(state: State, action: Action): State {
       const goals = state.goals.map((g) => (g.checkIns.some((c) => c.logId === action.id) ? { ...g, checkIns: g.checkIns.filter((c) => c.logId !== action.id) } : g));
       return { ...state, logs: state.logs.filter((l) => l.id !== action.id), favorites, goals };
     }
+    case 'setAppGround':
+      return { ...state, appGround: action.id };
     case 'addGoal':
       return { ...state, goals: [action.goal, ...state.goals] };
     case 'mapGoal':
@@ -592,6 +598,7 @@ function useStoreValue() {
         dispatch({ type: 'addSample', logs, goals, userId });
       },
       removeSampleYear: () => dispatch({ type: 'removeSample' }),
+      setAppGround: (id: string) => dispatch({ type: 'setAppGround', id }),
     }),
     [],
   );
@@ -612,6 +619,11 @@ export function useStore(): StoreValue {
   const value = useContext(StoreContext);
   if (!value) throw new Error('useStore must be used inside <StoreProvider>');
   return value;
+}
+
+/** The app background for non-niche screens (Cream unless changed in the Color lab). */
+export function useAppGround() {
+  return appGround(useStore().state.appGround);
 }
 
 /** Niche colors with any Color lab choices applied. */

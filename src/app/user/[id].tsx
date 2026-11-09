@@ -7,8 +7,8 @@ import { ChevronLeftIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { ProfileView } from '@/components/profile-view';
 import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
-import { useNiches, useStore } from '@/lib/store';
-import { floodSurface, TOUCH, type Surface } from '@/lib/theme';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { groundSurface, TOUCH, type Surface } from '@/lib/theme';
 
 /** Someone else's profile. */
 function UserScreenInner() {
@@ -54,12 +54,11 @@ const makeStyles = (sf: Surface) =>
   title: { fontSize: 17, fontWeight: '600', color: sf.text },
 });
 
-/** Flooded in the color of the niche you're in, like Home. */
+/** Profiles aren't a niche feed, so they sit on the app background, whatever niche you were last in. */
 export default function UserScreen() {
-  const { state } = useStore();
-  const niches = useNiches();
+  const ground = useAppGround();
   return (
-    <SurfaceProvider value={floodSurface(niches[state.niche])}>
+    <SurfaceProvider value={groundSurface(ground)}>
       <UserScreenInner />
     </SurfaceProvider>
   );

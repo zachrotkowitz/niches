@@ -8,8 +8,8 @@ import { ChevronLeftIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { PostSquares, ProfileView } from '@/components/profile-view';
 import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
-import { useNiches, useStore } from '@/lib/store';
-import { floodSurface, NICHE_ORDER, TOUCH, type Surface } from '@/lib/theme';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { groundSurface, NICHE_ORDER, TOUCH, type Surface } from '@/lib/theme';
 
 function ProfileScreenInner() {
   const styles = useSurfaceStyles(makeStyles);
@@ -132,12 +132,11 @@ const makeStyles = (sf: Surface) =>
   dot: { width: 12, height: 12, borderRadius: 6 },
 });
 
-/** Your profile, flooded in the color of the niche you're in. */
+/** Your profile sits on the app background, whatever niche you were last in. */
 export default function ProfileScreen() {
-  const { state } = useStore();
-  const niches = useNiches();
+  const ground = useAppGround();
   return (
-    <SurfaceProvider value={floodSurface(niches[state.niche])}>
+    <SurfaceProvider value={groundSurface(ground)}>
       <ProfileScreenInner />
     </SurfaceProvider>
   );

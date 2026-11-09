@@ -41,11 +41,22 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
   const weekly = goals.filter((g) => g.kind === 'habit' && !g.doneAt);
   const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals';
   const shown = tab === 'all' ? posts : isNicheTab(tab) ? posts.filter((p) => p.niche === tab) : [];
-  // Top 4 rows: the niche tab you're on, or every niche with picks on "All" (yours always shows your current niche so you can fill it).
+  // The niche this person is most active in (posts and diary), so the profile
+  // looks the same whichever niche was last open on Home.
+  const activity: Partial<Record<NicheId, number>> = {};
+  for (const p of posts) activity[p.niche] = (activity[p.niche] ?? 0) + 1;
+  for (const l of logs) activity[l.niche] = (activity[l.niche] ?? 0) + 1;
+  const mainNiche: NicheId = NICHE_ORDER.reduce((best, id) => ((activity[id] ?? 0) > (activity[best] ?? 0) ? id : best), 'cooking' as NicheId);
+  const withPicks = NICHE_ORDER.filter((id) => (state.favorites[user.id]?.[id]?.length ?? 0) > 0);
+  // Top 4 rows: the niche tab you're on; on "All", every niche with picks (or, if you have none yet, your main niche so you can start one). Never the niche last open on Home.
   const favNiches: NicheId[] =
     isNicheTab(tab)
       ? [tab]
-      : NICHE_ORDER.filter((id) => (state.favorites[user.id]?.[id]?.length ?? 0) > 0 || (isMe && id === state.niche));
+      : withPicks.length
+        ? withPicks
+        : isMe
+          ? [mainNiche]
+          : [];
   const monthPrefix = new Date().toISOString().slice(0, 7);
   const thisMonth = logs.filter((l) => l.date.startsWith(monthPrefix)).length;
   const avg = logs.length ? logs.reduce((n, l) => n + l.rating, 0) / logs.length : 0;
@@ -95,9 +106,9 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         {user.membership ? (
           <MembershipCard
             creator={user}
-            accent={niches[nicheTabs[0] ?? state.niche].accent}
-            field={niches[nicheTabs[0] ?? state.niche].field}
-            ink={niches[nicheTabs[0] ?? state.niche].ink}
+            accent={niches[nicheTabs[0] ?? mainNiche].accent}
+            field={niches[nicheTabs[0] ?? mainNiche].field}
+            ink={niches[nicheTabs[0] ?? mainNiche].ink}
           />
         ) : null}
         {nicheTabs.length ? (
@@ -113,7 +124,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           <Button
             label={following ? 'Following' : 'Follow'}
             tone={following ? 'outline' : 'solid'}
-            color={surface.flood ? surface.text : niches[nicheTabs[0] ?? state.niche].accent}
+            color={surface.flood ? surface.text : niches[nicheTabs[0] ?? mainNiche].accent}
             textStyle={following ? { color: surface.text } : undefined}
             style={following ? { borderColor: surface.line, backgroundColor: 'rgba(255,255,255,0.35)' } : undefined}
             onPress={() => actions.toggleFollow(user.id)}
@@ -174,7 +185,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           ) : null}
           {isMe ? (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-              <Button label="New goal" color={niches[state.niche].accent} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: state.niche } })} />
+              <Button label="New goal" color={niches[mainNiche].accent} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} />
               {goals.length ? <Button label="All goals" tone="outline" style={{ flex: 1 }} onPress={() => router.push('/goals')} /> : null}
             </View>
           ) : null}
@@ -182,7 +193,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
       ) : tab === 'diary' ? (
         <View style={styles.diary}>
-          {isMe ? <RecapCard niche={state.niche} /> : null}
+          {isMe ? <RecapCard niche={mainNiche} /> : null}
           {logs.length ? (
             <View style={[styles.diaryStats, { backgroundColor: niches[logs[0].niche].field }]}>
               <Stat value={String(logs.length)} label="logged" ink={niches[logs[0].niche].ink} />
@@ -192,9 +203,9 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           ) : null}
           {isMe ? (
             <Button
-              label={`${diaryWords(state.niche).did}: log something`}
-              color={niches[state.niche].accent}
-              onPress={() => router.push({ pathname: '/log/new', params: { niche: state.niche } })}
+              label={`${diaryWords(mainNiche).did}: log something`}
+              color={niches[mainNiche].accent}
+              onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })}
             />
           ) : null}
           {logs.length === 0 ? (
@@ -216,7 +227,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           {isMe ? (
             <>
               <Text style={styles.emptyBody}>Share your first dish, a question, or progress toward a goal.</Text>
-              <Button label="Create a post" color={niches[state.niche].accent} onPress={() => router.navigate('/create')} />
+              <Button label="Create a post" color={niches[mainNiche].accent} onPress={() => router.navigate('/create')} />
             </>
           ) : null}
         </View>
