@@ -10,6 +10,7 @@ import { NichePager } from '@/components/niche-swipe';
 import { PostCard } from '@/components/post-card';
 import { Button, DisplayText } from '@/components/primitives';
 import { NicheShop } from '@/components/shop';
+import { progress } from '@/lib/goals';
 import { SHOP_NICHES } from '@/lib/shop';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { inFeeds, useNiches, useStore } from '@/lib/store';
@@ -140,6 +141,9 @@ function FeedSection({ posts, layout }: { posts: Post[]; layout: 'posts' | 'grid
 /** The feed has a real end. Nothing else loads unless you ask. */
 function CaughtUp({ niche, count }: { niche: Niche; count: number }) {
   const router = useRouter();
+  const { state } = useStore();
+  // Instead of more posts: a nudge toward your own week.
+  const weekly = state.goals.filter((g) => g.userId === state.me?.id && g.niche === niche.id && g.kind === 'habit' && !g.doneAt);
   return (
     <View style={[styles.caughtUp, { backgroundColor: niche.field }]} accessibilityRole="summary">
       <View style={[styles.check, { backgroundColor: niche.accent }]}>
@@ -153,6 +157,20 @@ function CaughtUp({ niche, count }: { niche: Niche; count: number }) {
           ? 'No new posts since yesterday. Be the first to share something today.'
           : `That’s all ${count} new ${count === 1 ? 'post' : 'posts'} since yesterday. Go make something, then come back and share it.`}
       </Text>
+      {weekly.length ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push(weekly.length === 1 ? { pathname: '/goals/[id]', params: { id: weekly[0].id } } : '/goals')} style={styles.weekGoals}>
+          <Text style={[styles.weekGoalsLabel, { color: niche.inkSoft }]}>Your week</Text>
+          {weekly.slice(0, 3).map((g) => {
+            const p = progress(g);
+            return (
+              <View key={g.id} style={styles.weekGoalRow}>
+                <Text style={[styles.weekGoalTitle, { color: niche.ink }]} numberOfLines={1}>{g.title}</Text>
+                <Text style={[styles.weekGoalCount, { color: niche.ink }]}>{p.headline}</Text>
+              </View>
+            );
+          })}
+        </Pressable>
+      ) : null}
       <View style={{ gap: 8, marginTop: 4 }}>
         <Button label="Open your saves" color={niche.accent} onPress={() => router.navigate('/saved')} />
         <Button label="Share what you made" tone="inverse" color={niche.ink} onPress={() => router.navigate('/create')} />
@@ -213,6 +231,11 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 13, color: colors.textMuted },
   caughtUp: { margin: 20, padding: 22, paddingTop: 28, borderRadius: 24, gap: 14 },
   check: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  weekGoals: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, gap: 6 },
+  weekGoalsLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  weekGoalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  weekGoalTitle: { fontSize: 15, fontWeight: '600', flex: 1 },
+  weekGoalCount: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   caughtUpBody: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
   olderWrap: { paddingHorizontal: 20 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 4 },

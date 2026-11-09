@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
 import { DiaryRow, TopFour } from '@/components/diary';
+import { GoalCard } from '@/components/goals';
 import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
@@ -12,11 +13,12 @@ import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/prim
 import { pickPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { diaryWords } from '@/lib/diary';
+import { progress, visibleGoals } from '@/lib/goals';
 import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } from '@/lib/store';
-import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
+import { colors, fonts, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
-type Tab = 'all' | NicheId | 'shop' | 'diary';
+type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
 export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
@@ -31,10 +33,13 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
   const nicheTabs = NICHE_ORDER.filter((id) => posts.some((p) => p.niche === id));
   const listings = state.listings.filter((l) => l.sellerId === user.id);
   const logs = visibleLogs(state, user.id);
-  const shown = tab === 'all' ? posts : tab === 'shop' || tab === 'diary' ? [] : posts.filter((p) => p.niche === tab);
+  const goals = visibleGoals(state.goals, user.id, state.me?.id).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt) || b.createdAt - a.createdAt);
+  const weekly = goals.filter((g) => g.kind === 'habit' && !g.doneAt);
+  const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals';
+  const shown = tab === 'all' ? posts : isNicheTab(tab) ? posts.filter((p) => p.niche === tab) : [];
   // Top 4 rows: the niche tab you're on, or every niche with picks on "All" (yours always shows your current niche so you can fill it).
   const favNiches: NicheId[] =
-    tab !== 'all' && tab !== 'shop' && tab !== 'diary'
+    isNicheTab(tab)
       ? [tab]
       : NICHE_ORDER.filter((id) => (state.favorites[user.id]?.[id]?.length ?? 0) > 0 || (isMe && id === state.niche));
   const monthPrefix = new Date().toISOString().slice(0, 7);
@@ -127,7 +132,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
       ) : null}
 
-      {favNiches.length && tab !== 'shop' ? (
+      {favNiches.length && tab !== 'shop' && tab !== 'goals' ? (
         <View style={styles.favs}>
           {favNiches.map((id) => (
             <TopFour key={id} userId={user.id} niche={id} isMe={isMe} />
@@ -136,18 +141,42 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
       ) : null}
 
       <View accessibilityRole="tablist" style={styles.tabs}>
-        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
+        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? colors.text : 'transparent' }]}>
-              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : niches[t].label}</Text>
+              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      {tab === 'diary' ? (
+      {tab === 'goals' ? (
         <View style={styles.diary}>
+          {isMe && weekly.length ? (
+            <Text style={styles.goalsSummary}>
+              This week: <Text style={{ fontWeight: '800', color: colors.text }}>{weekly.filter((g) => progress(g).fraction >= 1).length} of {weekly.length}</Text> weekly {weekly.length === 1 ? 'goal' : 'goals'} done
+            </Text>
+          ) : null}
+          {goals.map((g) => (
+            <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
+          ))}
+          {goals.length === 0 ? (
+            <Text style={styles.diaryEmpty}>
+              {isMe ? 'Set a goal and check in when you work on it. Streaks are weekly, rest weeks never break one, and goals are private unless you choose otherwise.' : 'No public goals.'}
+            </Text>
+          ) : null}
+          {isMe ? (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+              <Button label="New goal" color={niches[state.niche].accent} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: state.niche } })} />
+              {goals.length ? <Button label="All goals" tone="outline" style={{ flex: 1 }} onPress={() => router.push('/goals')} /> : null}
+            </View>
+          ) : null}
+          {isMe && goals.some((g) => g.visibility === 'private') ? <Text style={styles.diaryNote}>Goals with a lock are private. Others only see the ones you put on your profile.</Text> : null}
+        </View>
+      ) : tab === 'diary' ? (
+        <View style={styles.diary}>
+          {isMe ? <RecapCard niche={state.niche} /> : null}
           {logs.length ? (
             <View style={[styles.diaryStats, { backgroundColor: niches[logs[0].niche].field }]}>
               <Stat value={String(logs.length)} label="logged" ink={niches[logs[0].niche].ink} />
@@ -192,6 +221,26 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
 
       {footer}
     </View>
+  );
+}
+
+/** Entry to "Your year in Cooking" from your own diary. */
+function RecapCard({ niche: id }: { niche: NicheId }) {
+  const router = useRouter();
+  const n = useNiches()[id];
+  const year = new Date().getFullYear();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Your ${year} in ${n.label}. Open recap`}
+      onPress={() => router.push({ pathname: '/recap/[niche]', params: { niche: id } })}
+      style={({ pressed }) => [styles.recap, { backgroundColor: n.ink, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+      <Text style={[styles.recapYear, { color: n.field }]}>{year}</Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.recapTitle}>Your year in {n.label}</Text>
+        <Text style={[styles.recapSub, { color: n.field }]}>What you made, your go-tos, your best weeks</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -272,6 +321,11 @@ const styles = StyleSheet.create({
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
   diaryStats: { flexDirection: 'row', paddingVertical: 14, borderRadius: 16, marginBottom: 6 },
   diaryEmpty: { fontSize: 15, lineHeight: 21, color: colors.textSecondary, padding: 16, borderRadius: 14, backgroundColor: colors.surface },
+  goalsSummary: { fontSize: 15, color: colors.textSecondary, marginBottom: 4 },
+  recap: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, marginBottom: 6 },
+  recapYear: { fontFamily: fonts.displayHeavy, fontSize: 34, letterSpacing: -1.5 },
+  recapTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  recapSub: { fontSize: 13, marginTop: 2 },
   diaryNote: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
   plansHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   plansTitle: { fontSize: 17, fontWeight: '700', color: colors.text },

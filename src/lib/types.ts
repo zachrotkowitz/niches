@@ -57,6 +57,8 @@ export type Post = {
   durationSec?: number;
   /** Set when this is a progress post toward a goal. */
   progressLabel?: string;
+  /** The goal a progress post belongs to. */
+  goalId?: string;
   /** Cheers from people who are not in the demo's user list. */
   seedCheers?: number;
   /** Saves from people who are not in the demo's user list. */

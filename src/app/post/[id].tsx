@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChevronLeftIcon, LockIcon } from '@/components/icons';
+import { ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
 import { diaryWords } from '@/lib/diary';
 import { Avatar, Button } from '@/components/primitives';
@@ -37,6 +37,8 @@ export default function PostScreen() {
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
   const locked = !hasAccess(state, post);
   const canSend = draft.trim().length > 0 && !!state.me && !post.commentsOff && !locked;
+  // A progress post links to its goal when the viewer can see that goal.
+  const goal = post.goalId ? state.goals.find((g) => g.id === post.goalId && (g.userId === state.me?.id || g.visibility === 'profile')) : undefined;
 
   const send = () => {
     if (!canSend || !state.me) return;
@@ -81,6 +83,20 @@ export default function PostScreen() {
               <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{diaryWords(post.niche).did}</Text>
             </Pressable>
           </View>
+        ) : null}
+        {goal ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Goal: ${goal.title}. See progress`}
+            onPress={() => router.push({ pathname: '/goals/[id]', params: { id: goal.id } })}
+            style={({ pressed }) => [styles.goalLink, { backgroundColor: niche.field, opacity: pressed ? 0.85 : 1 }]}>
+            <TrendIcon size={16} color={niche.ink} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.goalLinkLabel, { color: niche.inkSoft }]}>{isMine ? 'Your goal' : `${usersById[goal.userId]?.username}’s goal`}</Text>
+              <Text style={[styles.goalLinkTitle, { color: niche.ink }]} numberOfLines={1}>{goal.title}</Text>
+            </View>
+            <Text style={[styles.goalLinkGo, { color: niche.ink }]}>See progress</Text>
+          </Pressable>
         ) : null}
         {state.logs.some((l) => l.userId === state.me?.id && l.postId === post.id) ? (
           <Text style={styles.madeIt}>
@@ -176,6 +192,10 @@ const styles = StyleSheet.create({
   diaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
   diaryButton: { flex: 1, minHeight: TOUCH, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   diaryButtonText: { fontSize: 15, fontWeight: '700' },
+  goalLink: { marginHorizontal: 20, marginTop: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH + 8 },
+  goalLinkLabel: { fontSize: 12, fontWeight: '600' },
+  goalLinkTitle: { fontSize: 15, fontWeight: '700' },
+  goalLinkGo: { fontSize: 14, fontWeight: '700' },
   madeIt: { paddingHorizontal: 20, paddingTop: 8, fontSize: 13, color: colors.textMuted },
   banner: { marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   bannerText: { fontSize: 14, fontWeight: '600' },

@@ -25,6 +25,8 @@ export type LogEntry = {
   /** Set when the entry was also shared as a post. */
   sharedPostId?: string;
   createdAt: number;
+  /** Demo sample data ("fill in a sample year"), removable in one tap. */
+  sample?: boolean;
 };
 
 /** A Top 4 slot: one of your diary entries, or a post (yours or one you saved). */

@@ -6,6 +6,8 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNo
 
 import type { CreatorApplication } from './creators';
 import { MAX_FAVORITES, seedFavorites, seedLogs, type FavoriteRef, type LogEntry } from './diary';
+import { seedGoals, type CheckIn, type Goal } from './goals';
+import { sampleFavorites, sampleYear } from './recap';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
@@ -63,6 +65,8 @@ type State = {
   wantList: Record<string, number>;
   /** Top 4 per niche, keyed by user id. */
   favorites: Record<string, Partial<Record<NicheId, FavoriteRef[]>>>;
+  /** Goals, yours and demo accounts'. */
+  goals: Goal[];
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -102,7 +106,12 @@ type Action =
   | { type: 'deleteLog'; id: string }
   | { type: 'toggleWant'; postId: string }
   | { type: 'wantDone'; postId: string }
-  | { type: 'setFavorites'; userId: string; niche: NicheId; refs: FavoriteRef[] };
+  | { type: 'setFavorites'; userId: string; niche: NicheId; refs: FavoriteRef[] }
+  | { type: 'addGoal'; goal: Goal }
+  | { type: 'mapGoal'; id: string; fn: (goal: Goal) => Goal }
+  | { type: 'deleteGoal'; id: string }
+  | { type: 'addSample'; logs: LogEntry[]; goals: Goal[]; userId: string }
+  | { type: 'removeSample' };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -136,6 +145,7 @@ function freshState(): Persisted {
     logs: seedLogs(now),
     wantList: {},
     favorites: seedFavorites(),
+    goals: seedGoals(now),
   };
 }
 
@@ -179,6 +189,8 @@ function reducer(state: State, action: Action): State {
     case 'deletePost':
       return {
         ...state,
+        // A deleted progress post doesn't undo the progress: its check-in stays, unlinked.
+        goals: state.goals.map((g) => (g.checkIns.some((c) => c.postId === action.id) ? { ...g, checkIns: g.checkIns.map((c) => (c.postId === action.id ? { ...c, postId: undefined } : c)) } : g)),
         posts: state.posts.filter((p) => p.id !== action.id),
         comments: state.comments.filter((c) => c.postId !== action.id),
         deletedPostIds: [...state.deletedPostIds, action.id],
@@ -249,14 +261,49 @@ function reducer(state: State, action: Action): State {
     case 'updateLog':
       return { ...state, logs: state.logs.map((l) => (l.id === action.id ? { ...l, ...action.patch } : l)) };
     case 'deleteLog': {
-      // Also drop it from any Top 4 it was in.
+      // Also drop it from any Top 4 it was in, and remove the goal check-in it made.
       const favorites = { ...state.favorites };
       for (const uid in favorites) {
         const byNiche = { ...favorites[uid] };
         for (const n in byNiche) byNiche[n as NicheId] = byNiche[n as NicheId]!.filter((r) => !(r.kind === 'log' && r.id === action.id));
         favorites[uid] = byNiche;
       }
-      return { ...state, logs: state.logs.filter((l) => l.id !== action.id), favorites };
+      const goals = state.goals.map((g) => (g.checkIns.some((c) => c.logId === action.id) ? { ...g, checkIns: g.checkIns.filter((c) => c.logId !== action.id) } : g));
+      return { ...state, logs: state.logs.filter((l) => l.id !== action.id), favorites, goals };
+    }
+    case 'addGoal':
+      return { ...state, goals: [action.goal, ...state.goals] };
+    case 'mapGoal':
+      return { ...state, goals: state.goals.map((g) => (g.id === action.id ? action.fn(g) : g)) };
+    case 'deleteGoal':
+      return {
+        ...state,
+        goals: state.goals.filter((g) => g.id !== action.id),
+        // Progress posts stay, they just aren't linked to a goal anymore.
+        posts: state.posts.map((p) => (p.goalId === action.id ? { ...p, goalId: undefined } : p)),
+      };
+    case 'addSample': {
+      const haveLogs = new Set(state.logs.map((l) => l.id));
+      const haveGoals = new Set(state.goals.map((g) => g.id));
+      const logs = action.logs.filter((l) => !haveLogs.has(l.id));
+      const mine = state.favorites[action.userId] ?? {};
+      const favorites = mine.cooking?.length ? state.favorites : { ...state.favorites, [action.userId]: { ...mine, cooking: sampleFavorites(action.logs) } };
+      return { ...state, logs: [...logs, ...state.logs], goals: [...action.goals.filter((g) => !haveGoals.has(g.id)), ...state.goals], favorites };
+    }
+    case 'removeSample': {
+      const gone = new Set(state.logs.filter((l) => l.sample).map((l) => l.id));
+      const favorites = { ...state.favorites };
+      for (const uid in favorites) {
+        const byNiche = { ...favorites[uid] };
+        for (const n in byNiche) byNiche[n as NicheId] = byNiche[n as NicheId]!.filter((r) => !(r.kind === 'log' && gone.has(r.id)));
+        favorites[uid] = byNiche;
+      }
+      return {
+        ...state,
+        logs: state.logs.filter((l) => !l.sample),
+        goals: state.goals.filter((g) => !g.sample).map((g) => ({ ...g, checkIns: g.checkIns.filter((c) => !c.logId || !gone.has(c.logId)) })),
+        favorites,
+      };
     }
     case 'toggleWant': {
       const wantList = { ...state.wantList };
@@ -281,6 +328,11 @@ function reducer(state: State, action: Action): State {
       return { ...state, orders: state.orders.map((o) => (o.id === action.id ? { ...o, status: action.status } : o)) };
   }
 }
+
+const isoDayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const makeId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -459,7 +511,7 @@ function useStoreValue() {
       },
       updateMyMembership: (membership: Membership) => dispatch({ type: 'updateMe', patch: { membership } }),
       /** "I made this": log it, and optionally share it as a post too. Returns the entry id. */
-      addLog(input: Omit<LogEntry, 'id' | 'createdAt'>, shareAsPost?: { caption: string; imageAspect?: number }): string {
+      addLog(input: Omit<LogEntry, 'id' | 'createdAt'>, shareAsPost?: { caption: string; imageAspect?: number }, goalIds: string[] = []): string {
         const id = makeId('log');
         let sharedPostId: string | undefined;
         if (shareAsPost) {
@@ -481,6 +533,11 @@ function useStoreValue() {
           });
         }
         dispatch({ type: 'addLog', log: { ...input, id, createdAt: Date.now(), sharedPostId } });
+        // Counting toward goals: one check-in per goal, tied to this entry.
+        for (const goalId of goalIds) {
+          const checkIn: CheckIn = { id: makeId('ci'), date: input.date, logId: id, postId: sharedPostId, createdAt: Date.now() };
+          dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: [...g.checkIns, checkIn] }) });
+        }
         // Making something takes it off your "Want to make" list.
         if (input.postId) dispatch({ type: 'wantDone', postId: input.postId });
         return id;
@@ -496,11 +553,39 @@ function useStoreValue() {
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });
       },
-      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; imageUri?: string; imageAspect?: number; progressLabel?: string; premium?: boolean; unlockCents?: number }): string {
+      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; imageUri?: string; imageAspect?: number; progressLabel?: string; goalId?: string; premium?: boolean; unlockCents?: number }): string {
         const id = makeId('p');
         dispatch({ type: 'addPost', post: { id, createdAt: Date.now(), ...input } });
+        // A progress post toward a goal counts as a check-in.
+        if (input.goalId) {
+          const checkIn: CheckIn = { id: makeId('ci'), date: isoDayLocal(), postId: id, createdAt: Date.now() };
+          dispatch({ type: 'mapGoal', id: input.goalId, fn: (g) => ({ ...g, checkIns: [...g.checkIns, checkIn] }) });
+        }
         return id;
       },
+      createGoal(input: Omit<Goal, 'id' | 'createdAt' | 'checkIns' | 'restWeeks'>): string {
+        const id = makeId('goal');
+        dispatch({ type: 'addGoal', goal: { ...input, id, createdAt: Date.now(), checkIns: [], restWeeks: [] } });
+        return id;
+      },
+      updateGoal: (id: string, patch: Partial<Pick<Goal, 'title' | 'perWeek' | 'target' | 'unit' | 'start' | 'visibility' | 'hideNumbers'>>) =>
+        dispatch({ type: 'mapGoal', id, fn: (g) => ({ ...g, ...patch }) }),
+      deleteGoal: (id: string) => dispatch({ type: 'deleteGoal', id }),
+      checkIn: (goalId: string, input: Omit<CheckIn, 'id' | 'createdAt'>) =>
+        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: [...g.checkIns, { ...input, id: makeId('ci'), createdAt: Date.now() }] }) }),
+      removeCheckIn: (goalId: string, checkInId: string) =>
+        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: g.checkIns.filter((c) => c.id !== checkInId) }) }),
+      /** Rest weeks keep a habit streak alive. Tap again to undo. */
+      toggleRestWeek: (goalId: string, week: string) =>
+        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, restWeeks: g.restWeeks.includes(week) ? g.restWeeks.filter((w) => w !== week) : [...g.restWeeks, week] }) }),
+      setGoalDone: (goalId: string, done: boolean) =>
+        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, doneAt: done ? Date.now() : undefined }) }),
+      /** Demo: fill your diary with a year of sample entries and two goals. */
+      addSampleYear(userId: string) {
+        const { logs, goals } = sampleYear(userId);
+        dispatch({ type: 'addSample', logs, goals, userId });
+      },
+      removeSampleYear: () => dispatch({ type: 'removeSample' }),
     }),
     [],
   );

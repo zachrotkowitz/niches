@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CalendarIcon, CameraIcon, CheckIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
+import { goalRule, weekNumber } from '@/lib/goals';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
@@ -21,9 +22,19 @@ export default function CreateScreen() {
   const router = useRouter();
   const { state, actions } = useStore();
   const NICHES = useNiches();
+  const params = useLocalSearchParams<{ goalId?: string }>();
   const [kind, setKind] = useState<Kind>('post');
   const [caption, setCaption] = useState('');
   const [goal, setGoal] = useState('');
+  // The goal a progress post belongs to; null means "just name it" (free text).
+  const [goalId, setGoalId] = useState<string | null>(null);
+  // Opening from a goal's "Progress post" button preselects it.
+  useEffect(() => {
+    if (params.goalId) {
+      setKind('progress');
+      setGoalId(params.goalId);
+    }
+  }, [params.goalId]);
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
   const choosePhoto = async () => {
@@ -41,7 +52,9 @@ export default function CreateScreen() {
 
   const niche = NICHES[nicheId];
   const needsPhoto = kind !== 'question';
-  const ready = caption.trim().length > 0 && (kind !== 'progress' || goal.trim().length > 0);
+  const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
+  const pickedGoal = goalId ? myGoals.find((g) => g.id === goalId) : undefined;
+  const ready = caption.trim().length > 0 && (kind !== 'progress' || !!pickedGoal || goal.trim().length > 0);
 
   const share = () => {
     if (!ready || !state.me) return;
@@ -55,7 +68,9 @@ export default function CreateScreen() {
       imageUri: postKind === 'photo' ? photo?.uri : undefined,
       imageAspect: postKind === 'photo' && photo ? photo.height / photo.width : undefined,
       mediaLabel: postKind === 'photo' ? caption.trim().split(/[.!?\n]/)[0].slice(0, 40) : undefined,
-      progressLabel: kind === 'progress' ? goal.trim() : undefined,
+      // Progress labels say "week 4", never the numbers: those stay private on the goal.
+      progressLabel: kind === 'progress' ? (pickedGoal ? `${pickedGoal.title}, week ${weekNumber(pickedGoal)}` : goal.trim()) : undefined,
+      goalId: kind === 'progress' && pickedGoal ? pickedGoal.id : undefined,
       premium: membersOnly && !!state.me.membership ? true : undefined,
     });
     actions.setNiche(nicheId);
@@ -65,8 +80,10 @@ export default function CreateScreen() {
   const reset = () => {
     setCaption('');
     setGoal('');
+    setGoalId(null);
     setPhoto(null);
     setPostedId(null);
+    if (params.goalId) router.setParams({ goalId: undefined });
   };
 
   if (postedId) {
@@ -143,9 +160,30 @@ export default function CreateScreen() {
         ) : null}
 
         {kind === 'progress' ? (
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 8 }}>
             <Text style={styles.label}>Which goal is this progress toward?</Text>
-            <TextInput accessibilityLabel="Goal" value={goal} onChangeText={setGoal} placeholder="e.g. Fresh pasta, week 4" placeholderTextColor="#6B7178" maxLength={60} style={styles.input} selectionColor={niche.accent} />
+            {myGoals.map((g) => {
+              const on = g.id === goalId;
+              return (
+                <Pressable key={g.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setGoalId(g.id)} style={[styles.goalOption, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
+                  <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.goalTitle}>{g.title}</Text>
+                    <Text style={styles.goalSub}>{goalRule(g)} · counts as a check-in</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+            <Pressable accessibilityRole="radio" accessibilityState={{ checked: goalId === null }} onPress={() => setGoalId(null)} style={[styles.goalOption, goalId === null ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
+              <View style={[styles.radio, goalId === null ? { borderColor: niche.accent } : null]}>{goalId === null ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
+              <Text style={[styles.goalTitle, { flex: 1 }]}>{myGoals.length ? 'Something else' : 'Name what you’re working on'}</Text>
+            </Pressable>
+            {goalId === null ? (
+              <TextInput accessibilityLabel="Goal" value={goal} onChangeText={setGoal} placeholder="e.g. Fresh pasta, week 4" placeholderTextColor="#6B7178" maxLength={60} style={styles.input} selectionColor={niche.accent} />
+            ) : null}
+            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: nicheId } })} style={styles.newGoal}>
+              <Text style={[styles.newGoalText, { color: niche.accent }]}>+ Set a new goal</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -229,6 +267,13 @@ const styles = StyleSheet.create({
   nicheChip: { minHeight: 40, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   nicheChipText: { fontSize: 14, fontWeight: '600' },
   hint: { fontSize: 13, lineHeight: 18, color: colors.textMuted, textAlign: 'center' },
+  goalOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  goalTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  goalSub: { fontSize: 13, color: colors.textMuted },
+  newGoal: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
+  newGoalText: { fontSize: 15, fontWeight: '700' },
   done: { flex: 1, paddingHorizontal: 28, justifyContent: 'center', gap: 16 },
   doneCheck: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   doneBody: { fontSize: 16, lineHeight: 23 },

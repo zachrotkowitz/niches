@@ -9,6 +9,7 @@ import { CameraIcon, CheckIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { useToast } from '@/components/toast';
 import { diaryWords, type LogVisibility } from '@/lib/diary';
+import { goalRule } from '@/lib/goals';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
@@ -16,7 +17,7 @@ import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
 /** "I made this": add an entry to your diary. Private unless you choose otherwise. */
 export default function NewLogScreen() {
-  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId }>();
+  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -33,9 +34,13 @@ export default function NewLogScreen() {
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [visibility, setVisibility] = useState<LogVisibility>('private');
   const [share, setShare] = useState(false);
+  // Goals this entry counts toward. Personal bests need a number, so they're checked in on the goal itself.
+  const [goalIds, setGoalIds] = useState<string[]>(params.goalId ? [params.goalId] : []);
 
   const niche = niches[nicheId];
   const words = diaryWords(nicheId);
+  const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt && g.kind !== 'best');
+  const toggleGoal = (id: string) => setGoalIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const canShare = niche.open;
   const ready = !!state.me && title.trim().length > 0 && rating > 0;
   const days = Array.from({ length: 14 }, (_, i) => isoDay(-i));
@@ -57,6 +62,7 @@ export default function NewLogScreen() {
         visibility,
       },
       share && canShare ? { caption: `${words.did}: ${title.trim()}${credit}. ${'★'.repeat(rating)}${notes.trim() ? `\n${notes.trim()}` : ''}`, imageAspect: photo ? photo.height / photo.width : undefined } : undefined,
+      goalIds.filter((id) => goals.some((g) => g.id === id)),
     );
     toast(share && canShare ? 'Logged and shared' : visibility === 'profile' ? 'Logged on your profile' : 'Logged in your private diary');
     router.replace({ pathname: '/log/[id]', params: { id } });
@@ -146,6 +152,25 @@ export default function NewLogScreen() {
             })}
           </View>
         </Field>
+
+        {goals.length ? (
+          <Field label="Counts toward">
+            <View style={{ gap: 8 }}>
+              {goals.map((g) => {
+                const on = goalIds.includes(g.id);
+                return (
+                  <Pressable key={g.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => toggleGoal(g.id)} style={styles.check}>
+                    <View style={[styles.box, on ? { backgroundColor: niche.accent, borderColor: niche.accent } : null]}>{on ? <CheckIcon size={15} strokeWidth={3} /> : null}</View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.optionTitle}>{g.title}</Text>
+                      <Text style={styles.optionSub}>{goalRule(g)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Field>
+        ) : null}
 
         {canShare ? (
           <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: share }} onPress={() => setShare(!share)} style={styles.check}>
