@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -6,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraIcon, CheckIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { useToast } from '@/components/toast';
+import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { CATEGORIES, FEE_RATE, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH, type NicheId } from '@/lib/theme';
@@ -37,7 +39,11 @@ export default function NewListingScreen() {
   const [price, setPrice] = useState('');
   const [shipping, setShipping] = useState('5');
   const [stock, setStock] = useState('');
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  const choosePhoto = async () => {
+    const picked = await pickPhoto();
+    if (picked) setPhoto(picked);
+  };
   const [linkedPostId, setLinkedPostId] = useState<string | undefined>(undefined);
   const [ownWork, setOwnWork] = useState(false);
   const [noFood, setNoFood] = useState(false);
@@ -68,7 +74,8 @@ export default function NewListingScreen() {
       shippingCents: format === 'physical' ? shippingCents ?? 0 : undefined,
       stock: format === 'physical' && Number.isInteger(stockN) && stockN > 0 ? stockN : undefined,
       linkedPostId,
-      mediaColor: photo ?? SWATCHES[0],
+      mediaColor: photo ? '#E3E5E1' : SWATCHES[Math.floor(Math.random() * SWATCHES.length)],
+      imageUri: photo?.uri,
       mediaLabel: title.trim(),
     });
     toast(`Listed in the ${niche.label} shop`);
@@ -103,14 +110,14 @@ export default function NewListingScreen() {
         </Field>
 
         {photo ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Change photo" onPress={() => setPhoto(SWATCHES[(SWATCHES.indexOf(photo) + 1) % SWATCHES.length])} style={[styles.photo, { backgroundColor: photo }]}>
-            <CameraIcon />
+          <Pressable accessibilityRole="button" accessibilityLabel="Change photo" onPress={choosePhoto} style={[styles.photo, { overflow: 'hidden', backgroundColor: '#E3E5E1' }]}>
+            <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
           </Pressable>
         ) : (
-          <Pressable accessibilityRole="button" onPress={() => setPhoto(SWATCHES[Math.floor(Math.random() * SWATCHES.length)])} style={styles.picker}>
+          <Pressable accessibilityRole="button" onPress={choosePhoto} style={styles.picker}>
             <CameraIcon color={colors.textBody} />
-            <Text style={styles.pickerTitle}>Add photos</Text>
-            <Text style={styles.hint}>Demo: adds a placeholder. Real photos come with uploads.</Text>
+            <Text style={styles.pickerTitle}>Add a photo</Text>
+            <Text style={styles.hint}>From your camera roll. Optional: without one, the listing gets a color block.</Text>
           </Pressable>
         )}
 

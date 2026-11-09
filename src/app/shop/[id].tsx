@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -70,9 +71,13 @@ export default function ListingScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View accessible accessibilityRole="image" accessibilityLabel={`Photo: ${listing.mediaLabel}`} style={[styles.hero, { backgroundColor: listing.mediaColor }]}>
-          <View style={styles.heroLabel}>
-            <Text style={styles.heroLabelText}>Photo · {listing.mediaLabel}</Text>
-          </View>
+          {listing.imageUri ? (
+            <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={styles.heroLabel}>
+              <Text style={styles.heroLabelText}>Photo · {listing.mediaLabel}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.body}>

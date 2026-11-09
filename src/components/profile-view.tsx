@@ -8,6 +8,7 @@ import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
+import { pickPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { connections, hasAccess, isVisible, useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
@@ -41,7 +42,22 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
     <View>
       <View style={styles.head}>
         <View style={styles.identity}>
-          <Avatar user={user} size={72} />
+          {isMe ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={user.avatarUri ? 'Change profile photo' : 'Add a profile photo'}
+              onPress={async () => {
+                const picked = await pickPhoto([1, 1]);
+                if (picked) actions.setAvatar(picked.uri);
+              }}>
+              <Avatar user={user} size={72} />
+              <View style={styles.avatarEdit}>
+                <Text style={styles.avatarEditText}>{user.avatarUri ? 'Edit' : '+'}</Text>
+              </View>
+            </Pressable>
+          ) : (
+            <Avatar user={user} size={72} />
+          )}
           <View style={styles.counts}>
             <Count value={posts.length} label={posts.length === 1 ? 'post' : 'posts'} />
             <Count value={followers.length} label={followers.length === 1 ? 'follower' : 'followers'} onPress={() => openList('followers')} />
@@ -186,6 +202,8 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: 20, gap: 12 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   handle: { fontSize: 14, color: colors.textMuted },
+  avatarEdit: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: colors.text, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  avatarEditText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   counts: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   count: { minWidth: 64, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   countValue: { fontSize: 18, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },

@@ -28,6 +28,8 @@ export type Listing = {
   linkedPostId?: string;
   mediaColor: string;
   mediaLabel: string;
+  /** A real product photo, when one was picked. */
+  imageUri?: string;
   createdAt: number;
   sold: number;
 };

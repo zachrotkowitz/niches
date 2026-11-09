@@ -9,8 +9,10 @@ export type User = {
   id: string;
   displayName: string;
   username: string;
-  /** Avatar background color until real photos exist. */
+  /** Avatar background color, shown with an initial when there's no photo. */
   avatarColor: string;
+  /** Profile photo, when one was picked. */
+  avatarUri?: string;
   bio?: string;
   /** Demo-only marker for made-up founding creators in not-yet-open niches. */
   foundingCreator?: boolean;
@@ -43,8 +45,12 @@ export type Post = {
   kind: PostKind;
   caption: string;
   createdAt: number;
-  /** Placeholder color standing in for the photo or video until uploads exist. */
+  /** Placeholder color standing in for the photo or video when there's no real image. */
   mediaColor?: string;
+  /** A real photo (local file on phones, inline data on web) when one was picked. */
+  imageUri?: string;
+  /** Photo height ÷ width, so feeds can show it at its natural shape. */
+  imageAspect?: number;
   /** Describes the media, for screen readers and the placeholder label. */
   mediaLabel?: string;
   /** Video length in seconds (videos are capped at 90s). */

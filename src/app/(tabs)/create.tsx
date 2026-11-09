@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -7,12 +8,13 @@ import { CalendarIcon, CameraIcon, CheckIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
+import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import type { PostKind } from '@/lib/types';
 
 type Kind = 'post' | 'progress' | 'question';
 
-// Until photo uploads exist, a picked "photo" is a colored placeholder.
-const SWATCHES = ['#C8553D', '#C9A877', '#6E8B4E', '#E0A43A', '#8E2F4F', '#B9783F', '#5E2A22', '#2B2B2E'];
+// Shown behind a photo while it loads.
+const LOADING_TINT = '#E3E5E1';
 
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
@@ -22,7 +24,17 @@ export default function CreateScreen() {
   const [kind, setKind] = useState<Kind>('post');
   const [caption, setCaption] = useState('');
   const [goal, setGoal] = useState('');
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  const [picking, setPicking] = useState(false);
+  const choosePhoto = async () => {
+    setPicking(true);
+    try {
+      const picked = await pickPhoto();
+      if (picked) setPhoto(picked);
+    } finally {
+      setPicking(false);
+    }
+  };
   const [nicheId] = useState<NicheId>('cooking');
   const [postedId, setPostedId] = useState<string | null>(null);
   const [membersOnly, setMembersOnly] = useState(false);
@@ -39,7 +51,9 @@ export default function CreateScreen() {
       niche: nicheId,
       kind: postKind,
       caption: caption.trim(),
-      mediaColor: postKind === 'photo' ? photo ?? undefined : undefined,
+      mediaColor: postKind === 'photo' ? LOADING_TINT : undefined,
+      imageUri: postKind === 'photo' ? photo?.uri : undefined,
+      imageAspect: postKind === 'photo' && photo ? photo.height / photo.width : undefined,
       mediaLabel: postKind === 'photo' ? caption.trim().split(/[.!?\n]/)[0].slice(0, 40) : undefined,
       progressLabel: kind === 'progress' ? goal.trim() : undefined,
       premium: membersOnly && !!state.me.membership ? true : undefined,
@@ -108,16 +122,22 @@ export default function CreateScreen() {
         {needsPhoto ? (
           photo ? (
             <View style={{ gap: 8 }}>
-              <View accessibilityRole="image" accessibilityLabel="Your photo (placeholder)" style={[styles.photo, { backgroundColor: photo }]}>
-                <CameraIcon />
+              <Image
+                source={{ uri: photo.uri }}
+                accessibilityLabel="Your photo"
+                contentFit="cover"
+                style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), height: undefined, backgroundColor: LOADING_TINT }]}
+              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button tone="outline" label="Change photo" style={{ flex: 1 }} onPress={choosePhoto} />
+                <Button tone="ghost" label="Remove" onPress={() => setPhoto(null)} />
               </View>
-              <Button tone="ghost" label="Remove photo" onPress={() => setPhoto(null)} />
             </View>
           ) : (
-            <Pressable accessibilityRole="button" onPress={() => setPhoto(SWATCHES[Math.floor(Math.random() * SWATCHES.length)])} style={styles.picker}>
+            <Pressable accessibilityRole="button" accessibilityState={{ busy: picking }} disabled={picking} onPress={choosePhoto} style={styles.picker}>
               <CameraIcon color={colors.textBody} />
-              <Text style={styles.pickerTitle}>Add a photo</Text>
-              <Text style={styles.hint}>Demo: adds a placeholder. Real photos and 90-second videos come next.</Text>
+              <Text style={styles.pickerTitle}>{picking ? 'Opening your photos…' : 'Add a photo'}</Text>
+              <Text style={styles.hint}>From your camera roll. Videos up to 90 seconds come next.</Text>
             </Pressable>
           )
         ) : null}

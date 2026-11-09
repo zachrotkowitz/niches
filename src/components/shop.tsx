@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -35,6 +36,7 @@ export function ListingTile({ listing, nicheBorder = false }: { listing: Listing
         onPress={() => !swiping() && router.push({ pathname: '/shop/[id]', params: { id: listing.id } })}
         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}>
         <View style={[{ height, borderRadius: nicheBorder ? 18 : 16, overflow: 'hidden', backgroundColor: listing.mediaColor }, nicheBorder ? { borderWidth: NICHE_BORDER, borderColor: niche.accent } : null]}>
+          {listing.imageUri ? <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${listing.title}`} /> : null}
           <View style={styles.price}>
             <Text style={styles.priceText}>{formatPrice(listing.priceCents)}</Text>
           </View>

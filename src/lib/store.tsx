@@ -411,13 +411,14 @@ function useStoreValue() {
         dispatch({ type: 'updateMe', patch: { membership: { priceCents: 399, tagline: 'Behind the scenes of everything I make', perks: ['Members-only posts', 'Full recipes and process notes'] } } });
       },
       updateMyMembership: (membership: Membership) => dispatch({ type: 'updateMe', patch: { membership } }),
+      setAvatar: (avatarUri: string) => dispatch({ type: 'updateMe', patch: { avatarUri } }),
       setDemoMembers: (n: number) => dispatch({ type: 'setDemoMembers', n }),
       setOrderStatus: (id: string, status: OrderStatus) => dispatch({ type: 'setOrderStatus', id, status }),
       chooseDish: (id: string, ideaId: string | undefined) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, chosenDishId: ideaId }) }),
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });
       },
-      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; progressLabel?: string; premium?: boolean; unlockCents?: number }): string {
+      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; imageUri?: string; imageAspect?: number; progressLabel?: string; premium?: boolean; unlockCents?: number }): string {
         const id = makeId('p');
         dispatch({ type: 'addPost', post: { id, createdAt: Date.now(), ...input } });
         return id;

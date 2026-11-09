@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { CameraIcon, PlayIcon } from '@/components/icons';
@@ -7,6 +8,17 @@ import type { Post, User } from '@/lib/types';
 
 export function Avatar({ user, size = 34 }: { user: User | undefined; size?: number }) {
   const initial = (user?.displayName || user?.username || '?').trim().charAt(0).toUpperCase();
+  if (user?.avatarUri) {
+    return (
+      <Image
+        source={{ uri: user.avatarUri }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        contentFit="cover"
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: user.avatarColor }}
+      />
+    );
+  }
   return (
     <View
       accessibilityElementsHidden
@@ -17,9 +29,21 @@ export function Avatar({ user, size = 34 }: { user: User | undefined; size?: num
   );
 }
 
-/** Stands in for a photo or video until uploads exist. */
+/** A post's photo, or a labeled color block standing in for it when there's no real image yet. */
 export function MediaPlaceholder({ post, height, radius = 0, showLabel = true }: { post: Post; height: number; radius?: number; showLabel?: boolean }) {
   const isVideo = post.kind === 'video';
+  if (post.imageUri && !isVideo) {
+    return (
+      <Image
+        source={{ uri: post.imageUri }}
+        accessibilityLabel={post.mediaLabel ? `Photo: ${post.mediaLabel}` : 'Photo'}
+        accessible
+        contentFit="cover"
+        transition={150}
+        style={{ height, borderRadius: radius, backgroundColor: post.mediaColor ?? '#E3E5E1' }}
+      />
+    );
+  }
   return (
     <View
       accessible

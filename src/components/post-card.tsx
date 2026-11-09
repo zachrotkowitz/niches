@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { LockedPanel, NameWithBadges } from '@/components/creator';
 import { BookmarkIcon, CommentIcon, HeartIcon, LockIcon, MoreIcon, PauseIcon, PlayIcon, StarIcon, TrendIcon } from '@/components/icons';
@@ -19,6 +19,9 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[post.niche];
   const [menuOpen, setMenuOpen] = useState(false);
+  const { width } = useWindowDimensions();
+  // Real photos keep their own shape (between 4:5 portrait and 5:4 landscape), like Instagram.
+  const photoHeight = post.imageUri && post.imageAspect ? Math.round(Math.min(width, 640) * Math.min(1.25, Math.max(0.8, post.imageAspect))) : mediaHeight;
   const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];
   const isMine = !!state.me && post.authorId === state.me.id;
@@ -67,7 +70,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
       ) : null}
       {!locked && post.kind === 'photo' ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>
-          <MediaPlaceholder post={post} height={mediaHeight} />
+          <MediaPlaceholder post={post} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} />
         </Pressable>
       ) : null}
       {!locked && post.kind === 'video' ? <VideoPlaceholder post={post} height={mediaHeight} /> : null}

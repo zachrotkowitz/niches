@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -102,7 +103,9 @@ export default function CartScreen() {
                     const max = listing.format === 'digital' ? 1 : listing.stock ?? 10;
                     return (
                       <View key={listing.id} style={styles.line}>
-                        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${listing.title}`} onPress={() => router.push({ pathname: '/shop/[id]', params: { id: listing.id } })} style={[styles.thumb, { backgroundColor: listing.mediaColor }]} />
+                        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${listing.title}`} onPress={() => router.push({ pathname: '/shop/[id]', params: { id: listing.id } })} style={[styles.thumb, { backgroundColor: listing.mediaColor, overflow: 'hidden' }]}>
+                          {listing.imageUri ? <Image source={{ uri: listing.imageUri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                        </Pressable>
                         <View style={{ flex: 1, gap: 2 }}>
                           <Text style={styles.lineTitle} numberOfLines={2}>{listing.title}</Text>
                           <Text style={styles.lineSub}>{listing.format === 'digital' ? 'Digital download' : listing.shippingCents ? `${formatPrice(listing.shippingCents)} shipping` : 'Free shipping'}</Text>
