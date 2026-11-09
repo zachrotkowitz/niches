@@ -214,7 +214,8 @@ export function sampleYear(userId: string, now = Date.now()): { logs: LogEntry[]
       const dish = i === 0 && month >= 1 && month <= 3 && rand() < 0.5 ? DISHES[0] : pick();
       const iso = isoDay(0, date);
       const loaf = dish === DISHES[0] ? ++loafCount.n : 0;
-      const rating = Math.min(5, Math.max(2, Math.round(3.2 + rand() * 2.2 + (loaf > 8 ? 0.6 : 0))));
+      // Half-star steps, like the rating input.
+      const rating = Math.min(5, Math.max(2, Math.round((3.2 + rand() * 2.2 + (loaf > 8 ? 0.6 : 0)) * 2) / 2));
       const note = dish.notes && rand() < 0.45 ? dish.notes[Math.floor(rand() * dish.notes.length)] : undefined;
       logs.push({
         id: `log_sample_${logs.length}`,

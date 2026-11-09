@@ -15,7 +15,7 @@ export type LogEntry = {
   title: string;
   /** Local calendar date, YYYY-MM-DD. */
   date: string;
-  /** 1–5 stars. */
+  /** ½–5 stars, in half-star steps. */
   rating: number;
   notes?: string;
   imageUri?: string;
@@ -61,7 +61,7 @@ const day = (now: number, back: number) => {
 export function seedLogs(now: number): LogEntry[] {
   return [
     { id: 'log_maya_1', userId: 'u_maya', niche: 'cooking', postId: 'p_chili', title: 'Chili crisp (Jules’s recipe)', date: day(now, 1), rating: 5, notes: 'Doubled the shallots. On everything this week.', mediaColor: '#5E2A22', visibility: 'profile', createdAt: now - 1 * 86400000 },
-    { id: 'log_maya_2', userId: 'u_maya', niche: 'cooking', postId: 'p_tagliatelle', title: 'Hand-cut tagliatelle, try 3', date: day(now, 0), rating: 3, notes: 'Still too thick. Roll thinner next time.', mediaColor: '#C8553D', visibility: 'profile', createdAt: now - 3600000 },
+    { id: 'log_maya_2', userId: 'u_maya', niche: 'cooking', postId: 'p_tagliatelle', title: 'Hand-cut tagliatelle, try 3', date: day(now, 0), rating: 3.5, notes: 'Still too thick. Roll thinner next time.', mediaColor: '#C8553D', visibility: 'profile', createdAt: now - 3600000 },
     { id: 'log_maya_3', userId: 'u_maya', niche: 'cooking', postId: 'p_corn', title: 'Miso butter corn', date: day(now, 4), rating: 4, mediaColor: '#E0A43A', visibility: 'profile', createdAt: now - 4 * 86400000 },
     { id: 'log_maya_4', userId: 'u_maya', niche: 'cooking', title: 'Grandma’s jollof rice', date: day(now, 9), rating: 5, notes: 'Finally tastes like hers.', mediaColor: '#B4532A', visibility: 'profile', createdAt: now - 9 * 86400000 },
     { id: 'log_dev_1', userId: 'u_dev', niche: 'cooking', postId: 'p_sourdough', title: 'Loaf #14', date: day(now, 0), rating: 5, mediaColor: '#C9A877', visibility: 'profile', createdAt: now - 3600000 },

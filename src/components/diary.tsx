@@ -20,34 +20,79 @@ function StarShape({ size, fill, stroke }: { size: number; fill: string; stroke:
   );
 }
 
-/** Read-only stars, e.g. ★★★★☆. */
+/** "3.5" → "3½". Ratings go from ½ to 5 in half-star steps. */
+export function formatRating(r: number): string {
+  const whole = Math.floor(r);
+  return r % 1 ? `${whole ? whole : ''}½` : String(whole);
+}
+
+/** One star filled to `fill` (0, 0.5 or 1): a half star is the filled star cut at the middle. */
+function PartStar({ size, fill, color, empty }: { size: number; fill: number; color: string; empty: string }) {
+  return (
+    <View style={{ width: size, height: size }}>
+      <StarShape size={size} fill="transparent" stroke={fill > 0 ? color : empty} />
+      {fill > 0 ? (
+        <View style={{ position: 'absolute', left: 0, top: 0, width: size * fill, height: size, overflow: 'hidden' }}>
+          <StarShape size={size} fill={color} stroke={color} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const starFill = (rating: number, i: number) => Math.max(0, Math.min(1, rating - (i - 1)));
+
+/** Read-only stars, with halves, e.g. ★★★½☆. */
 export function Stars({ rating, size = 14, color }: { rating: number; size?: number; color: string }) {
   const styles = useSurfaceStyles(makeStyles);
   return (
     <View style={styles.stars} accessible accessibilityLabel={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <StarShape key={i} size={size} fill={i <= rating ? color : 'transparent'} stroke={i <= rating ? color : '#B9BFB8'} />
+        <PartStar key={i} size={size} fill={starFill(rating, i)} color={color} empty="#B9BFB8" />
       ))}
     </View>
   );
 }
 
-/** Tap-to-rate stars. Tapping the current rating again clears it. */
+/**
+ * Tap-to-rate stars, like Letterboxd: tap a star for a full star, tap the
+ * same star again for a half star (tap once more to go back to full).
+ */
 export function StarInput({ value, onChange, color }: { value: number; onChange: (v: number) => void; color: string }) {
   const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
+  const tap = (i: number) => onChange(value === i ? i - 0.5 : i);
   return (
-    <View accessibilityRole="adjustable" accessibilityLabel={`Rating: ${value} out of 5`} style={styles.starInput}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Pressable
-          key={i}
-          accessibilityRole="button"
-          accessibilityLabel={`${i} ${i === 1 ? 'star' : 'stars'}`}
-          accessibilityState={{ selected: i <= value }}
-          onPress={() => onChange(value === i ? 0 : i)}
-          style={({ pressed }) => [styles.starButton, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
-          <StarShape size={32} fill={i <= value ? color : 'transparent'} stroke={i <= value ? color : '#9AA19B'} />
-        </Pressable>
-      ))}
+    <View style={{ gap: 4 }}>
+      <View
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel="Rating"
+        accessibilityValue={{ text: value ? `${value} out of 5 stars` : 'Not rated' }}
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        onAccessibilityAction={(e) => onChange(Math.max(0.5, Math.min(5, value + (e.nativeEvent.actionName === 'increment' ? 0.5 : -0.5))))}
+        style={styles.starInput}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Pressable
+            key={i}
+            accessibilityRole="button"
+            accessibilityLabel={`${i} ${i === 1 ? 'star' : 'stars'}`}
+            onPress={() => tap(i)}
+            style={({ pressed }) => [styles.starButton, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
+            <PartStar size={32} fill={starFill(value, i)} color={color} empty="#9AA19B" />
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.ratingRow}>
+        <Text style={[styles.ratingText, { color: surface.muted }]}>
+          {value ? `${formatRating(value)} ${value <= 1 ? 'star' : 'stars'}` : 'Tap a star twice for a half star'}
+        </Text>
+        {value ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear rating" onPress={() => onChange(0)} hitSlop={10}>
+            <Text style={[styles.ratingText, { color: surface.text, fontWeight: '700' }]}>Clear</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -61,7 +106,7 @@ export function DiaryRow({ log, showPrivacy = false }: { log: LogEntry; showPriv
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${log.title}, ${dayLabel(log.date)}, ${log.rating} stars${log.visibility === 'private' && showPrivacy ? ', private' : ''}`}
+      accessibilityLabel={`${log.title}, ${dayLabel(log.date)}, ${formatRating(log.rating)} stars${log.visibility === 'private' && showPrivacy ? ', private' : ''}`}
       onPress={() => router.push({ pathname: '/log/[id]', params: { id: log.id } })}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}>
       <View style={[styles.thumb, { backgroundColor: log.mediaColor ?? niche.field }]}>
@@ -157,6 +202,8 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
 const makeStyles = (sf: Surface) =>
   StyleSheet.create({
   stars: { flexDirection: 'row', gap: 1 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 6 },
+  ratingText: { fontSize: 13, fontWeight: '600' },
   starInput: { flexDirection: 'row', gap: 2 },
   starButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingVertical: 8 },

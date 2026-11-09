@@ -6,6 +6,7 @@ import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useToast } from '@/components/toast';
+import { formatRating } from '@/components/diary';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import type { Photo } from '@/lib/demo-photos';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef } from '@/lib/diary';
@@ -36,7 +37,7 @@ export default function FavoritesScreen() {
       title: `From your ${words.diary.toLowerCase()}`,
       items: state.logs
         .filter((l) => l.userId === meId && l.niche === niche)
-        .map((l) => ({ ref: { kind: 'log', id: l.id }, title: l.title, sub: `${l.rating}★ · ${l.date}`, image: logPhoto(l), color: l.mediaColor })),
+        .map((l) => ({ ref: { kind: 'log', id: l.id }, title: l.title, sub: `${formatRating(l.rating)}★ · ${l.date}`, image: logPhoto(l), color: l.mediaColor })),
     },
     {
       title: 'Your posts',

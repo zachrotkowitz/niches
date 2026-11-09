@@ -106,9 +106,9 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         {user.membership ? (
           <MembershipCard
             creator={user}
-            accent={niches[nicheTabs[0] ?? mainNiche].accent}
-            field={niches[nicheTabs[0] ?? mainNiche].field}
-            ink={niches[nicheTabs[0] ?? mainNiche].ink}
+            accent={surface.text}
+            field="#FFFFFF"
+            ink={surface.text}
           />
         ) : null}
         {nicheTabs.length ? (
@@ -124,7 +124,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           <Button
             label={following ? 'Following' : 'Follow'}
             tone={following ? 'outline' : 'solid'}
-            color={surface.flood ? surface.text : niches[nicheTabs[0] ?? mainNiche].accent}
+            color={surface.text}
             textStyle={following ? { color: surface.text } : undefined}
             style={following ? { borderColor: surface.line, backgroundColor: 'rgba(255,255,255,0.35)' } : undefined}
             onPress={() => actions.toggleFollow(user.id)}
@@ -185,7 +185,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           ) : null}
           {isMe ? (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-              <Button label="New goal" color={niches[mainNiche].accent} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} />
+              <Button label="New goal" color={surface.text} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} />
               {goals.length ? <Button label="All goals" tone="outline" style={{ flex: 1 }} onPress={() => router.push('/goals')} /> : null}
             </View>
           ) : null}
@@ -195,16 +195,16 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         <View style={styles.diary}>
           {isMe ? <RecapCard niche={mainNiche} /> : null}
           {logs.length ? (
-            <View style={[styles.diaryStats, { backgroundColor: niches[logs[0].niche].field }]}>
-              <Stat value={String(logs.length)} label="logged" ink={niches[logs[0].niche].ink} />
-              <Stat value={String(thisMonth)} label="this month" ink={niches[logs[0].niche].ink} />
-              <Stat value={avg ? avg.toFixed(1) : '–'} label="avg stars" ink={niches[logs[0].niche].ink} />
+            <View style={[styles.diaryStats, { backgroundColor: '#FFFFFF' }]}>
+              <Stat value={String(logs.length)} label="logged" ink={surface.text} />
+              <Stat value={String(thisMonth)} label="this month" ink={surface.text} />
+              <Stat value={avg ? avg.toFixed(1) : '–'} label="avg stars" ink={surface.text} />
             </View>
           ) : null}
           {isMe ? (
             <Button
               label={`${diaryWords(mainNiche).did}: log something`}
-              color={niches[mainNiche].accent}
+              color={surface.text}
               onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })}
             />
           ) : null}
@@ -227,7 +227,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           {isMe ? (
             <>
               <Text style={styles.emptyBody}>Share your first dish, a question, or progress toward a goal.</Text>
-              <Button label="Create a post" color={niches[mainNiche].accent} onPress={() => router.navigate('/create')} />
+              <Button label="Create a post" color={surface.text} onPress={() => router.navigate('/create')} />
             </>
           ) : null}
         </View>
@@ -244,6 +244,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
 /** Entry to "Your year in Cooking" from your own diary. */
 function RecapCard({ niche: id }: { niche: NicheId }) {
   const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const router = useRouter();
   const n = useNiches()[id];
   const year = new Date().getFullYear();
@@ -252,11 +253,11 @@ function RecapCard({ niche: id }: { niche: NicheId }) {
       accessibilityRole="button"
       accessibilityLabel={`Your ${year} in ${n.label}. Open recap`}
       onPress={() => router.push({ pathname: '/recap/[niche]', params: { niche: id } })}
-      style={({ pressed }) => [styles.recap, { backgroundColor: n.ink, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-      <Text style={[styles.recapYear, { color: n.field }]}>{year}</Text>
+      style={({ pressed }) => [styles.recap, { backgroundColor: surface.text, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+      <Text style={[styles.recapYear, { color: surface.ground }]}>{year}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.recapTitle}>Your year in {n.label}</Text>
-        <Text style={[styles.recapSub, { color: n.field }]}>What you made, your go-tos, your best weeks</Text>
+        <Text style={[styles.recapSub, { color: surface.ground }]}>What you made, your go-tos, your best weeks</Text>
       </View>
     </Pressable>
   );
@@ -344,7 +345,7 @@ const makeStyles = (sf: Surface) =>
   diaryEmpty: { fontSize: 15, lineHeight: 21, color: sf.body, padding: 16, borderRadius: 14, backgroundColor: sf.raised },
   goalsSummary: { fontSize: 15, color: sf.body, marginBottom: 4 },
   recap: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, marginBottom: 6 },
-  recapYear: { fontFamily: fonts.displayHeavy, fontSize: 34, letterSpacing: -1.5 },
+  recapYear: { fontFamily: fonts.displayItalic, fontSize: 40, letterSpacing: -1 },
   recapTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
   recapSub: { fontSize: 13, marginTop: 2 },
   diaryNote: { fontSize: 13, color: sf.muted, marginTop: 6 },
