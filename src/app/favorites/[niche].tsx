@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ReorderRow } from '@/components/reorder-row';
 import { useToast } from '@/components/toast';
 import { formatRating } from '@/components/diary';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
@@ -53,6 +54,7 @@ export default function FavoritesScreen() {
     },
   ];
   const empty = options.every((g) => !g.items.length);
+  const byKey: Record<string, Option> = Object.fromEntries(options.flatMap((g) => g.items).map((o) => [key(o.ref), o]));
 
   const toggle = (r: FavoriteRef) => {
     if (picked.some((p) => key(p) === key(r))) setPicked(picked.filter((p) => key(p) !== key(r)));
@@ -82,6 +84,36 @@ export default function FavoritesScreen() {
           Pick up to four, in order. They sit at the top of your profile in {n.label}. {picked.length}/{MAX_FAVORITES} chosen.
           {adding ? ' Your post took the last spot. Tap it to remove it, or tap another to swap it out instead, then Done.' : ''}
         </Text>
+        {picked.length ? (
+          <View style={{ gap: 8 }}>
+            <Text style={styles.group}>Your order</Text>
+            <ReorderRow
+              slots={MAX_FAVORITES}
+              itemHeight={(w) => w * 1.25 + 22}
+              items={picked.map((r, i) => {
+                const o = byKey[key(r)];
+                return {
+                  key: key(r),
+                  label: `${i + 1}. ${o?.title ?? ''}`,
+                  render: () => (
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <View style={[styles.thumb, { backgroundColor: o?.color ?? n.field, borderColor: n.accent }]}>
+                        {o?.image ? <Image source={o.image} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                        <View style={[styles.num, { backgroundColor: n.accent }]}>
+                          <Text style={styles.numText}>{i + 1}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.cellTitle} numberOfLines={1}>{o?.title ?? ''}</Text>
+                    </View>
+                  ),
+                };
+              })}
+              onReorder={(keys) => setPicked(keys.map((k) => picked.find((r) => key(r) === k)).filter((r): r is FavoriteRef => !!r))}
+              renderEmpty={() => <View style={[styles.thumb, styles.slot, { borderColor: n.line }]} />}
+            />
+            {picked.length > 1 ? <Text style={styles.hint}>Hold and drag to change the order.</Text> : null}
+          </View>
+        ) : null}
         {empty ? (
           <Text style={styles.empty}>Nothing to choose yet. Log something with “{words.did}”, post, or save a few {n.label.toLowerCase()} posts first.</Text>
         ) : null}
@@ -144,6 +176,8 @@ const styles = StyleSheet.create({
   numText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   cellTitle: { fontSize: 12, fontWeight: '600', color: colors.text, lineHeight: 15 },
   cellSub: { fontSize: 11, color: colors.textMuted },
+  slot: { borderStyle: 'dashed', backgroundColor: 'transparent' },
+  hint: { fontSize: 12, color: colors.textMuted },
   clear: { alignSelf: 'center', minHeight: TOUCH, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' },
   clearText: { fontSize: 15, fontWeight: '600', color: colors.textMuted },
 });

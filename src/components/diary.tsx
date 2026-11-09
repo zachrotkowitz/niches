@@ -5,6 +5,7 @@ import { Text } from '@/components/text';
 import Svg, { Path } from 'react-native-svg';
 
 import { LockIcon, PlusIcon } from '@/components/icons';
+import { ReorderRow } from '@/components/reorder-row';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef, type LogEntry } from '@/lib/diary';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import { dayLabel } from '@/lib/plans';
@@ -152,16 +153,68 @@ function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId
   );
 }
 
-/** Letterboxd-style Top 4 for one niche. Your own shows empty slots you can fill. */
+/** A Top 4 tile without its own tap handling, for the draggable row. */
+function FavoriteTileBody({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId }) {
+  const styles = useSurfaceStyles(makeStyles);
+  const item = useFavoriteItem(refItem);
+  const n = useNiches()[niche];
+  return (
+    <View style={{ flex: 1, gap: 4 }}>
+      <View style={[styles.tile, { backgroundColor: item?.color ?? n.field }]}>
+        {item?.image ? <Image source={item.image} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+      </View>
+      <Text style={styles.tileTitle} numberOfLines={2}>{item?.title ?? ''}</Text>
+    </View>
+  );
+}
+
+const refKey = (r: FavoriteRef) => `${r.kind}:${r.id}`;
+
+/** Letterboxd-style Top 4 for one niche. Your own shows empty slots you can fill, and you can hold and drag to reorder. */
 export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheId; isMe: boolean }) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const router = useRouter();
-  const { state } = useStore();
+  const { state, actions } = useStore();
   const n = useNiches()[niche];
   const refs = state.favorites[userId]?.[niche] ?? [];
   if (!refs.length && !isMe) return null;
   const edit = () => router.push({ pathname: '/favorites/[niche]', params: { niche } });
+  const titleOf = (r: FavoriteRef) =>
+    r.kind === 'log' ? state.logs.find((l) => l.id === r.id)?.title ?? '' : (() => { const p = state.posts.find((x) => x.id === r.id); return p ? p.mediaLabel ?? p.caption : ''; })();
+  const open = (r: FavoriteRef) =>
+    r.kind === 'log' ? router.push({ pathname: '/log/[id]', params: { id: r.id } }) : router.push({ pathname: '/post/[id]', params: { id: r.id } });
+  const emptySlot = (i: number) => (
+    <Pressable key={`empty-${i}`} accessibilityRole="button" accessibilityLabel={`Add to ${diaryWords(niche).top}`} onPress={edit} style={{ flex: 1 }}>
+      <View style={[styles.tile, styles.emptyTile, { borderColor: n.accent }]}>
+        <PlusIcon size={18} color={n.accent} />
+      </View>
+    </Pressable>
+  );
+  // Your own Top 4 with two or more picks: hold and drag a tile to change the order.
+  if (isMe && refs.length >= 2) {
+    return (
+      <View style={{ gap: 8 }}>
+        <View style={styles.topHead}>
+          <Text style={[styles.topTitle, { color: n.ink }]}>{diaryWords(niche).top}</Text>
+          <Pressable accessibilityRole="button" onPress={edit} style={styles.editButton}>
+            <Text style={[styles.editText, { color: surface.active(n) }]}>Edit</Text>
+          </Pressable>
+        </View>
+        <ReorderRow
+          slots={MAX_FAVORITES}
+          itemHeight={(w) => w * 1.25 + 32}
+          items={refs.map((r) => ({ key: refKey(r), label: titleOf(r), onPress: () => open(r), render: () => <FavoriteTileBody refItem={r} niche={niche} /> }))}
+          onReorder={(keys) => {
+            const next = keys.map((k) => refs.find((r) => refKey(r) === k)).filter((r): r is FavoriteRef => !!r);
+            if (next.map(refKey).join() !== refs.map(refKey).join()) actions.setFavorites(userId, niche, next);
+          }}
+          renderEmpty={emptySlot}
+        />
+        <Text style={[styles.dragHint, { color: surface.muted }]}>Hold and drag to change the order</Text>
+      </View>
+    );
+  }
   return (
     <View style={{ gap: 8 }}>
       <View style={styles.topHead}>
@@ -217,6 +270,7 @@ const makeStyles = (sf: Surface) =>
   editButton: { minHeight: 32, justifyContent: 'center', paddingLeft: 12 },
   editText: { fontSize: 14, fontWeight: '700' },
   tiles: { flexDirection: 'row', gap: 8 },
+  dragHint: { fontSize: 12, fontWeight: '500' },
   tile: { aspectRatio: 0.8, borderRadius: 10, overflow: 'hidden' },
   emptyTile: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   tileTitle: { fontSize: 11, fontWeight: '600', color: sf.body, lineHeight: 14 },
