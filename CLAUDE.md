@@ -48,7 +48,7 @@ Expo (React Native, Expo Router) for iOS, Android and web from one codebase; Sup
 - **Phase A (demo polish):** post menu, Color lab, new Discover (people + inspiration), niche borders on Saved/Discover, swipe between niches.
 - **Phase B, Plans:** one feature covering meal scheduling (shareable with friends), group meals where invitees pick a dish and claim who brings which ingredient, and photo/art outings (what + where + when). Each plan public or private.
 - **Phase C, Shop ("Etsy meets Pinterest"):** users sell cookbooks, recipes, prints, artworks — **no food sales** (state cottage-food laws); listings attach to posts and are browsable per niche (Cooking, Photography, Art first). Demo checkout is pretend.
-- **Phase D, Creators:** verified "celebrity" profiles and premium chefs/artists who charge a subscription or one-time fee for their best content. Same model for other niches. **Invite-only at first** (founder approves), open applications later.
+- **Phase D, Creators:** verified "celebrity" profiles and premium chefs/artists who charge a subscription or one-time fee for their best content. Same model for other niches. **Invite-only at first** (founder approves), open applications later. **Niches takes 5% of creator earnings** (founder confirmed Nov 2026; same as the Shop).
 - **More niches:** founder likes Gardening; wants other popular hobby suggestions.
 - C and D need real accounts (Supabase) and payments; mind Apple/Google rules on paid digital content.
 
