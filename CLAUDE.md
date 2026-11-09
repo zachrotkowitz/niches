@@ -18,6 +18,7 @@ The founder has little coding experience and wants to be involved: explain decis
   Order: Cooking → Art → Photography → Gym. Tabs stay tap-only.
 - **Demo has preview posts** from made-up founding creators in Art and Photography; those niches stay closed for posting. Gym has none.
 - **Post "⋯" menu, like Instagram:** own posts — edit, adjust grid preview, hide cheer count, turn off comments, archive, delete; others' posts — save, not interested, report, copy link.
+- **Bolder look under review (Nov 2026):** three directions on https://claude.ai/artifact/WcSK5feoqtRFASzgGTprDw for the founder to react to: A Flood (niche color fills the screen, wide heavy type), B Sticker (ink outlines, hard shadows, goals as a punch card), C Issue (each feed is a daily magazine issue, serif headlines). Niche colors stay in all three. Don't restyle the app until the founder picks.
 - **Niche colors are being explored:** a Color lab in Profile → Settings lets the founder try palettes per niche on device.
 - **Profiles:** one profile per person with niche tabs (All · Cooking · Art ...).
 - **Likes** (renamed from "cheers" in the UI; code still says `cheers`): counts hidden from everyone except the poster, who sees like and save counts on their own posts. No leaderboards.
