@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
@@ -157,16 +157,17 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
       ) : null}
 
-      <View accessibilityRole="tablist" style={styles.tabs}>
+      {/* Tabs keep their natural width (no wrapped labels) and scroll sideways if they don't all fit. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={styles.tabs} contentContainerStyle={styles.tabsRow}>
         {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
-              <Text style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
+              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {tab === 'goals' ? (
         <View style={styles.diary}>
@@ -293,8 +294,12 @@ export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; ni
   const router = useRouter();
   const niches = useNiches();
   const { state } = useStore();
+  // Exactly three squares per row: measure the row and size each cell from it.
+  const { width: windowWidth } = useWindowDimensions();
+  const [rowWidth, setRowWidth] = useState(0);
+  const size = Math.floor(((rowWidth || windowWidth) - GRID_GAP * 2) / 3);
   return (
-    <View style={styles.grid}>
+    <View style={styles.grid} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
       {posts.map((p) => {
         const n = niches[p.niche];
         return (
@@ -303,13 +308,13 @@ export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; ni
             accessibilityRole="button"
             accessibilityLabel={`Open ${n.label} post: ${tileTitle(p)}`}
             onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } })}
-            style={[styles.cell, nicheBorders ? { borderWidth: NICHE_BORDER, borderColor: n.accent } : null]}>
+            style={[styles.cell, { width: size, height: size }, nicheBorders ? { borderWidth: NICHE_BORDER, borderColor: n.accent } : null]}>
             {p.kind === 'text' ? (
               <View style={[styles.textCell, { backgroundColor: n.field }]}>
                 <Text style={[styles.textCellText, { color: n.ink }]} numberOfLines={4}>{p.caption}</Text>
               </View>
             ) : (
-              <MediaPlaceholder post={p} height={nicheBorders ? 122 : 128} showLabel={false} />
+              <MediaPlaceholder post={p} height={size - (nicheBorders ? NICHE_BORDER * 2 : 0)} showLabel={false} />
             )}
             {!hasAccess(state, p) ? (
               <View style={styles.lockVeil} accessibilityLabel="Members only">
@@ -322,6 +327,8 @@ export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; ni
     </View>
   );
 }
+
+const GRID_GAP = 2;
 
 const makeStyles = (sf: Surface) =>
   StyleSheet.create({
@@ -353,11 +360,12 @@ const makeStyles = (sf: Surface) =>
   plansTitle: { fontSize: 17, fontWeight: '700', color: sf.text },
   seeAll: { minHeight: 36, justifyContent: 'center', paddingLeft: 12 },
   seeAllText: { fontSize: 15, fontWeight: '600', color: sf.body },
-  tabs: { flexDirection: 'row', marginTop: 18, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: sf.line },
-  tab: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
+  tabs: { marginTop: 18, borderBottomWidth: 1, borderBottomColor: sf.line, flexGrow: 0 },
+  tabsRow: { flexGrow: 1, paddingHorizontal: 8 },
+  tab: { flexGrow: 1, minHeight: 46, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
   tabText: { fontSize: 14, fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingTop: 2 },
-  cell: { width: '33%', flexGrow: 1, maxWidth: '33.4%', height: 128, overflow: 'hidden' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, paddingTop: GRID_GAP },
+  cell: { overflow: 'hidden' },
   lockVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,22,26,0.5)', alignItems: 'center', justifyContent: 'center' },
   textCell: { flex: 1, padding: 10, justifyContent: 'flex-end' },
   textCellText: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
