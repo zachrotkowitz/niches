@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProgressBar, WeekStrip } from '@/components/goals';
@@ -8,12 +9,13 @@ import { CheckIcon, ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { PostSquares } from '@/components/profile-view';
 import { Button, DisplayText } from '@/components/primitives';
 import { Sheet } from '@/components/sheet';
+import { SurfaceProvider } from '@/components/surface';
 import { useToast } from '@/components/toast';
 import { diaryWords } from '@/lib/diary';
 import { currentBest, fmt, goalRule, longestStreak, progress, streak, weekKey, type Goal, type WeekCell } from '@/lib/goals';
 import { dayLabel, isoDay } from '@/lib/plans';
 import { isVisible, useNiches, useStore } from '@/lib/store';
-import { colors, TOUCH } from '@/lib/theme';
+import { floodSurface, fonts, PLAIN_SURFACE, TOUCH, type Surface } from '@/lib/theme';
 
 export default function GoalScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +28,9 @@ export default function GoalScreen() {
   const [editing, setEditing] = useState(false);
 
   const goal = state.goals.find((g) => g.id === id);
+  // A goal's screen is flooded in its niche's color.
+  const surface = goal ? floodSurface(niches[goal.niche]) : PLAIN_SURFACE;
+  const styles = useMemo(() => makeStyles(surface), [surface]);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/goals'));
   const isMine = !!goal && goal.userId === state.me?.id;
 
@@ -77,21 +82,22 @@ export default function GoalScreen() {
   };
 
   return (
+    <SurfaceProvider value={surface}>
     <View style={styles.screen}>
       <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.back}>
-          <ChevronLeftIcon color={niche.accent} />
-          <Text style={[styles.backText, { color: niche.accent }]}>{isMine ? 'Goals' : owner?.username ?? 'Back'}</Text>
+          <ChevronLeftIcon color={niche.ink} />
+          <Text style={[styles.backText, { color: niche.ink }]}>{isMine ? 'Goals' : owner?.username ?? 'Back'}</Text>
         </Pressable>
         {isMine ? (
           <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={styles.editButton}>
-            <Text style={[styles.editText, { color: niche.accent }]}>Edit</Text>
+            <Text style={[styles.editText, { color: niche.ink }]}>Edit</Text>
           </Pressable>
         ) : null}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={[styles.hero, { backgroundColor: niche.field }]}>
+        <View style={styles.hero}>
           <View style={styles.heroTop}>
             <Text style={[styles.rule, { color: niche.inkSoft }]}>
               {niche.label} · {goalRule(goal)}
@@ -250,7 +256,7 @@ export default function GoalScreen() {
             </View>
             <View style={{ gap: 8, marginTop: 18 }}>
               <Button tone="outline" label={done ? 'Reopen goal' : 'Mark as done'} onPress={() => { actions.setGoalDone(goal.id, !done); toast(done ? 'Goal reopened' : 'Goal done. Nice work.'); }} />
-              <Button tone="ghost" label="Delete goal" textStyle={{ color: colors.danger }} onPress={confirmDelete} />
+              <Button tone="ghost" label="Delete goal" textStyle={{ color: niche.ink }} onPress={confirmDelete} />
             </View>
           </View>
         ) : null}
@@ -259,11 +265,13 @@ export default function GoalScreen() {
       {isMine ? <CheckInSheet goal={goal} visible={checkingIn} onClose={() => setCheckingIn(false)} /> : null}
       {isMine ? <EditSheet goal={goal} visible={editing} onClose={() => setEditing(false)} /> : null}
     </View>
+    </SurfaceProvider>
   );
 }
 
 /** Check in: when, plus the number for totals and personal bests, plus an optional note. */
 function CheckInSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; onClose: () => void }) {
+  const styles = plainStyles;
   const { actions } = useStore();
   const toast = useToast();
   const niche = useNiches()[goal.niche];
@@ -327,6 +335,7 @@ function CheckInSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean
 
 /** Rename, change the weekly number, or raise the target. */
 function EditSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; onClose: () => void }) {
+  const styles = plainStyles;
   const { actions } = useStore();
   const toast = useToast();
   const niche = useNiches()[goal.niche];
@@ -366,20 +375,21 @@ function EditSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; o
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+const makeStyles = (sf: Surface) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: sf.ground },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, paddingBottom: 6 },
   back: { minHeight: TOUCH, minWidth: 96, flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
   backText: { fontSize: 17 },
   editButton: { minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 14 },
   editText: { fontSize: 17, fontWeight: '600' },
-  hero: { marginHorizontal: 16, padding: 20, borderRadius: 24, gap: 14 },
+  hero: { marginHorizontal: 6, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, gap: 14 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   rule: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
   private: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   privateText: { fontSize: 12, fontWeight: '700' },
   big: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
-  headline: { fontSize: 40, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  headline: { fontFamily: fonts.display, fontSize: 88, lineHeight: 88, letterSpacing: -2, fontVariant: ['tabular-nums'] },
   caption: { fontSize: 15, fontWeight: '600' },
   stripLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   stripLabel: { fontSize: 11, fontWeight: '600' },
@@ -390,30 +400,33 @@ const styles = StyleSheet.create({
   reached: { gap: 10, paddingTop: 4 },
   reachedTitle: { fontSize: 16, fontWeight: '700' },
   actions: { paddingHorizontal: 20, paddingTop: 16, gap: 8 },
-  restRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginTop: 4 },
-  restTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  restSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
+  restRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: sf.line, marginTop: 4 },
+  restTitle: { fontSize: 15, fontWeight: '700', color: sf.text },
+  restSub: { fontSize: 13, lineHeight: 18, color: sf.muted },
   switchTrack: { width: 46, height: 28, borderRadius: 14, backgroundColor: '#D5D8D3', padding: 3 },
   switchKnob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
   section: { paddingHorizontal: 20, marginTop: 26 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  emptyText: { fontSize: 14, lineHeight: 20, color: colors.textMuted, marginTop: 8 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: sf.text },
+  emptyText: { fontSize: 14, lineHeight: 20, color: sf.muted, marginTop: 8 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6, minHeight: TOUCH },
   checkDot: { width: 8, height: 8, borderRadius: 4 },
-  checkWhat: { fontSize: 15, fontWeight: '600', color: colors.text },
-  checkWhen: { fontSize: 13, color: colors.textMuted },
+  checkWhat: { fontSize: 15, fontWeight: '600', color: sf.text },
+  checkWhen: { fontSize: 13, color: sf.muted },
   remove: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  removeText: { fontSize: 22, color: colors.textMuted },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border },
+  removeText: { fontSize: 22, color: sf.muted },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: sf.line },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
-  optionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  optionSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
+  optionTitle: { fontSize: 15, fontWeight: '700', color: sf.text },
+  optionSub: { fontSize: 13, lineHeight: 18, color: sf.muted },
   check: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingVertical: 6 },
   box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
-  day: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 14, fontWeight: '600', color: colors.textBody },
-  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 14, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF' },
-  num: { flex: 1, height: TOUCH, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  numText: { fontSize: 15, fontWeight: '700', color: colors.textBody },
+  day: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F4F5F2', alignItems: 'center', justifyContent: 'center' },
+  dayText: { fontSize: 14, fontWeight: '600', color: sf.body },
+  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: '#DADDD8', paddingHorizontal: 14, fontSize: 16, color: sf.text, backgroundColor: '#FFFFFF' },
+  num: { flex: 1, height: TOUCH, borderRadius: 12, backgroundColor: '#F4F5F2', alignItems: 'center', justifyContent: 'center' },
+  numText: { fontSize: 15, fontWeight: '700', color: sf.body },
 });
+
+// The check-in and edit sheets are white panels, so they use the plain colors.
+const plainStyles = makeStyles(PLAIN_SURFACE);

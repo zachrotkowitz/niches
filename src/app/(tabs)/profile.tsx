@@ -1,15 +1,19 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { PostSquares, ProfileView } from '@/components/profile-view';
+import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
 import { useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, TOUCH } from '@/lib/theme';
+import { floodSurface, NICHE_ORDER, TOUCH, type Surface } from '@/lib/theme';
 
-export default function ProfileScreen() {
+function ProfileScreenInner() {
+  const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, actions } = useStore();
@@ -66,7 +70,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <ChevronLeftIcon size={18} color={colors.textMuted} />
+                <ChevronLeftIcon size={18} color={surface.muted} />
               </View>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => router.push('/creators/memberships')} style={styles.linkRow}>
@@ -77,7 +81,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <ChevronLeftIcon size={18} color={colors.textMuted} />
+                <ChevronLeftIcon size={18} color={surface.muted} />
               </View>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => router.push('/settings/colors')} style={styles.linkRow}>
@@ -91,12 +95,12 @@ export default function ProfileScreen() {
                 ))}
               </View>
               <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <ChevronLeftIcon size={18} color={colors.textMuted} />
+                <ChevronLeftIcon size={18} color={surface.muted} />
               </View>
             </Pressable>
             <Row label="Notifications" value="Daily digest at 6:00 PM (coming soon)" />
             <Row label="Born" value={`${me.birthDate} · never shown`} />
-            <Button tone="outline" label="Delete demo account" textStyle={{ color: colors.danger }} onPress={confirmReset} style={{ marginTop: 12 }} />
+            <Button tone="outline" label="Delete demo account" textStyle={{ color: surface.flood ? surface.text : "#B42318" }} onPress={confirmReset} style={{ marginTop: 12 }} />
           </View>
         }
       />
@@ -105,6 +109,7 @@ export default function ProfileScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useSurfaceStyles(makeStyles);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -113,15 +118,27 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
+const makeStyles = (sf: Surface) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: sf.ground },
   settings: { marginTop: 28, paddingHorizontal: 20, gap: 4 },
-  settingsTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 6 },
-  row: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline, gap: 2 },
-  linkRow: { minHeight: TOUCH + 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.hairline, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel: { fontSize: 15, color: colors.text, fontWeight: '500', flexShrink: 1 },
-  rowValue: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  rowAction: { marginLeft: 'auto', fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  settingsTitle: { fontSize: 17, fontWeight: '700', color: sf.text, marginBottom: 6 },
+  row: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: sf.line, gap: 2 },
+  linkRow: { minHeight: TOUCH + 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: sf.line, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowLabel: { fontSize: 15, color: sf.text, fontWeight: '500', flexShrink: 1 },
+  rowValue: { fontSize: 13, lineHeight: 18, color: sf.muted },
+  rowAction: { marginLeft: 'auto', fontSize: 15, fontWeight: '600', color: sf.body },
   dots: { flexDirection: 'row', gap: 4 },
   dot: { width: 12, height: 12, borderRadius: 6 },
 });
+
+/** Your profile, flooded in the color of the niche you're in. */
+export default function ProfileScreen() {
+  const { state } = useStore();
+  const niches = useNiches();
+  return (
+    <SurfaceProvider value={floodSurface(niches[state.niche])}>
+      <ProfileScreenInner />
+    </SurfaceProvider>
+  );
+}

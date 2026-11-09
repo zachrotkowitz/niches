@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Text } from '@/components/text';
 
 import { CameraIcon, PlayIcon } from '@/components/icons';
 import { formatDuration } from '@/lib/format';
@@ -97,9 +98,10 @@ export function Button({ label, tone = 'solid', color = '#1E6B47', style, textSt
   );
 }
 
-export function DisplayText({ children, size = 38, color = colors.text, style }: { children: React.ReactNode; size?: number; color?: string; style?: StyleProp<TextStyle> }) {
+/** Headlines in Instrument Serif. Italic for the big niche names and moments like "You're caught up." */
+export function DisplayText({ children, size = 38, color = colors.text, italic = false, style }: { children: React.ReactNode; size?: number; color?: string; italic?: boolean; style?: StyleProp<TextStyle> }) {
   return (
-    <Text accessibilityRole="header" style={[{ fontFamily: fonts.display, fontSize: size, lineHeight: size * 1.08, letterSpacing: -size * 0.03, color }, style]}>
+    <Text accessibilityRole="header" style={[{ fontFamily: italic ? fonts.displayItalic : fonts.display, fontSize: size, lineHeight: size * 1.04, letterSpacing: -size * 0.015, color }, style]}>
       {children}
     </Text>
   );

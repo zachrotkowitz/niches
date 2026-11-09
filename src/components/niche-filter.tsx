@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Text } from '@/components/text';
 
 import { useNiches } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';

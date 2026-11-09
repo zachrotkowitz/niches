@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { LockedPanel, NameWithBadges } from '@/components/creator';
 import { BookmarkIcon, CommentIcon, HeartIcon, LockIcon, MoreIcon, PauseIcon, PlayIcon, StarIcon, TrendIcon } from '@/components/icons';
@@ -8,6 +9,7 @@ import { useSwipeBlocked } from '@/components/niche-swipe';
 import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
+import { useSurface } from '@/components/surface';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -18,10 +20,15 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const router = useRouter();
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[post.niche];
+  const surface = useSurface();
+  const active = surface.active(niche);
   const [menuOpen, setMenuOpen] = useState(false);
   const { width } = useWindowDimensions();
   // Real photos keep their own shape (between 4:5 portrait and 5:4 landscape), like Instagram.
-  const photoHeight = post.imageUri && post.imageAspect ? Math.round(Math.min(width, 640) * Math.min(1.25, Math.max(0.8, post.imageAspect))) : mediaHeight;
+  // On a flooded screen photos sit inset with rounded corners, like prints on colored paper.
+  const mediaWidth = Math.min(width, 640) - (surface.flood ? 32 : 0);
+  const photoHeight = post.imageUri && post.imageAspect ? Math.round(mediaWidth * Math.min(1.25, Math.max(0.8, post.imageAspect))) : mediaHeight;
+  const inset = surface.flood ? styles.mediaInset : null;
   const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];
   const isMine = !!state.me && post.authorId === state.me.id;
@@ -41,13 +48,13 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const openAuthor = () => (isMine ? router.navigate('/profile') : router.push({ pathname: '/user/[id]', params: { id: post.authorId } }));
 
   return (
-    <View style={[styles.card, inDetail ? null : styles.cardDivider]}>
+    <View style={[styles.card, inDetail ? null : [styles.cardDivider, { borderBottomColor: surface.line }]]}>
       <View style={styles.head}>
         <Pressable accessibilityRole="button" accessibilityLabel={`View ${author?.username ?? 'author'}’s profile`} onPress={openAuthor} style={styles.author}>
           <Avatar user={author} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <NameWithBadges user={author} style={styles.user} />
-            <Text style={styles.time}>
+            <NameWithBadges user={author} style={[styles.user, { color: surface.text }]} />
+            <Text style={[styles.time, { color: surface.muted }]}>
               {timeAgo(post.createdAt)}
               {post.editedAt ? ' · edited' : ''}
               {post.archived ? ' · archived' : ''}
@@ -55,13 +62,13 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           </View>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Post options" onPress={() => setMenuOpen(true)} hitSlop={4} style={styles.iconButton}>
-          <MoreIcon />
+          <MoreIcon color={surface.body} />
         </Pressable>
       </View>
 
       {locked && post.kind !== 'text' ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Members-only post. Open to see options" onPress={open} disabled={inDetail}>
-          <View style={[styles.lockedMedia, { height: Math.round(mediaHeight * 0.55), backgroundColor: post.mediaColor ?? niche.field }]}>
+          <View style={[styles.lockedMedia, inset, { height: Math.round(mediaHeight * 0.55), backgroundColor: post.mediaColor ?? niche.field }]}>
             <View style={styles.lockedVeil} />
             <LockIcon size={28} color="#FFFFFF" />
             <Text style={styles.lockedMediaText}>Members only</Text>
@@ -70,25 +77,31 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
       ) : null}
       {!locked && post.kind === 'photo' ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>
-          <MediaPlaceholder post={post} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} />
+          <View style={inset}>
+            <MediaPlaceholder post={post} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} />
+          </View>
         </Pressable>
       ) : null}
-      {!locked && post.kind === 'video' ? <VideoPlaceholder post={post} height={mediaHeight} /> : null}
+      {!locked && post.kind === 'video' ? (
+        <View style={inset}>
+          <VideoPlaceholder post={post} height={mediaHeight} />
+        </View>
+      ) : null}
 
       <Pressable onPress={open} disabled={inDetail} accessibilityRole={inDetail ? undefined : 'button'} accessibilityLabel={inDetail ? undefined : 'Open post'} style={styles.body}>
         {post.progressLabel ? (
-          <View style={[styles.tag, { backgroundColor: niche.field }]}>
+          <View style={[styles.tag, { backgroundColor: surface.flood ? '#FFFFFF' : niche.field }]}>
             <TrendIcon color={niche.ink} />
             <Text style={[styles.tagText, { color: niche.ink }]}>Progress · {post.progressLabel}</Text>
           </View>
         ) : null}
         {post.premium && !locked ? (
-          <View style={[styles.tag, { backgroundColor: niche.field }]}>
+          <View style={[styles.tag, { backgroundColor: surface.flood ? '#FFFFFF' : niche.field }]}>
             <StarIcon size={11} color={niche.ink} />
             <Text style={[styles.tagText, { color: niche.ink }]}>{isMine ? 'Members only' : 'Members only · unlocked for you'}</Text>
           </View>
         ) : null}
-        <Text style={[styles.caption, post.kind === 'text' ? styles.captionLarge : null]} numberOfLines={locked ? 2 : undefined}>
+        <Text style={[styles.caption, { color: surface.text }, post.kind === 'text' ? styles.captionLarge : null]} numberOfLines={locked ? 2 : undefined}>
           {post.caption}
         </Text>
       </Pressable>
@@ -105,8 +118,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           accessibilityLabel={isMine ? `${likeLabel}${cheered ? ', you liked this' : ''}` : likeLabel}
           onPress={() => !swiping() && actions.toggleCheer(post.id)}
           style={({ pressed }) => [styles.action, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
-          <HeartIcon filled={cheered} color={cheered ? niche.accent : colors.textSecondary} />
-          <Text style={[styles.actionText, { color: cheered ? niche.accent : colors.textSecondary }]}>{likeLabel}</Text>
+          <HeartIcon filled={cheered} color={cheered ? active : surface.body} />
+          <Text style={[styles.actionText, { color: cheered ? active : surface.body }]}>{likeLabel}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -114,8 +127,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           onPress={open}
           disabled={inDetail}
           style={styles.action}>
-          <CommentIcon />
-          <Text style={[styles.actionText, { fontWeight: '500' }]}>
+          <CommentIcon color={surface.body} />
+          <Text style={[styles.actionText, { fontWeight: '500', color: surface.body }]}>
             {post.commentsOff ? 'Comments off' : `${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`}
           </Text>
         </Pressable>
@@ -126,8 +139,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           accessibilityLabel={isMine ? `${saveLabel}${saved ? ', you saved this' : ''}` : saveLabel}
           onPress={() => !swiping() && actions.toggleSave(post.id)}
           style={({ pressed }) => [styles.action, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
-          <BookmarkIcon size={20} filled={saved} color={saved ? niche.accent : colors.textSecondary} />
-          <Text style={[styles.actionText, { color: saved ? niche.accent : colors.textSecondary }]}>{saveLabel}</Text>
+          <BookmarkIcon size={20} filled={saved} color={saved ? active : surface.body} />
+          <Text style={[styles.actionText, { color: saved ? active : surface.body }]}>{saveLabel}</Text>
         </Pressable>
       </View>
       )}
@@ -159,8 +172,9 @@ function VideoPlaceholder({ post, height }: { post: Post; height: number }) {
 }
 
 const styles = StyleSheet.create({
-  card: { paddingBottom: 6, backgroundColor: colors.ground },
-  cardDivider: { borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  card: { paddingBottom: 6 },
+  mediaInset: { marginHorizontal: 16, borderRadius: 22, overflow: 'hidden' },
+  cardDivider: { borderBottomWidth: 1 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 20, paddingRight: 8, paddingVertical: 12 },
   author: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH },
   user: { fontSize: 15, fontWeight: '600', color: colors.text },

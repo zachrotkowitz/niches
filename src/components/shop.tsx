@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { NICHE_BORDER } from '@/components/feed-grid';
 import { BagIcon, BookmarkIcon, DownloadIcon } from '@/components/icons';

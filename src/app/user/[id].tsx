@@ -1,15 +1,19 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
 import { ProfileView } from '@/components/profile-view';
-import { useStore } from '@/lib/store';
-import { colors, TOUCH } from '@/lib/theme';
+import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
+import { useNiches, useStore } from '@/lib/store';
+import { floodSurface, TOUCH, type Surface } from '@/lib/theme';
 
 /** Someone else's profile. */
-export default function UserScreen() {
+function UserScreenInner() {
+  const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -21,7 +25,7 @@ export default function UserScreen() {
     <View style={styles.screen}>
       <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.back}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeftIcon color={surface.text} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
         {user ? <Text style={styles.title}>{user.username}</Text> : null}
@@ -33,7 +37,7 @@ export default function UserScreen() {
         </ScrollView>
       ) : (
         <View style={{ padding: 20, gap: 14 }}>
-          <Text style={{ fontSize: 17, color: colors.text }}>This account isn’t available.</Text>
+          <Text style={{ fontSize: 17, color: surface.text }}>This account isn’t available.</Text>
           <Button label="Go back" onPress={goBack} />
         </View>
       )}
@@ -41,10 +45,22 @@ export default function UserScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ground },
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: colors.hairline },
+const makeStyles = (sf: Surface) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: sf.ground },
+  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: sf.line },
   back: { minHeight: TOUCH, minWidth: 80, flexDirection: 'row', alignItems: 'center' },
-  backText: { fontSize: 17, color: colors.text },
-  title: { fontSize: 17, fontWeight: '600', color: colors.text },
+  backText: { fontSize: 17, color: sf.text },
+  title: { fontSize: 17, fontWeight: '600', color: sf.text },
 });
+
+/** Flooded in the color of the niche you're in, like Home. */
+export default function UserScreen() {
+  const { state } = useStore();
+  const niches = useNiches();
+  return (
+    <SurfaceProvider value={floodSurface(niches[state.niche])}>
+      <UserScreenInner />
+    </SurfaceProvider>
+  );
+}

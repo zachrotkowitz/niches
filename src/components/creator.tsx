@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
+import { Text } from '@/components/text';
 
 import { CheckIcon, LockIcon, StarIcon, VerifiedIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';

@@ -1,4 +1,12 @@
-import { SchibstedGrotesk_700Bold, SchibstedGrotesk_800ExtraBold, useFonts } from '@expo-google-fonts/schibsted-grotesk';
+import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import {
+  SchibstedGrotesk_400Regular,
+  SchibstedGrotesk_500Medium,
+  SchibstedGrotesk_600SemiBold,
+  SchibstedGrotesk_700Bold,
+  SchibstedGrotesk_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/schibsted-grotesk';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -34,7 +42,15 @@ export default function RootLayout() {
 
 function RootStack() {
   const { state } = useStore();
-  const [fontsLoaded, fontError] = useFonts({ SchibstedGrotesk_700Bold, SchibstedGrotesk_800ExtraBold });
+  const [fontsLoaded, fontError] = useFonts({
+    InstrumentSerif_400Regular,
+    InstrumentSerif_400Regular_Italic,
+    SchibstedGrotesk_400Regular,
+    SchibstedGrotesk_500Medium,
+    SchibstedGrotesk_600SemiBold,
+    SchibstedGrotesk_700Bold,
+    SchibstedGrotesk_800ExtraBold,
+  });
   const ready = state.hydrated && (fontsLoaded || !!fontError);
 
   useEffect(() => {

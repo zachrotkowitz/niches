@@ -1,13 +1,15 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import Svg, { Path } from 'react-native-svg';
 
 import { LockIcon, PlusIcon } from '@/components/icons';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef, type LogEntry } from '@/lib/diary';
 import { dayLabel } from '@/lib/plans';
+import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { useNiches, useStore } from '@/lib/store';
-import { colors, TOUCH, type NicheId } from '@/lib/theme';
+import { TOUCH, type NicheId, type Surface } from '@/lib/theme';
 
 function StarShape({ size, fill, stroke }: { size: number; fill: string; stroke: string }) {
   return (
@@ -19,6 +21,7 @@ function StarShape({ size, fill, stroke }: { size: number; fill: string; stroke:
 
 /** Read-only stars, e.g. ★★★★☆. */
 export function Stars({ rating, size = 14, color }: { rating: number; size?: number; color: string }) {
+  const styles = useSurfaceStyles(makeStyles);
   return (
     <View style={styles.stars} accessible accessibilityLabel={`${rating} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -30,6 +33,7 @@ export function Stars({ rating, size = 14, color }: { rating: number; size?: num
 
 /** Tap-to-rate stars. Tapping the current rating again clears it. */
 export function StarInput({ value, onChange, color }: { value: number; onChange: (v: number) => void; color: string }) {
+  const styles = useSurfaceStyles(makeStyles);
   return (
     <View accessibilityRole="adjustable" accessibilityLabel={`Rating: ${value} out of 5`} style={styles.starInput}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -49,6 +53,8 @@ export function StarInput({ value, onChange, color }: { value: number; onChange:
 
 /** One diary entry in a list. */
 export function DiaryRow({ log, showPrivacy = false }: { log: LogEntry; showPrivacy?: boolean }) {
+  const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const router = useRouter();
   const niche = useNiches()[log.niche];
   return (
@@ -65,7 +71,7 @@ export function DiaryRow({ log, showPrivacy = false }: { log: LogEntry; showPriv
         <View style={styles.rowMeta}>
           <Stars rating={log.rating} color={niche.accent} />
           <Text style={styles.rowDate}>{dayLabel(log.date)}</Text>
-          {showPrivacy && log.visibility === 'private' ? <LockIcon size={12} color={colors.textMuted} /> : null}
+          {showPrivacy && log.visibility === 'private' ? <LockIcon size={12} color={surface.muted} /> : null}
         </View>
         {log.notes ? <Text style={styles.rowNotes} numberOfLines={1}>{log.notes}</Text> : null}
       </View>
@@ -85,6 +91,7 @@ export function useFavoriteItem(ref: FavoriteRef) {
 }
 
 function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId }) {
+  const styles = useSurfaceStyles(makeStyles);
   const router = useRouter();
   const item = useFavoriteItem(refItem);
   const n = useNiches()[niche];
@@ -101,6 +108,8 @@ function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId
 
 /** Letterboxd-style Top 4 for one niche. Your own shows empty slots you can fill. */
 export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheId; isMe: boolean }) {
+  const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const router = useRouter();
   const { state } = useStore();
   const n = useNiches()[niche];
@@ -113,7 +122,7 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
         <Text style={[styles.topTitle, { color: n.ink }]}>{diaryWords(niche).top}</Text>
         {isMe ? (
           <Pressable accessibilityRole="button" onPress={edit} style={styles.editButton}>
-            <Text style={[styles.editText, { color: n.accent }]}>{refs.length ? 'Edit' : 'Choose'}</Text>
+            <Text style={[styles.editText, { color: surface.active(n) }]}>{refs.length ? 'Edit' : 'Choose'}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -144,16 +153,17 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (sf: Surface) =>
+  StyleSheet.create({
   stars: { flexDirection: 'row', gap: 1 },
   starInput: { flexDirection: 'row', gap: 2 },
   starButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingVertical: 8 },
   thumb: { width: 56, height: 56, borderRadius: 10, overflow: 'hidden' },
-  rowTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  rowTitle: { fontSize: 15, fontWeight: '700', color: sf.text },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowDate: { fontSize: 13, color: colors.textMuted },
-  rowNotes: { fontSize: 13, color: colors.textSecondary },
+  rowDate: { fontSize: 13, color: sf.muted },
+  rowNotes: { fontSize: 13, color: sf.body },
   topHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
   editButton: { minHeight: 32, justifyContent: 'center', paddingLeft: 12 },
@@ -161,5 +171,5 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: 8 },
   tile: { aspectRatio: 0.8, borderRadius: 10, overflow: 'hidden' },
   emptyTile: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  tileTitle: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, lineHeight: 14 },
+  tileTitle: { fontSize: 11, fontWeight: '600', color: sf.body, lineHeight: 14 },
 });

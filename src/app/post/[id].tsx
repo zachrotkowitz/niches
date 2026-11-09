@@ -1,15 +1,17 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
 import { diaryWords } from '@/lib/diary';
 import { Avatar, Button } from '@/components/primitives';
+import { SurfaceProvider } from '@/components/surface';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
-import { colors, fonts, TOUCH } from '@/lib/theme';
+import { colors, floodSurface, fonts, TOUCH } from '@/lib/theme';
 
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +34,8 @@ export default function PostScreen() {
   }
 
   const niche = niches[post.niche];
+  // A post's screen is flooded in its niche's color, like the feed it came from.
+  const surface = floodSurface(niche);
   const isMine = !!state.me && post.authorId === state.me.id;
   const stats = postStats(state, post);
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
@@ -47,13 +51,14 @@ export default function PostScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
+    <SurfaceProvider value={surface}>
+    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: niche.mid }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.nav, { paddingTop: insets.top + 4, borderBottomColor: niche.line }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Back to ${niche.label}`} onPress={goBack} style={styles.back}>
-          <ChevronLeftIcon color={niche.accent} />
-          <Text style={[styles.backText, { color: niche.accent }]}>{niche.label}</Text>
+          <ChevronLeftIcon color={niche.ink} />
+          <Text style={[styles.backText, { color: niche.ink }]}>{niche.label}</Text>
         </Pressable>
-        <Text style={styles.navTitle}>{isMine ? 'Your post' : 'Post'}</Text>
+        <Text style={[styles.navTitle, { color: niche.ink }]}>{isMine ? 'Your post' : 'Post'}</Text>
         <View style={{ width: 96 }} />
       </View>
 
@@ -71,15 +76,15 @@ export default function PostScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected: !!state.wantList[post.id] }}
               onPress={() => actions.toggleWant(post.id)}
-              style={({ pressed }) => [styles.diaryButton, state.wantList[post.id] ? { backgroundColor: niche.field, borderColor: niche.accent } : null, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <Text style={[styles.diaryButtonText, { color: state.wantList[post.id] ? niche.ink : colors.textBody }]}>
+              style={({ pressed }) => [styles.diaryButton, { borderColor: niche.line, backgroundColor: state.wantList[post.id] ? '#FFFFFF' : 'rgba(255,255,255,0.35)' }, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <Text style={[styles.diaryButtonText, { color: niche.ink }]}>
                 {state.wantList[post.id] ? `On your list` : `+ ${diaryWords(post.niche).want}`}
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/log/new', params: { postId: post.id } })}
-              style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.accent, borderColor: niche.accent, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
               <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{diaryWords(post.niche).did}</Text>
             </Pressable>
           </View>
@@ -89,7 +94,7 @@ export default function PostScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Goal: ${goal.title}. See progress`}
             onPress={() => router.push({ pathname: '/goals/[id]', params: { id: goal.id } })}
-            style={({ pressed }) => [styles.goalLink, { backgroundColor: niche.field, opacity: pressed ? 0.85 : 1 }]}>
+            style={({ pressed }) => [styles.goalLink, { backgroundColor: '#FFFFFF', opacity: pressed ? 0.85 : 1 }]}>
             <TrendIcon size={16} color={niche.ink} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[styles.goalLinkLabel, { color: niche.inkSoft }]}>{isMine ? 'Your goal' : `${usersById[goal.userId]?.username}’s goal`}</Text>
@@ -99,7 +104,7 @@ export default function PostScreen() {
           </Pressable>
         ) : null}
         {state.logs.some((l) => l.userId === state.me?.id && l.postId === post.id) ? (
-          <Text style={styles.madeIt}>
+          <Text style={[styles.madeIt, { color: niche.inkSoft }]}>
             You’ve logged this {state.logs.filter((l) => l.userId === state.me?.id && l.postId === post.id).length}× in your diary.
           </Text>
         ) : null}
@@ -120,17 +125,17 @@ export default function PostScreen() {
         ) : null}
 
         <View style={styles.comments}>
-          <Text style={styles.commentsTitle}>{locked ? 'Comments are for members' : post.commentsOff ? 'Comments are turned off' : comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
+          <Text style={[styles.commentsTitle, { color: niche.ink }]}>{locked ? 'Comments are for members' : post.commentsOff ? 'Comments are turned off' : comments.length === 0 ? 'No comments yet' : 'Comments'}</Text>
           {(post.commentsOff || locked ? [] : comments).map((c) => {
             const author = usersById[c.authorId];
             return (
               <View key={c.id} style={styles.comment}>
                 <Avatar user={author} size={30} />
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.commentMeta}>
-                    <Text style={{ fontWeight: '600', color: colors.text }}>{author?.username ?? 'unknown'}</Text> · {timeAgo(c.createdAt)}
+                  <Text style={[styles.commentMeta, { color: niche.inkSoft }]}>
+                    <Text style={{ fontWeight: '600', color: niche.ink }}>{author?.username ?? 'unknown'}</Text> · {timeAgo(c.createdAt)}
                   </Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
+                  <Text style={[styles.commentText, { color: niche.ink }]}>{c.text}</Text>
                 </View>
               </View>
             );
@@ -139,7 +144,7 @@ export default function PostScreen() {
       </ScrollView>
 
       {post.commentsOff || locked ? null : (
-      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: niche.mid, borderTopColor: niche.line }]}>
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -157,12 +162,13 @@ export default function PostScreen() {
           accessibilityState={{ disabled: !canSend }}
           disabled={!canSend}
           onPress={send}
-          style={[styles.send, { backgroundColor: niche.accent, opacity: canSend ? 1 : 0.45 }]}>
+          style={[styles.send, { backgroundColor: niche.ink, opacity: canSend ? 1 : 0.45 }]}>
           <Text style={styles.sendText}>Post</Text>
         </Pressable>
       </View>
       )}
     </KeyboardAvoidingView>
+    </SurfaceProvider>
   );
 }
 
@@ -181,12 +187,12 @@ const styles = StyleSheet.create({
   back: { minHeight: TOUCH, minWidth: 96, flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
   backText: { fontSize: 17 },
   navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
-  private: { marginHorizontal: 20, marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: colors.surface, gap: 12 },
+  private: { marginHorizontal: 16, marginTop: 14, padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF', gap: 12 },
   privateHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   privateTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   statRow: { flexDirection: 'row', gap: 8 },
-  stat: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, gap: 2 },
-  statValue: { fontFamily: fonts.display, fontSize: 24, color: colors.text, fontVariant: ['tabular-nums'] },
+  stat: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 12, gap: 2 },
+  statValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34, color: colors.text, fontVariant: ['tabular-nums'] },
   statHidden: { fontSize: 17, lineHeight: 30, color: colors.textMuted },
   statLabel: { fontSize: 12, color: colors.textMuted },
   diaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
@@ -206,7 +212,7 @@ const styles = StyleSheet.create({
   commentMeta: { fontSize: 13, color: colors.textMuted },
   commentText: { fontSize: 14, lineHeight: 20, color: colors.textBody },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.hairline, backgroundColor: colors.ground },
-  input: { flex: 1, minHeight: TOUCH, borderRadius: 22, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 16, fontSize: 15, color: colors.text },
+  input: { flex: 1, minHeight: TOUCH, borderRadius: 22, borderWidth: 1, borderColor: 'transparent', backgroundColor: '#FFFFFF', paddingHorizontal: 16, fontSize: 15, color: colors.text },
   send: { minHeight: TOUCH, paddingHorizontal: 16, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sendText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
 });

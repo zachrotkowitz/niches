@@ -23,7 +23,22 @@ export type Niche = Omit<Palette, 'id' | 'name'> & {
   paletteId: string;
   /** Open for posting, or still "coming soon". */
   open: boolean;
+  /**
+   * The "Soft Flood" ground (founder's pick, Nov 2026): a dusty mid-tone of the
+   * accent that fills niche screens. Ink and inkSoft pass AA on it for every
+   * palette; the accent is only for icons and fills there, never for text.
+   */
+  mid: string;
+  /** Hairlines and outlines on the mid ground: ink at 20%. */
+  line: string;
 };
+
+/** Mixes a color with white. t = 1 is the color, 0 is white. */
+export function tint(hex: string, t: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(t * c + (1 - t) * 255));
+  return `#${ch.map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
 
 // Curated palettes for the Color lab. Any niche can take any palette.
 export const PALETTES: Palette[] = [
@@ -60,7 +75,7 @@ export function resolveNiches(overrides: Partial<Record<NicheId, string>> = {}):
     const base = NICHE_BASE[id];
     const paletteId = overrides[id] && PALETTES_BY_ID[overrides[id]!] ? overrides[id]! : base.paletteId;
     const { id: _pid, name: _name, ...colors } = PALETTES_BY_ID[paletteId];
-    out[id] = { ...base, ...colors, paletteId };
+    out[id] = { ...base, ...colors, paletteId, mid: tint(colors.accent, 0.34), line: `${colors.ink}33` };
   }
   return out;
 }
@@ -90,9 +105,62 @@ export const colors = {
 };
 
 export const fonts = {
-  display: 'SchibstedGrotesk_700Bold',
+  /** Headlines and big numbers: Instrument Serif (from the "Issue" direction). */
+  display: 'InstrumentSerif_400Regular',
+  displayItalic: 'InstrumentSerif_400Regular_Italic',
+  /** The wordmark and anything that needs heavy grotesk. */
   displayHeavy: 'SchibstedGrotesk_800ExtraBold',
 };
+
+/** Body text: Schibsted Grotesk, one font file per weight. */
+export const BODY_FONTS: Record<string, string> = {
+  '400': 'SchibstedGrotesk_400Regular',
+  '500': 'SchibstedGrotesk_500Medium',
+  '600': 'SchibstedGrotesk_600SemiBold',
+  '700': 'SchibstedGrotesk_700Bold',
+  '800': 'SchibstedGrotesk_800ExtraBold',
+  '900': 'SchibstedGrotesk_800ExtraBold',
+};
+
+/**
+ * The colors a component should use for where it sits. Screens that belong to
+ * one niche (Home, a post, a profile, a goal) are flooded with that niche's mid
+ * tone; screens that mix niches stay white so the niche borders read.
+ */
+export type Surface = {
+  flood: boolean;
+  ground: string;
+  text: string;
+  body: string;
+  muted: string;
+  line: string;
+  /** Raised panels: white on a flood, light gray on white. */
+  raised: string;
+  /** Selected and liked states: ink on a flood (the accent fails as text there), the accent on white. */
+  active: (n: Niche) => string;
+};
+
+export const PLAIN_SURFACE: Surface = {
+  flood: false,
+  ground: '#FFFFFF',
+  text: '#14161A',
+  body: '#2B3036',
+  muted: '#5B6168',
+  line: '#ECEEEA',
+  raised: '#F4F5F2',
+  active: (n) => n.accent,
+};
+
+const floodCache = new WeakMap<Niche, Surface>();
+
+export function floodSurface(n: Niche): Surface {
+  let s = floodCache.get(n);
+  if (!s) {
+    s = { flood: true, ground: n.mid, text: n.ink, body: n.ink, muted: n.inkSoft, line: n.line, raised: '#FFFFFF', active: () => n.ink };
+    floodCache.set(n, s);
+  }
+  return s;
+}
 
 /** Minimum tappable size (Apple HIG 44pt). */
 export const TOUCH = 44;

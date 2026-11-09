@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
@@ -10,18 +11,21 @@ import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
+import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { pickPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { diaryWords } from '@/lib/diary';
 import { progress, visibleGoals } from '@/lib/goals';
 import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } from '@/lib/store';
-import { colors, fonts, NICHE_ORDER, type NicheId } from '@/lib/theme';
+import { colors, fonts, NICHE_ORDER, type NicheId, type Surface } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
 export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
+  const styles = useSurfaceStyles(makeStyles);
+  const surface = useSurface();
   const router = useRouter();
   const { state, actions } = useStore();
   const niches = useNiches();
@@ -82,7 +86,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
         <View style={{ gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <DisplayText size={24}>{user.displayName}</DisplayText>
+            <DisplayText size={36} color={surface.text}>{user.displayName}</DisplayText>
             <Badges user={user} size={20} />
           </View>
           <Text style={styles.handle}>{user.username}</Text>
@@ -109,7 +113,9 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
           <Button
             label={following ? 'Following' : 'Follow'}
             tone={following ? 'outline' : 'solid'}
-            color={niches[nicheTabs[0] ?? state.niche].accent}
+            color={surface.flood ? surface.text : niches[nicheTabs[0] ?? state.niche].accent}
+            textStyle={following ? { color: surface.text } : undefined}
+            style={following ? { borderColor: surface.line, backgroundColor: 'rgba(255,255,255,0.35)' } : undefined}
             onPress={() => actions.toggleFollow(user.id)}
             accessibilityState={{ selected: following }}
           />
@@ -144,8 +150,8 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
-            <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? colors.text : 'transparent' }]}>
-              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
+            <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
+              <Text style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
             </Pressable>
           );
         })}
@@ -155,7 +161,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         <View style={styles.diary}>
           {isMe && weekly.length ? (
             <Text style={styles.goalsSummary}>
-              This week: <Text style={{ fontWeight: '800', color: colors.text }}>{weekly.filter((g) => progress(g).fraction >= 1).length} of {weekly.length}</Text> weekly {weekly.length === 1 ? 'goal' : 'goals'} done
+              This week: <Text style={{ fontWeight: '800', color: surface.text }}>{weekly.filter((g) => progress(g).fraction >= 1).length} of {weekly.length}</Text> weekly {weekly.length === 1 ? 'goal' : 'goals'} done
             </Text>
           ) : null}
           {goals.map((g) => (
@@ -226,6 +232,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
 
 /** Entry to "Your year in Cooking" from your own diary. */
 function RecapCard({ niche: id }: { niche: NicheId }) {
+  const styles = useSurfaceStyles(makeStyles);
   const router = useRouter();
   const n = useNiches()[id];
   const year = new Date().getFullYear();
@@ -254,6 +261,7 @@ function Stat({ value, label, ink }: { value: string; label: string; ink: string
 }
 
 function Count({ value, label, onPress }: { value: number; label: string; onPress?: () => void }) {
+  const styles = useSurfaceStyles(makeStyles);
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : 'text'}
@@ -269,6 +277,7 @@ function Count({ value, label, onPress }: { value: number; label: string; onPres
 
 /** Three-across square grid, as on Instagram profiles. */
 export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; nicheBorders?: boolean }) {
+  const styles = useSurfaceStyles(makeStyles);
   const router = useRouter();
   const niches = useNiches();
   const { state } = useStore();
@@ -302,17 +311,18 @@ export function PostSquares({ posts, nicheBorders = false }: { posts: Post[]; ni
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (sf: Surface) =>
+  StyleSheet.create({
   head: { paddingHorizontal: 20, gap: 12 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  handle: { fontSize: 14, color: colors.textMuted },
-  avatarEdit: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: colors.text, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  handle: { fontSize: 14, color: sf.muted },
+  avatarEdit: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: sf.text, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarEditText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   counts: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   count: { minWidth: 64, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  countValue: { fontSize: 18, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-  countLabel: { fontSize: 13, color: colors.textMuted },
-  bio: { fontSize: 15, lineHeight: 21, color: colors.text },
+  countValue: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, color: sf.text, fontVariant: ['tabular-nums'] },
+  countLabel: { fontSize: 13, color: sf.muted },
+  bio: { fontSize: 15, lineHeight: 21, color: sf.text },
   nicheRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   nichePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   nichePillText: { fontSize: 12, fontWeight: '700' },
@@ -320,18 +330,18 @@ const styles = StyleSheet.create({
   favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
   diaryStats: { flexDirection: 'row', paddingVertical: 14, borderRadius: 16, marginBottom: 6 },
-  diaryEmpty: { fontSize: 15, lineHeight: 21, color: colors.textSecondary, padding: 16, borderRadius: 14, backgroundColor: colors.surface },
-  goalsSummary: { fontSize: 15, color: colors.textSecondary, marginBottom: 4 },
+  diaryEmpty: { fontSize: 15, lineHeight: 21, color: sf.body, padding: 16, borderRadius: 14, backgroundColor: sf.raised },
+  goalsSummary: { fontSize: 15, color: sf.body, marginBottom: 4 },
   recap: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, marginBottom: 6 },
   recapYear: { fontFamily: fonts.displayHeavy, fontSize: 34, letterSpacing: -1.5 },
   recapTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
   recapSub: { fontSize: 13, marginTop: 2 },
-  diaryNote: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
+  diaryNote: { fontSize: 13, color: sf.muted, marginTop: 6 },
   plansHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  plansTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  plansTitle: { fontSize: 17, fontWeight: '700', color: sf.text },
   seeAll: { minHeight: 36, justifyContent: 'center', paddingLeft: 12 },
-  seeAllText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-  tabs: { flexDirection: 'row', marginTop: 18, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline },
+  seeAllText: { fontSize: 15, fontWeight: '600', color: sf.body },
+  tabs: { flexDirection: 'row', marginTop: 18, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: sf.line },
   tab: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
   tabText: { fontSize: 14, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingTop: 2 },
@@ -339,7 +349,7 @@ const styles = StyleSheet.create({
   lockVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,22,26,0.5)', alignItems: 'center', justifyContent: 'center' },
   textCell: { flex: 1, padding: 10, justifyContent: 'flex-end' },
   textCellText: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
-  empty: { margin: 20, padding: 20, borderRadius: 20, backgroundColor: colors.surface, gap: 10 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  emptyBody: { fontSize: 15, lineHeight: 21, color: colors.textSecondary },
+  empty: { margin: 20, padding: 20, borderRadius: 20, backgroundColor: sf.raised, gap: 10 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: sf.text },
+  emptyBody: { fontSize: 15, lineHeight: 21, color: sf.body },
 });

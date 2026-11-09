@@ -3,22 +3,23 @@ import { View } from 'react-native';
 
 import { BookmarkIcon, HomeIcon, PersonIcon, PlusIcon, SearchIcon } from '@/components/icons';
 import { useNiches, useStore } from '@/lib/store';
-import { colors } from '@/lib/theme';
+import { BODY_FONTS } from '@/lib/theme';
 
 export default function TabLayout() {
   const { state } = useStore();
   const NICHES = useNiches();
-  // The tab bar takes the color of the niche you're in.
-  const accent = NICHES[state.niche].accent;
+  // The tab bar takes the flood color of the niche you're in, on every tab,
+  // so you always know which niche you're in.
+  const niche = NICHES[state.niche];
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { borderTopColor: colors.hairline, backgroundColor: colors.ground },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarActiveTintColor: niche.ink,
+        tabBarInactiveTintColor: niche.inkSoft,
+        tabBarStyle: { borderTopColor: niche.line, backgroundColor: niche.mid },
+        tabBarLabelStyle: { fontSize: 10, fontFamily: BODY_FONTS['600'] },
       }}>
       <Tabs.Screen
         name="index"
@@ -35,7 +36,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: 'Create a post',
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <View style={{ width: 44, height: 34, borderRadius: 11, backgroundColor: focused ? accent : colors.text, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+            <View style={{ width: 48, height: 36, borderRadius: 18, backgroundColor: focused ? niche.accent : niche.ink, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
               <PlusIcon />
             </View>
           ),

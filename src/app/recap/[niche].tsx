@@ -3,7 +3,8 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,7 +15,7 @@ import { diaryWords, type FavoriteRef } from '@/lib/diary';
 import { buildRecap, MONTHS, MONTHS_LONG, recapText, type Recap } from '@/lib/recap';
 import { dayLabel } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
-import { fonts, NICHE_ORDER, TOUCH, type Niche, type NicheId } from '@/lib/theme';
+import { BODY_FONTS, fonts, NICHE_ORDER, TOUCH, type Niche, type NicheId } from '@/lib/theme';
 import type { User } from '@/lib/types';
 
 type Tone = 'ink' | 'accent' | 'field';
@@ -514,15 +515,15 @@ const styles = StyleSheet.create({
   page: { flex: 1, paddingHorizontal: 28, paddingTop: 110, justifyContent: 'center' },
   center: { gap: 10 },
   stack: { gap: 12 },
-  yearHuge: { fontFamily: fonts.displayHeavy, fontSize: 116, lineHeight: 116, letterSpacing: -6 },
-  huge: { fontFamily: fonts.displayHeavy, fontSize: 150, lineHeight: 150, letterSpacing: -8, fontVariant: ['tabular-nums'] },
-  lead: { fontSize: 15, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-  h0: { fontFamily: fonts.displayHeavy, fontSize: 46, lineHeight: 48, letterSpacing: -1.8 },
-  h1: { fontFamily: fonts.display, fontSize: 32, lineHeight: 36, letterSpacing: -1 },
+  yearHuge: { fontFamily: fonts.displayItalic, fontSize: 120, lineHeight: 120, letterSpacing: -4 },
+  huge: { fontFamily: fonts.display, fontSize: 160, lineHeight: 160, letterSpacing: -5, fontVariant: ['tabular-nums'] },
+  lead: { fontFamily: BODY_FONTS['800'], fontSize: 15, letterSpacing: 1, textTransform: 'uppercase' },
+  h0: { fontFamily: fonts.displayItalic, fontSize: 52, lineHeight: 54, letterSpacing: -1 },
+  h1: { fontFamily: fonts.display, fontSize: 36, lineHeight: 39, letterSpacing: -0.6 },
   h2: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27, letterSpacing: -0.4 },
-  body: { fontSize: 17, lineHeight: 24 },
+  body: { fontFamily: BODY_FONTS['400'], fontSize: 17, lineHeight: 24 },
   small: { fontSize: 13, lineHeight: 18 },
-  quote: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.8 },
+  quote: { fontFamily: fonts.displayItalic, fontSize: 38, lineHeight: 43, letterSpacing: -0.5 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 176, marginVertical: 8 },
   barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   barFill: { width: '100%', borderRadius: 6 },
@@ -545,18 +546,18 @@ const styles = StyleSheet.create({
   emptyWrap: { flex: 1, justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
   card: { borderRadius: 28, padding: 20, gap: 14 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  cardYear: { fontFamily: fonts.displayHeavy, fontSize: 44, letterSpacing: -2 },
+  cardYear: { fontFamily: fonts.display, fontSize: 44, letterSpacing: -2 },
   cardTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   cardSub: { fontSize: 14, fontWeight: '600' },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statCell: { width: '48%', flexGrow: 1, borderRadius: 16, padding: 12 },
-  statValue: { fontFamily: fonts.displayHeavy, fontSize: 30, color: '#FFFFFF', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  statValue: { fontFamily: fonts.display, fontSize: 30, color: '#FFFFFF', letterSpacing: -1, fontVariant: ['tabular-nums'] },
   statLabel: { fontSize: 13, fontWeight: '600' },
   cardLine: { fontSize: 15 },
   cardLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   favTile: { aspectRatio: 0.85, borderRadius: 10, overflow: 'hidden' },
   favTitle: { fontSize: 11, fontWeight: '600', color: '#FFFFFF' },
-  cardFoot: { fontFamily: fonts.displayHeavy, fontSize: 15, letterSpacing: -0.3, textAlign: 'right' },
+  cardFoot: { fontFamily: fonts.display, fontSize: 15, letterSpacing: -0.3, textAlign: 'right' },
   removeSample: { minHeight: TOUCH, alignItems: 'center', justifyContent: 'center' },
   removeSampleText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
 });

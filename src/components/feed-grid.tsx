@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 
 import { BookmarkIcon, LockIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
 import { MediaPlaceholder } from '@/components/primitives';
+import { useSurface } from '@/components/surface';
 import { hasAccess, useNiches, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Post, PreviewShape } from '@/lib/types';
@@ -57,6 +59,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
   const router = useRouter();
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[post.niche];
+  const surface = useSurface();
   const saved = !!state.saves[post.id];
   const swiping = useSwipeBlocked();
   const locked = !hasAccess(state, post);
@@ -90,8 +93,8 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
             </View>
           ) : null}
         </View>
-        <Text style={styles.title} numberOfLines={2}>{title}</Text>
-        <Text style={styles.user} numberOfLines={1}>{usersById[post.authorId]?.username}</Text>
+        <Text style={[styles.title, { color: surface.text }]} numberOfLines={2}>{title}</Text>
+        <Text style={[styles.user, { color: surface.muted }]} numberOfLines={1}>{usersById[post.authorId]?.username}</Text>
       </Pressable>
       {interactive && post.kind !== 'text' ? (
         <Pressable
