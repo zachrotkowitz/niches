@@ -6,6 +6,7 @@ import { Text } from '@/components/text';
 
 import { Sheet, type SheetItem } from '@/components/sheet';
 import { useToast } from '@/components/toast';
+import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
 import type { Post, ReportReason } from '@/lib/types';
@@ -29,6 +30,23 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
   const [step, setStep] = useState<Step>('menu');
   const isMine = !!state.me && post.authorId === state.me.id;
   const saved = !!state.saves[post.id];
+  // Top 4 for this post's niche ("Top 4 dishes", "Top 4 pieces", "Top 4 photos").
+  const top = diaryWords(post.niche).top;
+  const favs = (state.me && state.favorites[state.me.id]?.[post.niche]) || [];
+  const inTop = favs.some((r) => r.kind === 'post' && r.id === post.id);
+  const toggleTop = () => {
+    if (!state.me) return;
+    if (inTop) {
+      actions.setFavorites(state.me.id, post.niche, favs.filter((r) => !(r.kind === 'post' && r.id === post.id)));
+      toast(`Removed from your ${top}`);
+    } else if (favs.length < MAX_FAVORITES) {
+      actions.setFavorites(state.me.id, post.niche, [...favs, { kind: 'post', id: post.id }]);
+      toast(`Added to your ${top}`);
+    } else {
+      // Full: open the picker with this post already chosen, so you pick which one it replaces.
+      router.push({ pathname: '/favorites/[niche]', params: { niche: post.niche, add: post.id } });
+    }
+  };
 
   const close = () => {
     setStep('menu');
@@ -86,6 +104,15 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
     ? [
         { label: 'Edit', detail: 'Change the caption or progress label.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id } })) },
         { label: 'Adjust preview', detail: 'Choose how this post looks in grids.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id, section: 'preview' } })) },
+        ...(post.kind !== 'text' && !post.archived
+          ? [
+              {
+                label: inTop ? `Remove from your ${top}` : `Add to your ${top}`,
+                detail: inTop ? undefined : favs.length >= MAX_FAVORITES ? `Your ${top} is full. Choose which one to swap out.` : 'Shows at the top of your profile.',
+                onPress: run(toggleTop),
+              },
+            ]
+          : []),
         {
           label: post.hideCheers ? 'Show like count to me' : 'Hide like count',
           detail: post.hideCheers ? 'See how many people liked it.' : 'Nobody else ever sees it. This hides it from you too.',

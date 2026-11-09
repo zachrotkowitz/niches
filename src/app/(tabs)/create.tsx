@@ -10,6 +10,7 @@ import { Button, DisplayText } from '@/components/primitives';
 import { goalRule, weekNumber } from '@/lib/goals';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
+import { shortTitle } from '@/lib/format';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import type { PostKind } from '@/lib/types';
 
@@ -62,7 +63,8 @@ export default function CreateScreen() {
   const needsPhoto = kind !== 'question';
   const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
   const pickedGoal = goalId ? myGoals.find((g) => g.id === goalId) : undefined;
-  const ready = caption.trim().length > 0 && (kind !== 'progress' || !!pickedGoal || goal.trim().length > 0);
+  // Wait for a photo that's still being prepared, so it isn't left off the post.
+  const ready = !picking && caption.trim().length > 0 && (kind !== 'progress' || !!pickedGoal || goal.trim().length > 0);
 
   const share = () => {
     if (!ready || !state.me) return;
@@ -75,7 +77,7 @@ export default function CreateScreen() {
       mediaColor: postKind === 'photo' ? LOADING_TINT : undefined,
       imageUri: postKind === 'photo' ? photo?.uri : undefined,
       imageAspect: postKind === 'photo' && photo ? photo.height / photo.width : undefined,
-      mediaLabel: postKind === 'photo' ? caption.trim().split(/[.!?\n]/)[0].slice(0, 40) : undefined,
+      mediaLabel: postKind === 'photo' ? shortTitle(caption.trim()) : undefined,
       // Progress labels say "week 4", never the numbers: those stay private on the goal.
       progressLabel: kind === 'progress' ? (pickedGoal ? `${pickedGoal.title}, week ${weekNumber(pickedGoal)}` : goal.trim()) : undefined,
       goalId: kind === 'progress' && pickedGoal ? pickedGoal.id : undefined,

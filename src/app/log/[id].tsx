@@ -45,20 +45,6 @@ export default function LogScreen() {
   const favs = state.favorites[log.userId]?.[log.niche] ?? [];
   const inTop = favs.some((r) => r.kind === 'log' && r.id === log.id);
 
-  const shareNow = () => {
-    if (!state.me) return;
-    const postId = actions.createPost({
-      authorId: state.me.id,
-      niche: log.niche,
-      kind: log.imageUri ? 'photo' : 'text',
-      caption: `${words.did}: ${log.title}. ${'★'.repeat(log.rating)}${log.notes ? `\n${log.notes}` : ''}`,
-      imageUri: log.imageUri,
-      mediaColor: log.imageUri ? '#E3E5E1' : undefined,
-      mediaLabel: log.imageUri ? log.title : undefined,
-    });
-    actions.updateLog(log.id, { sharedPostId: postId });
-    toast(`Shared to ${niche.label}`);
-  };
 
   return (
     <View style={styles.screen}>
@@ -108,8 +94,6 @@ export default function LogScreen() {
             <View style={{ gap: 8, marginTop: 8 }}>
               {log.sharedPostId ? (
                 <Button tone="outline" label="See the post you shared" onPress={() => router.push({ pathname: '/post/[id]', params: { id: log.sharedPostId! } })} />
-              ) : niche.open ? (
-                <Button label={`Share as a post in ${niche.label}`} color={niche.accent} onPress={shareNow} />
               ) : null}
               <Button
                 tone="outline"

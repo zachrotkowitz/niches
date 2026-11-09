@@ -12,6 +12,7 @@ import { useToast } from '@/components/toast';
 import { diaryWords, type LogVisibility } from '@/lib/diary';
 import { goalRule } from '@/lib/goals';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
+import { shortTitle } from '@/lib/format';
 import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
@@ -28,13 +29,17 @@ export default function NewLogScreen() {
   const sourceAuthor = source ? usersById[source.authorId] : undefined;
 
   const [nicheId, setNicheId] = useState<NicheId>(source?.niche ?? (params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche));
-  const [title, setTitle] = useState(source ? (source.mediaLabel ?? source.caption.split(/[.!?\n]/)[0]).slice(0, 60) : '');
+  const fromMyPost = !!source && source.authorId === state.me?.id;
+  // Your own post's caption is the full text; demo posts have a short title already.
+  const [title, setTitle] = useState(source ? (fromMyPost ? shortTitle(source.caption) : source.mediaLabel ?? shortTitle(source.caption)) : '');
   const [date, setDate] = useState(isoDay(0));
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState('');
-  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  // Logging your own post brings its photo along.
+  const [photo, setPhoto] = useState<PickedPhoto | null>(
+    fromMyPost && source?.imageUri ? { uri: source.imageUri, width: 1000, height: Math.round(1000 * (source.imageAspect ?? 1)) } : null,
+  );
   const [visibility, setVisibility] = useState<LogVisibility>('private');
-  const [share, setShare] = useState(false);
   // Goals this entry counts toward. Personal bests need a number, so they're checked in on the goal itself.
   const [goalIds, setGoalIds] = useState<string[]>(params.goalId ? [params.goalId] : []);
 
@@ -42,14 +47,12 @@ export default function NewLogScreen() {
   const words = diaryWords(nicheId);
   const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt && g.kind !== 'best');
   const toggleGoal = (id: string) => setGoalIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  const canShare = niche.open;
   const ready = !!state.me && title.trim().length > 0 && rating > 0;
   const days = Array.from({ length: 14 }, (_, i) => isoDay(-i));
 
   const save = () => {
     if (!ready || !state.me) return;
-    const credit = sourceAuthor && sourceAuthor.id !== state.me.id ? ` (recipe from ${sourceAuthor.username})` : '';
-    const id = actions.addLog(
+      const id = actions.addLog(
       {
         userId: state.me.id,
         niche: nicheId,
@@ -62,10 +65,10 @@ export default function NewLogScreen() {
         mediaColor: photo ? '#E3E5E1' : source?.mediaColor ?? niche.field,
         visibility,
       },
-      share && canShare ? { caption: `${words.did}: ${title.trim()}${credit}. ${'★'.repeat(rating)}${notes.trim() ? `\n${notes.trim()}` : ''}`, imageAspect: photo ? photo.height / photo.width : undefined } : undefined,
+      undefined,
       goalIds.filter((id) => goals.some((g) => g.id === id)),
     );
-    toast(share && canShare ? 'Logged and shared' : visibility === 'profile' ? 'Logged on your profile' : 'Logged in your private diary');
+    toast(visibility === 'profile' ? 'Logged on your profile' : 'Logged in your private diary');
     router.replace({ pathname: '/log/[id]', params: { id } });
   };
 
@@ -173,15 +176,6 @@ export default function NewLogScreen() {
           </Field>
         ) : null}
 
-        {canShare ? (
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: share }} onPress={() => setShare(!share)} style={styles.check}>
-            <View style={[styles.box, share ? { backgroundColor: niche.accent, borderColor: niche.accent } : null]}>{share ? <CheckIcon size={15} strokeWidth={3} /> : null}</View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.optionTitle}>Also share as a post in {niche.label}</Text>
-              <Text style={styles.optionSub}>Posts your photo, rating and notes to the {niche.label} feed{source && sourceAuthor?.id !== state.me?.id ? `, crediting ${sourceAuthor?.username}` : ''}.</Text>
-            </View>
-          </Pressable>
-        ) : null}
 
         <Button label={rating ? 'Save to diary' : 'Rate it to save'} color={niche.accent} disabled={!ready} onPress={save} />
       </ScrollView>

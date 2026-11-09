@@ -16,7 +16,7 @@ type Option = { ref: FavoriteRef; title: string; sub: string; image?: Photo; col
 
 /** Pick your Top 4 for a niche, from your diary, your posts and posts you saved. */
 export default function FavoritesScreen() {
-  const params = useLocalSearchParams<{ niche: NicheId }>();
+  const params = useLocalSearchParams<{ niche: NicheId; add?: string }>();
   const niche = NICHE_ORDER.includes(params.niche) ? params.niche : 'cooking';
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -25,7 +25,10 @@ export default function FavoritesScreen() {
   const n = useNiches()[niche];
   const words = diaryWords(niche);
   const meId = state.me?.id ?? '';
-  const [picked, setPicked] = useState<FavoriteRef[]>(state.favorites[meId]?.[niche] ?? []);
+  const current = state.favorites[meId]?.[niche] ?? [];
+  // Opened from a post's ⋯ menu with a full Top 4: that post goes in, and you pick which one it replaces.
+  const adding = params.add && !current.some((r) => r.kind === 'post' && r.id === params.add) ? params.add : undefined;
+  const [picked, setPicked] = useState<FavoriteRef[]>(adding ? [...current.slice(0, MAX_FAVORITES - 1), { kind: 'post', id: adding }] : current);
 
   const key = (r: FavoriteRef) => `${r.kind}:${r.id}`;
   const options: { title: string; items: Option[] }[] = [
@@ -76,6 +79,7 @@ export default function FavoritesScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, gap: 18, paddingBottom: insets.bottom + 40 }}>
         <Text style={styles.sub}>
           Pick up to four, in order. They sit at the top of your profile in {n.label}. {picked.length}/{MAX_FAVORITES} chosen.
+          {adding ? ' Your post took the last spot. Tap it to remove it, or tap another to swap it out instead, then Done.' : ''}
         </Text>
         {empty ? (
           <Text style={styles.empty}>Nothing to choose yet. Log something with “{words.did}”, post, or save a few {n.label.toLowerCase()} posts first.</Text>

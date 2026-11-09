@@ -37,3 +37,19 @@ export function parseBirthDate(month: string, day: string, year: string): Date |
   if (date.getTime() > Date.now()) return null;
   return date;
 }
+
+/**
+ * A short title from a caption: its first sentence, cut at a word boundary
+ * (never mid-word) if it's longer than `max`.
+ */
+export function shortTitle(text: string, max = 60): string {
+  const first = (text.split(/[.!?\n]/)[0] || text).trim();
+  if (first.length <= max) return first;
+  const cut = first.slice(0, max + 1);
+  const space = cut.lastIndexOf(' ');
+  let out = (space > max * 0.5 ? cut.slice(0, space) : first.slice(0, max)).replace(/[,;:\-–—\s]+$/, '');
+  // Don't end on a dangling little word ("…prosciutto for").
+  const dangling = /\s+(a|an|the|and|or|but|for|with|of|to|in|on|at|from|my|our|your)$/i;
+  while (dangling.test(out)) out = out.replace(dangling, '');
+  return out;
+}
