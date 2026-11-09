@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
+import { diaryWords } from '@/lib/diary';
 import { Avatar, Button } from '@/components/primitives';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
@@ -61,6 +62,31 @@ export default function PostScreen() {
           </View>
         ) : null}
         <PostCard post={post} inDetail mediaHeight={320} onGone={goBack} />
+
+        {!locked ? (
+          <View style={styles.diaryRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: !!state.wantList[post.id] }}
+              onPress={() => actions.toggleWant(post.id)}
+              style={({ pressed }) => [styles.diaryButton, state.wantList[post.id] ? { backgroundColor: niche.field, borderColor: niche.accent } : null, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <Text style={[styles.diaryButtonText, { color: state.wantList[post.id] ? niche.ink : colors.textBody }]}>
+                {state.wantList[post.id] ? `On your list` : `+ ${diaryWords(post.niche).want}`}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: '/log/new', params: { postId: post.id } })}
+              style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.accent, borderColor: niche.accent, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{diaryWords(post.niche).did}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {state.logs.some((l) => l.userId === state.me?.id && l.postId === post.id) ? (
+          <Text style={styles.madeIt}>
+            You’ve logged this {state.logs.filter((l) => l.userId === state.me?.id && l.postId === post.id).length}× in your diary.
+          </Text>
+        ) : null}
 
         {isMine ? (
           <View style={styles.private} accessibilityLabel="Only you can see these numbers">
@@ -147,6 +173,10 @@ const styles = StyleSheet.create({
   statValue: { fontFamily: fonts.display, fontSize: 24, color: colors.text, fontVariant: ['tabular-nums'] },
   statHidden: { fontSize: 17, lineHeight: 30, color: colors.textMuted },
   statLabel: { fontSize: 12, color: colors.textMuted },
+  diaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
+  diaryButton: { flex: 1, minHeight: TOUCH, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  diaryButtonText: { fontSize: 15, fontWeight: '700' },
+  madeIt: { paddingHorizontal: 20, paddingTop: 8, fontSize: 13, color: colors.textMuted },
   banner: { marginHorizontal: 20, marginTop: 12, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   bannerText: { fontSize: 14, fontWeight: '600' },
   privateNote: { fontSize: 13, lineHeight: 18, color: colors.textMuted },

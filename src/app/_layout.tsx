@@ -62,6 +62,9 @@ function RootStack() {
         <Stack.Screen name="creators/apply" />
         <Stack.Screen name="creators/studio" />
         <Stack.Screen name="creators/memberships" />
+        <Stack.Screen name="log/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="log/[id]" />
+        <Stack.Screen name="favorites/[niche]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings/colors" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>

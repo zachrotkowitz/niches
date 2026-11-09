@@ -4,17 +4,19 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
+import { DiaryRow, TopFour } from '@/components/diary';
 import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
 import { pickPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
-import { connections, hasAccess, isVisible, useNiches, useStore } from '@/lib/store';
+import { diaryWords } from '@/lib/diary';
+import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } from '@/lib/store';
 import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
-type Tab = 'all' | NicheId | 'shop';
+type Tab = 'all' | NicheId | 'shop' | 'diary';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
 export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
@@ -28,7 +30,16 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
     .sort((a, b) => b.createdAt - a.createdAt);
   const nicheTabs = NICHE_ORDER.filter((id) => posts.some((p) => p.niche === id));
   const listings = state.listings.filter((l) => l.sellerId === user.id);
-  const shown = tab === 'all' ? posts : tab === 'shop' ? [] : posts.filter((p) => p.niche === tab);
+  const logs = visibleLogs(state, user.id);
+  const shown = tab === 'all' ? posts : tab === 'shop' || tab === 'diary' ? [] : posts.filter((p) => p.niche === tab);
+  // Top 4 rows: the niche tab you're on, or every niche with picks on "All" (yours always shows your current niche so you can fill it).
+  const favNiches: NicheId[] =
+    tab !== 'all' && tab !== 'shop' && tab !== 'diary'
+      ? [tab]
+      : NICHE_ORDER.filter((id) => (state.favorites[user.id]?.[id]?.length ?? 0) > 0 || (isMe && id === state.niche));
+  const monthPrefix = new Date().toISOString().slice(0, 7);
+  const thisMonth = logs.filter((l) => l.date.startsWith(monthPrefix)).length;
+  const avg = logs.length ? logs.reduce((n, l) => n + l.rating, 0) / logs.length : 0;
   const following = !!state.following[user.id];
   const { followers, following: follows } = connections(state, user.id);
   // Your own upcoming plans, or the public plans someone else is hosting.
@@ -116,18 +127,53 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
       ) : null}
 
+      {favNiches.length && tab !== 'shop' ? (
+        <View style={styles.favs}>
+          {favNiches.map((id) => (
+            <TopFour key={id} userId={user.id} niche={id} isMe={isMe} />
+          ))}
+        </View>
+      ) : null}
+
       <View accessibilityRole="tablist" style={styles.tabs}>
-        {(['all', ...nicheTabs, ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
+        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? colors.text : 'transparent' }]}>
-              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : niches[t].label}</Text>
+              <Text style={[styles.tabText, { color: selected ? colors.text : '#6B7178' }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : niches[t].label}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      {tab === 'shop' ? (
+      {tab === 'diary' ? (
+        <View style={styles.diary}>
+          {logs.length ? (
+            <View style={[styles.diaryStats, { backgroundColor: niches[logs[0].niche].field }]}>
+              <Stat value={String(logs.length)} label="logged" ink={niches[logs[0].niche].ink} />
+              <Stat value={String(thisMonth)} label="this month" ink={niches[logs[0].niche].ink} />
+              <Stat value={avg ? avg.toFixed(1) : '–'} label="avg stars" ink={niches[logs[0].niche].ink} />
+            </View>
+          ) : null}
+          {isMe ? (
+            <Button
+              label={`${diaryWords(state.niche).did}: log something`}
+              color={niches[state.niche].accent}
+              onPress={() => router.push({ pathname: '/log/new', params: { niche: state.niche } })}
+            />
+          ) : null}
+          {logs.length === 0 ? (
+            <Text style={styles.diaryEmpty}>
+              {isMe
+                ? 'Your diary is private by default: a record of everything you make, with stars and notes for next time. Tap “I made this” on any post, or log something of your own.'
+                : 'Nothing in their diary yet.'}
+            </Text>
+          ) : (
+            logs.map((l) => <DiaryRow key={l.id} log={l} showPrivacy={isMe} />)
+          )}
+          {isMe && logs.length ? <Text style={styles.diaryNote}>Entries with a lock are private. Everything else shows here on your profile.</Text> : null}
+        </View>
+      ) : tab === 'shop' ? (
         <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />
       ) : shown.length === 0 ? (
         <View style={styles.empty}>
@@ -145,6 +191,15 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
       )}
 
       {footer}
+    </View>
+  );
+}
+
+function Stat({ value, label, ink }: { value: string; label: string; ink: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={{ fontSize: 22, fontWeight: '800', color: ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text style={{ fontSize: 12, color: ink }}>{label}</Text>
     </View>
   );
 }
@@ -213,6 +268,11 @@ const styles = StyleSheet.create({
   nichePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   nichePillText: { fontSize: 12, fontWeight: '700' },
   plans: { paddingHorizontal: 20, marginTop: 20, gap: 10 },
+  favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
+  diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
+  diaryStats: { flexDirection: 'row', paddingVertical: 14, borderRadius: 16, marginBottom: 6 },
+  diaryEmpty: { fontSize: 15, lineHeight: 21, color: colors.textSecondary, padding: 16, borderRadius: 14, backgroundColor: colors.surface },
+  diaryNote: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
   plansHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   plansTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   seeAll: { minHeight: 36, justifyContent: 'center', paddingLeft: 12 },

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 
 import type { CreatorApplication } from './creators';
+import { MAX_FAVORITES, seedFavorites, seedLogs, type FavoriteRef, type LogEntry } from './diary';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
@@ -56,6 +57,12 @@ type State = {
   creatorApplication: CreatorApplication | null;
   /** Demo: pretend members of your own membership. */
   demoMembers: number;
+  /** Diary entries ("I made this"), yours and demo accounts'. */
+  logs: LogEntry[];
+  /** Your "Want to make" list: post id → when added. */
+  wantList: Record<string, number>;
+  /** Top 4 per niche, keyed by user id. */
+  favorites: Record<string, Partial<Record<NicheId, FavoriteRef[]>>>;
 };
 
 type Persisted = Omit<State, 'hydrated'>;
@@ -89,7 +96,13 @@ type Action =
   | { type: 'unlock'; postId: string }
   | { type: 'setApplication'; application: CreatorApplication | null }
   | { type: 'updateMe'; patch: Partial<Me> }
-  | { type: 'setDemoMembers'; n: number };
+  | { type: 'setDemoMembers'; n: number }
+  | { type: 'addLog'; log: LogEntry }
+  | { type: 'updateLog'; id: string; patch: Partial<LogEntry> }
+  | { type: 'deleteLog'; id: string }
+  | { type: 'toggleWant'; postId: string }
+  | { type: 'wantDone'; postId: string }
+  | { type: 'setFavorites'; userId: string; niche: NicheId; refs: FavoriteRef[] };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -120,6 +133,9 @@ function freshState(): Persisted {
     unlocks: {},
     creatorApplication: null,
     demoMembers: 0,
+    logs: seedLogs(now),
+    wantList: {},
+    favorites: seedFavorites(),
   };
 }
 
@@ -228,6 +244,37 @@ function reducer(state: State, action: Action): State {
       return { ...state, creatorApplication: action.application };
     case 'updateMe':
       return state.me ? { ...state, me: { ...state.me, ...action.patch } } : state;
+    case 'addLog':
+      return { ...state, logs: [action.log, ...state.logs] };
+    case 'updateLog':
+      return { ...state, logs: state.logs.map((l) => (l.id === action.id ? { ...l, ...action.patch } : l)) };
+    case 'deleteLog': {
+      // Also drop it from any Top 4 it was in.
+      const favorites = { ...state.favorites };
+      for (const uid in favorites) {
+        const byNiche = { ...favorites[uid] };
+        for (const n in byNiche) byNiche[n as NicheId] = byNiche[n as NicheId]!.filter((r) => !(r.kind === 'log' && r.id === action.id));
+        favorites[uid] = byNiche;
+      }
+      return { ...state, logs: state.logs.filter((l) => l.id !== action.id), favorites };
+    }
+    case 'toggleWant': {
+      const wantList = { ...state.wantList };
+      if (wantList[action.postId]) delete wantList[action.postId];
+      else wantList[action.postId] = Date.now();
+      return { ...state, wantList };
+    }
+    case 'wantDone': {
+      if (!state.wantList[action.postId]) return state;
+      const wantList = { ...state.wantList };
+      delete wantList[action.postId];
+      return { ...state, wantList };
+    }
+    case 'setFavorites':
+      return {
+        ...state,
+        favorites: { ...state.favorites, [action.userId]: { ...state.favorites[action.userId], [action.niche]: action.refs.slice(0, MAX_FAVORITES) } },
+      };
     case 'setDemoMembers':
       return { ...state, demoMembers: Math.max(0, action.n) };
     case 'setOrderStatus':
@@ -411,6 +458,37 @@ function useStoreValue() {
         dispatch({ type: 'updateMe', patch: { membership: { priceCents: 399, tagline: 'Behind the scenes of everything I make', perks: ['Members-only posts', 'Full recipes and process notes'] } } });
       },
       updateMyMembership: (membership: Membership) => dispatch({ type: 'updateMe', patch: { membership } }),
+      /** "I made this": log it, and optionally share it as a post too. Returns the entry id. */
+      addLog(input: Omit<LogEntry, 'id' | 'createdAt'>, shareAsPost?: { caption: string; imageAspect?: number }): string {
+        const id = makeId('log');
+        let sharedPostId: string | undefined;
+        if (shareAsPost) {
+          sharedPostId = makeId('p');
+          dispatch({
+            type: 'addPost',
+            post: {
+              id: sharedPostId,
+              authorId: input.userId,
+              niche: input.niche,
+              kind: input.imageUri ? 'photo' : 'text',
+              caption: shareAsPost.caption,
+              imageUri: input.imageUri,
+              imageAspect: shareAsPost.imageAspect,
+              mediaColor: input.imageUri ? '#E3E5E1' : undefined,
+              mediaLabel: input.imageUri ? input.title : undefined,
+              createdAt: Date.now(),
+            },
+          });
+        }
+        dispatch({ type: 'addLog', log: { ...input, id, createdAt: Date.now(), sharedPostId } });
+        // Making something takes it off your "Want to make" list.
+        if (input.postId) dispatch({ type: 'wantDone', postId: input.postId });
+        return id;
+      },
+      updateLog: (id: string, patch: Partial<LogEntry>) => dispatch({ type: 'updateLog', id, patch }),
+      deleteLog: (id: string) => dispatch({ type: 'deleteLog', id }),
+      toggleWant: (postId: string) => dispatch({ type: 'toggleWant', postId }),
+      setFavorites: (userId: string, niche: NicheId, refs: FavoriteRef[]) => dispatch({ type: 'setFavorites', userId, niche, refs }),
       setAvatar: (avatarUri: string) => dispatch({ type: 'updateMe', patch: { avatarUri } }),
       setDemoMembers: (n: number) => dispatch({ type: 'setDemoMembers', n }),
       setOrderStatus: (id: string, status: OrderStatus) => dispatch({ type: 'setOrderStatus', id, status }),
@@ -476,6 +554,12 @@ export function connections(state: State, userId: string) {
 export function hasAccess(state: State, post: Post) {
   if (!post.premium) return true;
   return post.authorId === state.me?.id || !!state.memberships[post.authorId] || !!state.unlocks[post.id];
+}
+
+/** Diary entries a viewer can see for a user: all of your own, or someone else's profile-visible ones. */
+export function visibleLogs(state: State, userId: string) {
+  const mine = userId === state.me?.id;
+  return state.logs.filter((l) => l.userId === userId && (mine || l.visibility === 'profile')).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
 /**
