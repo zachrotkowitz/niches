@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GridTile } from '@/components/feed-grid';
 import { Button } from '@/components/primitives';
 import { useToast } from '@/components/toast';
+import { shortTitle } from '@/lib/format';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
 import type { PreviewShape } from '@/lib/types';
@@ -56,6 +57,8 @@ export default function EditPostScreen() {
     const textChanged = caption.trim() !== post.caption || (post.progressLabel ?? '') !== progress.trim();
     actions.updatePost(post.id, {
       caption: caption.trim(),
+      // The short title shown on grids and in Top 4 follows the caption you just edited.
+      ...(caption.trim() !== post.caption && post.kind !== 'text' ? { mediaLabel: shortTitle(caption.trim()) } : null),
       progressLabel: post.progressLabel !== undefined ? progress.trim() || undefined : undefined,
       previewShape: draft.previewShape,
       previewTitle: draft.previewTitle,

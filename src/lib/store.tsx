@@ -21,7 +21,7 @@ export type FeedLayout = 'posts' | 'grid';
 export type Me = User & { birthDate: string };
 
 /** Fields the author can change from the post menu or the edit screen. */
-export type PostPatch = Partial<Pick<Post, 'caption' | 'progressLabel' | 'archived' | 'commentsOff' | 'hideCheers' | 'previewShape' | 'previewTitle' | 'editedAt' | 'premium' | 'unlockCents'>>;
+export type PostPatch = Partial<Pick<Post, 'caption' | 'mediaLabel' | 'progressLabel' | 'archived' | 'commentsOff' | 'hideCheers' | 'previewShape' | 'previewTitle' | 'editedAt' | 'premium' | 'unlockCents'>>;
 
 type State = {
   hydrated: boolean;

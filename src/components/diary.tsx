@@ -8,7 +8,9 @@ import { LockIcon, PlusIcon } from '@/components/icons';
 import { ReorderRow } from '@/components/reorder-row';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef, type LogEntry } from '@/lib/diary';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
+import { shortTitle } from '@/lib/format';
 import { dayLabel } from '@/lib/plans';
+import type { Post } from '@/lib/types';
 import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { useNiches, useStore } from '@/lib/store';
 import { TOUCH, type NicheId, type Surface } from '@/lib/theme';
@@ -126,15 +128,20 @@ export function DiaryRow({ log, showPrivacy = false }: { log: LogEntry; showPriv
   );
 }
 
-/** Resolves a Top 4 slot to something displayable. */
+/** A post's name in a Top 4: your own posts follow their current caption; others use their title. */
+export function favoritePostTitle(p: Post, meId: string | undefined): string {
+  return p.authorId === meId ? shortTitle(p.caption) : p.mediaLabel ?? shortTitle(p.caption);
+}
+
+/** Resolves a Top 4 slot to something displayable (a custom Top 4 name wins). */
 export function useFavoriteItem(ref: FavoriteRef) {
   const { state } = useStore();
   if (ref.kind === 'log') {
     const l = state.logs.find((x) => x.id === ref.id);
-    return l ? { title: l.title, image: logPhoto(l), color: l.mediaColor, href: { pathname: '/log/[id]' as const, params: { id: l.id } } } : null;
+    return l ? { title: ref.title || l.title, image: logPhoto(l), color: l.mediaColor, href: { pathname: '/log/[id]' as const, params: { id: l.id } } } : null;
   }
   const p = state.posts.find((x) => x.id === ref.id);
-  return p ? { title: p.mediaLabel ?? p.caption, image: postPhoto(p), color: p.mediaColor, href: { pathname: '/post/[id]' as const, params: { id: p.id } } } : null;
+  return p ? { title: ref.title || favoritePostTitle(p, state.me?.id), image: postPhoto(p), color: p.mediaColor, href: { pathname: '/post/[id]' as const, params: { id: p.id } } } : null;
 }
 
 function FavoriteTile({ refItem, niche }: { refItem: FavoriteRef; niche: NicheId }) {
@@ -181,7 +188,7 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
   if (!refs.length && !isMe) return null;
   const edit = () => router.push({ pathname: '/favorites/[niche]', params: { niche } });
   const titleOf = (r: FavoriteRef) =>
-    r.kind === 'log' ? state.logs.find((l) => l.id === r.id)?.title ?? '' : (() => { const p = state.posts.find((x) => x.id === r.id); return p ? p.mediaLabel ?? p.caption : ''; })();
+    r.title || (r.kind === 'log' ? state.logs.find((l) => l.id === r.id)?.title ?? '' : (() => { const p = state.posts.find((x) => x.id === r.id); return p ? favoritePostTitle(p, state.me?.id) : ''; })());
   const open = (r: FavoriteRef) =>
     r.kind === 'log' ? router.push({ pathname: '/log/[id]', params: { id: r.id } }) : router.push({ pathname: '/post/[id]', params: { id: r.id } });
   const emptySlot = (i: number) => (

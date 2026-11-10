@@ -30,7 +30,12 @@ export type LogEntry = {
 };
 
 /** A Top 4 slot: one of your diary entries, or a post (yours or one you saved). */
-export type FavoriteRef = { kind: 'post' | 'log'; id: string };
+export type FavoriteRef = {
+  kind: 'post' | 'log';
+  id: string;
+  /** Optional name for this pick in your Top 4. Without it, the tile follows the post's caption or the entry's title. */
+  title?: string;
+};
 
 /** Up to four per niche. */
 export type Favorites = Partial<Record<NicheId, FavoriteRef[]>>;

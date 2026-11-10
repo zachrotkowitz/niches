@@ -1,13 +1,13 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ReorderRow } from '@/components/reorder-row';
 import { useToast } from '@/components/toast';
-import { formatRating } from '@/components/diary';
+import { favoritePostTitle, formatRating } from '@/components/diary';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import type { Photo } from '@/lib/demo-photos';
 import { diaryWords, MAX_FAVORITES, type FavoriteRef } from '@/lib/diary';
@@ -31,6 +31,9 @@ export default function FavoritesScreen() {
   // Opened from a post's ⋯ menu with a full Top 4: that post goes in, and you pick which one it replaces.
   const adding = params.add && !current.some((r) => r.kind === 'post' && r.id === params.add) ? params.add : undefined;
   const [picked, setPicked] = useState<FavoriteRef[]>(adding ? [...current.slice(0, MAX_FAVORITES - 1), { kind: 'post', id: adding }] : current);
+  // The pick being renamed (tap it in "Your order").
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const setTitle = (k: string, title: string) => setPicked(picked.map((r) => (key(r) === k ? { ...r, title: title.trim() ? title : undefined } : r)));
 
   const key = (r: FavoriteRef) => `${r.kind}:${r.id}`;
   const options: { title: string; items: Option[] }[] = [
@@ -44,13 +47,13 @@ export default function FavoritesScreen() {
       title: 'Your posts',
       items: state.posts
         .filter((p) => p.authorId === meId && p.niche === niche && p.kind !== 'text' && !p.archived)
-        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: 'Your post', image: postPhoto(p), color: p.mediaColor })),
+        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: favoritePostTitle(p, meId), sub: 'Your post', image: postPhoto(p), color: p.mediaColor })),
     },
     {
       title: 'Posts you saved',
       items: state.posts
         .filter((p) => state.saves[p.id] && p.niche === niche && p.kind !== 'text' && p.authorId !== meId)
-        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: p.mediaLabel ?? p.caption, sub: `by ${usersById[p.authorId]?.username}`, image: postPhoto(p), color: p.mediaColor })),
+        .map((p) => ({ ref: { kind: 'post', id: p.id }, title: favoritePostTitle(p, meId), sub: `by ${usersById[p.authorId]?.username}`, image: postPhoto(p), color: p.mediaColor })),
     },
   ];
   const empty = options.every((g) => !g.items.length);
@@ -94,7 +97,8 @@ export default function FavoritesScreen() {
                 const o = byKey[key(r)];
                 return {
                   key: key(r),
-                  label: `${i + 1}. ${o?.title ?? ''}`,
+                  label: `${i + 1}. ${r.title || o?.title || ''}. Tap to rename`,
+                  onPress: () => setRenaming(renaming === key(r) ? null : key(r)),
                   render: () => (
                     <View style={{ flex: 1, gap: 4 }}>
                       <View style={[styles.thumb, { backgroundColor: o?.color ?? n.field, borderColor: n.accent }]}>
@@ -103,7 +107,7 @@ export default function FavoritesScreen() {
                           <Text style={styles.numText}>{i + 1}</Text>
                         </View>
                       </View>
-                      <Text style={styles.cellTitle} numberOfLines={1}>{o?.title ?? ''}</Text>
+                      <Text style={[styles.cellTitle, renaming === key(r) ? { color: n.ink, textDecorationLine: 'underline' } : null]} numberOfLines={1}>{r.title || o?.title || ''}</Text>
                     </View>
                   ),
                 };
@@ -111,7 +115,36 @@ export default function FavoritesScreen() {
               onReorder={(keys) => setPicked(keys.map((k) => picked.find((r) => key(r) === k)).filter((r): r is FavoriteRef => !!r))}
               renderEmpty={() => <View style={[styles.thumb, styles.slot, { borderColor: n.line }]} />}
             />
-            {picked.length > 1 ? <Text style={styles.hint}>Hold and drag to change the order.</Text> : null}
+            <Text style={styles.hint}>{picked.length > 1 ? 'Hold and drag to change the order. ' : ''}Tap one to give it its own name in your {words.top}.</Text>
+            {(() => {
+              const r = renaming ? picked.find((x) => key(x) === renaming) : undefined;
+              if (!r) return null;
+              const original = byKey[key(r)]?.title ?? '';
+              return (
+                <View style={styles.rename}>
+                  <Text style={styles.renameLabel}>Name in your {words.top}</Text>
+                  <TextInput
+                    accessibilityLabel={`Name in your ${words.top}`}
+                    value={r.title ?? ''}
+                    onChangeText={(t) => setTitle(key(r), t)}
+                    placeholder={original}
+                    placeholderTextColor="#6B7178"
+                    maxLength={40}
+                    autoFocus
+                    style={styles.renameInput}
+                    selectionColor={n.accent}
+                  />
+                  <View style={styles.renameRow}>
+                    <Text style={styles.renameNote} numberOfLines={2}>{r.title ? `Original: ${original}` : 'Leave empty to use the original (it follows the caption if you edit it).'}</Text>
+                    {r.title ? (
+                      <Pressable accessibilityRole="button" onPress={() => setTitle(key(r), '')} hitSlop={8}>
+                        <Text style={[styles.renameReset, { color: n.ink }]}>Use the original</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })()}
           </View>
         ) : null}
         {empty ? (
@@ -176,6 +209,12 @@ const styles = StyleSheet.create({
   numText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   cellTitle: { fontSize: 12, fontWeight: '600', color: colors.text, lineHeight: 15 },
   cellSub: { fontSize: 11, color: colors.textMuted },
+  rename: { gap: 6, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF' },
+  renameLabel: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  renameInput: { minHeight: TOUCH, borderRadius: 12, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 12, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF' },
+  renameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  renameNote: { flex: 1, fontSize: 12, color: colors.textMuted },
+  renameReset: { fontSize: 13, fontWeight: '700' },
   slot: { borderStyle: 'dashed', backgroundColor: 'transparent' },
   hint: { fontSize: 12, color: colors.textMuted },
   clear: { alignSelf: 'center', minHeight: TOUCH, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' },
