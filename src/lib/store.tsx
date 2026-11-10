@@ -45,6 +45,8 @@ type State = {
   palettes: Partial<Record<NicheId, string>>;
   /** Niches shown on Discover. Empty means all. */
   discoverNiches: NicheId[];
+  /** Discover searches, newest first. */
+  recentSearches: string[];
   plans: Plan[];
   /** Home shows each niche's feed or its shop. */
   homeMode: 'feed' | 'shop';
@@ -114,7 +116,8 @@ type Action =
   | { type: 'deleteGoal'; id: string }
   | { type: 'addSample'; logs: LogEntry[]; goals: Goal[]; userId: string }
   | { type: 'removeSample' }
-  | { type: 'setAppGround'; id: string };
+  | { type: 'setAppGround'; id: string }
+  | { type: 'setRecentSearches'; list: string[] };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -135,6 +138,7 @@ function freshState(): Persisted {
     nicheRequests: [],
     palettes: {},
     discoverNiches: [],
+    recentSearches: [],
     plans: seedPlans(now),
     homeMode: 'feed',
     listings: seedListings(now),
@@ -283,6 +287,8 @@ function reducer(state: State, action: Action): State {
     }
     case 'setAppGround':
       return { ...state, appGround: action.id };
+    case 'setRecentSearches':
+      return { ...state, recentSearches: action.list };
     case 'addGoal':
       return { ...state, goals: [action.goal, ...state.goals] };
     case 'mapGoal':
@@ -599,6 +605,7 @@ function useStoreValue() {
       },
       removeSampleYear: () => dispatch({ type: 'removeSample' }),
       setAppGround: (id: string) => dispatch({ type: 'setAppGround', id }),
+      setRecentSearches: (list: string[]) => dispatch({ type: 'setRecentSearches', list: list.slice(0, 8) }),
     }),
     [],
   );

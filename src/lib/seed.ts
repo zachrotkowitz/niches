@@ -12,7 +12,7 @@ export const SEED_VERSION = 4;
 
 export const SEED_USERS: User[] = [
   { id: 'u_maya', displayName: 'Maya Okafor', username: 'maya.cooks', avatarColor: '#7A4E9E', bio: 'Learning fresh pasta one bad batch at a time. Also paint on Sundays.' },
-  { id: 'u_dev', displayName: 'Dev Patel', username: 'dev_bakes', avatarColor: '#2F6F8F', bio: 'Sourdough, mostly.' },
+  { id: 'u_dev', displayName: 'Dev Sethi', username: 'dev_bakes', avatarColor: '#2F6F8F', bio: 'Sourdough, mostly.' },
   { id: 'u_jules', displayName: 'Jules Moreau', username: 'kitchen.jules', avatarColor: '#B4532A', bio: 'Fast sauces, big flavor.' },
   { id: 'u_sam', displayName: 'Sam Rivera', username: 'sam.r', avatarColor: '#3D7A55', bio: 'Home cook, spice collector.' },
   { id: 'u_priya', displayName: 'Priya Shah', username: 'priya.eats', avatarColor: '#8E2F4F', bio: 'Weeknight-fancy food and the occasional film photo.' },

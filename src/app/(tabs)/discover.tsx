@@ -1,61 +1,86 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from '@/components/text';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Badges } from '@/components/creator';
-import { FeedGrid } from '@/components/feed-grid';
-import { SearchIcon } from '@/components/icons';
-import { NicheFilter } from '@/components/niche-filter';
-import { Avatar, Button, DisplayText } from '@/components/primitives';
-import { ListingGrid } from '@/components/shop';
-import { formatPrice } from '@/lib/shop';
+import { EndNote, Eyebrow, NicheCard, PersonRow, RailTile, SearchBar, SectionTitle, ShopTile } from '@/components/discover-parts';
+import { SearchResults, SearchSuggestions } from '@/components/discover-search';
+import { ChevronLeftIcon } from '@/components/icons';
+import { Button, DisplayText } from '@/components/primitives';
+import { SurfaceProvider } from '@/components/surface';
+import { Text } from '@/components/text';
+import { normalize, weekFavorites, weekOfLabel } from '@/lib/discover';
+import { postPhoto } from '@/lib/demo-photos';
 import { SEED_USERS } from '@/lib/seed';
-import { inspirationThisWeek, isVisible, useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
-import type { User } from '@/lib/types';
+import { inFeeds, postStats, useAppGround, useNiches, useStore } from '@/lib/store';
+import { groundSurface, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
+type Mode = 'browse' | 'typing' | 'results';
+
+/**
+ * Discover (founder's combined design, Nov 2026): a weekly masthead and search,
+ * Explore by niche, this week's favorites, creators to know and the shops.
+ * Search is Instagram-style (suggestions, then results in tabs) with Pinterest's
+ * grid and related searches. Like every feed, it ends.
+ */
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { width } = useWindowDimensions();
   const { state, actions } = useStore();
   const niches = useNiches();
+  const ground = useAppGround();
+  const surface = groundSurface(ground);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [mode, setMode] = useState<Mode>('browse');
+  const [text, setText] = useState('');
   const [query, setQuery] = useState('');
   const [request, setRequest] = useState('');
   const [thanks, setThanks] = useState(false);
-  const filter = state.discoverNiches;
-  const allowed = new Set<NicheId>(filter.length ? filter : NICHE_ORDER);
-  const accent = niches[filter.length === 1 ? filter[0] : state.niche].accent;
 
-  // Which niches each person posts in.
-  const nichesByUser = useMemo(() => {
-    const map: Record<string, NicheId[]> = {};
-    for (const p of state.posts) {
-      if (!isVisible(state, p)) continue;
-      const list = (map[p.authorId] ??= []);
-      if (!list.includes(p.niche)) list.push(p.niche);
-    }
-    for (const id in map) map[id].sort((a, b) => NICHE_ORDER.indexOf(a) - NICHE_ORDER.indexOf(b));
-    return map;
+  const favorites = useMemo(() => weekFavorites(state, []), [state]);
+  // Collage photos per niche: its most-saved posts that have a picture.
+  const byNiche = useMemo(() => {
+    const out: Record<string, ReturnType<typeof weekFavorites>['posts']> = {};
+    for (const id of NICHE_ORDER) out[id] = weekFavorites(state, [id], 3).posts.filter((p) => p.kind !== 'text' && postPhoto(p));
+    return out;
   }, [state]);
 
-  const q = query.trim().toLowerCase().replace(/^@/, '');
-  const people = SEED_USERS.filter((u) => u.id !== state.me?.id)
-    .filter((u) => (q ? u.displayName.toLowerCase().includes(q) || u.username.includes(q) : (nichesByUser[u.id] ?? []).some((n) => allowed.has(n))))
-    // People you don't follow yet come first.
-    .sort((a, b) => Number(!!state.following[a.id]) - Number(!!state.following[b.id]));
-
-  const inspiration = inspirationThisWeek(state, filter);
-  const router = useRouter();
-  // Premium creators posting in the filtered niches.
-  const creators = SEED_USERS.filter((u) => u.membership && u.id !== state.me?.id && (nichesByUser[u.id] ?? []).some((n) => allowed.has(n)));
-  // Shop picks: best-selling listings in the filtered niches.
+  // Creators to know: verified and premium creators, each with their most-saved photo.
+  const creators = useMemo(
+    () =>
+      SEED_USERS.filter((u) => (u.verified || u.membership) && u.id !== state.me?.id).map((u) => {
+        const best = state.posts
+          .filter((p) => p.authorId === u.id && inFeeds(state, p) && p.kind !== 'text' && postPhoto(p))
+          .sort((a, b) => postStats(state, b).saves - postStats(state, a).saves)[0];
+        return { user: u, thumb: best };
+      }),
+    [state],
+  );
   const shopPicks = state.listings
-    .filter((l) => allowed.has(l.niche) && l.sellerId !== state.me?.id && l.stock !== 0)
+    .filter((l) => l.sellerId !== state.me?.id && l.stock !== 0)
     .sort((a, b) => b.sold - a.sold)
-    .slice(0, 6);
+    .slice(0, 4);
+  const shopW = Math.floor((Math.min(width, 520) - 40 - 12) / 2);
 
-  const submit = () => {
+  const runSearch = (raw: string) => {
+    const q = normalize(raw);
+    if (!q) return;
+    setText(raw.trim());
+    setQuery(q);
+    setMode('results');
+    input.current?.blur();
+    actions.setRecentSearches([q, ...state.recentSearches.filter((r) => r !== q)]);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  };
+  const cancel = () => {
+    setText('');
+    setQuery('');
+    setMode('browse');
+    input.current?.blur();
+  };
+  const submitRequest = () => {
     const name = request.trim();
     if (!name) return;
     actions.requestNiche(name);
@@ -63,179 +88,158 @@ export default function DiscoverScreen() {
     setThanks(true);
   };
 
+  const searching = mode !== 'browse';
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.head}>
-          <DisplayText>Discover</DisplayText>
-          <Text style={styles.sub}>Find people to follow and what everyone’s saving this week.</Text>
-          <View style={styles.search}>
-            <SearchIcon size={18} color={colors.textMuted} />
-            <TextInput
-              accessibilityLabel="Find people by name or username"
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Find people by name or username"
-              placeholderTextColor="#6B7178"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-              style={styles.searchInput}
-              selectionColor={accent}
-            />
-          </View>
-        </View>
-
-        <View style={{ marginTop: 12 }}>
-          <NicheFilter value={filter} onChange={actions.setDiscoverNiches} />
-        </View>
-
-        {!q && creators.length ? (
-          <>
-            <Text style={styles.section}>Featured creators</Text>
-            <Text style={styles.sectionSub}>Verified cooks and artists. Join for their members-only posts.</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.people}>
-              {creators.map((u) => {
-                const n = niches[(nichesByUser[u.id] ?? ['cooking'])[0]];
-                return (
-                  <Pressable
-                    key={u.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${u.displayName}${u.verified ? ', verified' : ''}. ${u.membership?.tagline}. ${formatPrice(u.membership!.priceCents)} a month`}
-                    onPress={() => router.push({ pathname: '/user/[id]', params: { id: u.id } })}
-                    style={({ pressed }) => [styles.creator, { backgroundColor: n.field, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-                    <Avatar user={u} size={48} />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={[styles.creatorName, { color: n.ink }]} numberOfLines={1}>{u.displayName}</Text>
-                      <Badges user={u} size={14} />
-                    </View>
-                    <Text style={[styles.creatorTagline, { color: n.inkSoft }]} numberOfLines={2}>{u.membership?.tagline}</Text>
-                    <Text style={[styles.creatorPrice, { color: n.ink }]}>
-                      {state.memberships[u.id] ? 'You’re a member' : `${formatPrice(u.membership!.priceCents)}/mo`}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </>
-        ) : null}
-
-        <Text style={styles.section}>{q ? `People matching “${query.trim()}”` : 'People to follow'}</Text>
-        {people.length === 0 ? (
-          <Text style={styles.none}>{q ? 'No one by that name yet.' : 'No one posts in these niches yet.'}</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.people}>
-            {people.map((u) => (
-              <PersonCard key={u.id} user={u} nicheIds={nichesByUser[u.id] ?? []} />
-            ))}
-          </ScrollView>
-        )}
-
-        <Text style={styles.section}>Inspiration this week</Text>
-        <Text style={styles.sectionSub}>The posts people saved most in the last 7 days, outlined in their niche’s color.</Text>
-        {inspiration.length === 0 ? (
-          <Text style={styles.none}>Nothing new in these niches this week.</Text>
-        ) : (
-          <FeedGrid posts={inspiration} nicheBorders />
-        )}
-
-        {shopPicks.length ? (
-          <>
-            <Text style={styles.section}>From the shops</Text>
-            <Text style={styles.sectionSub}>Cookbooks, prints and art from people in these niches.</Text>
-            <ListingGrid listings={shopPicks} nicheBorders />
-          </>
-        ) : null}
-
-        <View style={styles.request}>
-          <Text style={styles.requestTitle}>Missing a niche?</Text>
-          <Text style={styles.requestBody}>Tell us what should open next. We open the most-requested niches once their first creators sign on.</Text>
-          <TextInput
-            accessibilityLabel="Niche you want"
-            value={request}
-            onChangeText={(t) => {
-              setRequest(t);
-              setThanks(false);
-            }}
-            placeholder="e.g. Gardening, Climbing, Ceramics"
-            placeholderTextColor="#6B7178"
-            maxLength={40}
-            onSubmitEditing={submit}
-            returnKeyType="send"
-            style={styles.input}
-            selectionColor={accent}
-          />
-          <Button label="Send request" color={accent} disabled={!request.trim()} onPress={submit} />
-          {thanks ? <Text accessibilityRole="alert" style={styles.thanks}>Thanks. We’ll count your vote.</Text> : null}
-          {state.nicheRequests.length > 0 ? <Text style={styles.mine}>You’ve asked for: {state.nicheRequests.join(', ')}</Text> : null}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
-function PersonCard({ user, nicheIds }: { user: User; nicheIds: NicheId[] }) {
-  const router = useRouter();
-  const { state, actions } = useStore();
-  const niches = useNiches();
-  const following = !!state.following[user.id];
-  const accent = niches[nicheIds[0] ?? 'cooking'].accent;
-  return (
-    <View style={styles.card}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`View ${user.displayName}’s profile`} onPress={() => router.push({ pathname: '/user/[id]', params: { id: user.id } })} style={styles.cardTop}>
-        <Avatar user={user} size={56} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, maxWidth: '100%' }}>
-          <Text style={[styles.cardName, { marginTop: 0, flexShrink: 1 }]} numberOfLines={1}>{user.displayName}</Text>
-          <Badges user={user} size={14} />
-        </View>
-        <Text style={styles.cardHandle} numberOfLines={1}>{user.username}</Text>
-        <View style={styles.cardNiches} accessibilityLabel={`Posts in ${nicheIds.map((n) => niches[n].label).join(', ')}`}>
-          {nicheIds.map((n) => (
-            <View key={n} style={[styles.cardNiche, { borderColor: niches[n].accent }]}>
-              <Text style={[styles.cardNicheText, { color: niches[n].ink }]}>{niches[n].label}</Text>
+    <SurfaceProvider value={surface}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView ref={scroll} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          {/* The masthead hides while you search; the search bar stays the same element so it keeps focus. */}
+          {searching ? null : (
+            <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
+              <DisplayText size={42} color={ground.text}>Discover</DisplayText>
+              <Eyebrow>{weekOfLabel()}</Eyebrow>
             </View>
-          ))}
-        </View>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: following }}
-        accessibilityLabel={following ? `Following ${user.username}` : `Follow ${user.username}`}
-        onPress={() => actions.toggleFollow(user.id)}
-        style={({ pressed }) => [styles.follow, following ? { backgroundColor: '#FFFFFF', borderColor: colors.border } : { backgroundColor: accent, borderColor: accent }, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-        <Text style={[styles.followText, { color: following ? colors.textBody : '#FFFFFF' }]}>{following ? 'Following' : 'Follow'}</Text>
-      </Pressable>
-    </View>
+          )}
+          <View style={[styles.searchRow, searching ? { paddingLeft: mode === 'results' ? 8 : 20 } : null]}>
+            {mode === 'results' ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Back to Discover" onPress={cancel} style={styles.backBtn}>
+                <ChevronLeftIcon size={22} color={ground.text} />
+              </Pressable>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <SearchBar
+                ref={input}
+                compact={mode === 'results'}
+                focused={mode === 'typing'}
+                value={text}
+                onChangeText={setText}
+                onFocus={() => setMode('typing')}
+                onSubmitEditing={() => runSearch(text)}
+                onClear={mode === 'typing' ? () => setText('') : undefined}
+                placeholder="Search dishes, people, prints…"
+                accessibilityLabel="Search Niches"
+              />
+            </View>
+            {mode === 'typing' ? (
+              <Pressable accessibilityRole="button" onPress={cancel} style={styles.cancel}>
+                <Text style={[styles.cancelText, { color: ground.text }]}>Cancel</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {mode === 'typing' ? <SearchSuggestions q={normalize(text)} onPick={runSearch} /> : null}
+          {mode === 'results' ? <SearchResults key={query} q={query} onSearch={runSearch} /> : null}
+
+          {searching ? null : (
+            <>
+              <View style={styles.block}>
+                <SectionTitle>Explore by niche</SectionTitle>
+                <View style={styles.nicheGrid}>
+                  {NICHE_ORDER.map((id) => {
+                    const n = niches[id];
+                    return (
+                      <NicheCard
+                        key={id}
+                        niche={n}
+                        posts={byNiche[id]}
+                        notified={!!state.notify[id]}
+                        onPress={() => (n.open ? router.push({ pathname: '/discover/[niche]', params: { niche: id } }) : actions.toggleNotify(id))}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+
+              {favorites.posts.length ? (
+                <View style={styles.block}>
+                  <SectionTitle
+                    right={
+                      <Pressable accessibilityRole="button" accessibilityLabel="See all of this week’s favorites" onPress={() => router.push({ pathname: '/discover/[niche]', params: { niche: 'all' } })} style={styles.seeAll}>
+                        <Text style={[styles.seeAllText, { color: ground.text }]}>See all</Text>
+                      </Pressable>
+                    }>
+                    {favorites.lately ? 'Favorites lately' : 'This week’s favorites'}
+                  </SectionTitle>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+                    {favorites.posts.slice(0, 10).map((p) => (
+                      <RailTile key={p.id} post={p} />
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              {creators.length ? (
+                <View style={styles.block}>
+                  <SectionTitle>Creators to know</SectionTitle>
+                  <View style={[styles.rows, { borderBottomColor: ground.line }]}>
+                    {creators.map(({ user, thumb }) => (
+                      <PersonRow key={user.id} user={user} subtitle={user.membership?.tagline ?? user.bio} serifSubtitle thumb={thumb} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {shopPicks.length ? (
+                <View style={styles.block}>
+                  <SectionTitle>From the shops</SectionTitle>
+                  <View style={styles.shopGrid}>
+                    {shopPicks.map((l) => (
+                      <ShopTile key={l.id} listing={l} width={shopW} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              <EndNote title="That’s this week’s favorites." body="New picks every Monday. Search for anything else." />
+
+              <View style={[styles.request, { borderColor: ground.line }]}>
+                <Text style={[styles.requestTitle, { color: ground.text }]}>Missing a niche?</Text>
+                <Text style={[styles.requestBody, { color: ground.body }]}>Tell us what should open next. We open the most-requested niches once their first creators sign on.</Text>
+                <TextInput
+                  accessibilityLabel="Niche you want"
+                  value={request}
+                  onChangeText={(t) => {
+                    setRequest(t);
+                    setThanks(false);
+                  }}
+                  placeholder="e.g. Gardening, Climbing, Ceramics"
+                  placeholderTextColor={ground.muted}
+                  maxLength={40}
+                  onSubmitEditing={submitRequest}
+                  returnKeyType="send"
+                  style={[styles.input, { borderColor: ground.line, color: ground.text }]}
+                  selectionColor={ground.text}
+                />
+                <Button label="Send request" color={ground.text} disabled={!request.trim()} onPress={submitRequest} />
+                {thanks ? <Text accessibilityRole="alert" style={[styles.requestBody, { color: ground.body }]}>Thanks. We’ll count your vote.</Text> : null}
+                {state.nicheRequests.length > 0 ? <Text style={[styles.mine, { color: ground.muted }]}>You’ve asked for: {state.nicheRequests.join(', ')}</Text> : null}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
-  head: { paddingHorizontal: 20, gap: 8 },
-  sub: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
-  search: { marginTop: 8, minHeight: TOUCH + 2, borderRadius: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
-  searchInput: { flex: 1, minHeight: TOUCH, fontSize: 16, color: colors.text },
-  section: { fontSize: 19, fontWeight: '700', color: colors.text, paddingHorizontal: 20, marginTop: 26 },
-  sectionSub: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 20, marginTop: 4, lineHeight: 19 },
-  none: { fontSize: 15, color: colors.textMuted, paddingHorizontal: 20, paddingTop: 10 },
-  creator: { width: 190, padding: 14, borderRadius: 20, gap: 6 },
-  creatorName: { fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  creatorTagline: { fontSize: 13, lineHeight: 17 },
-  creatorPrice: { fontSize: 14, fontWeight: '800', marginTop: 2 },
-  people: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
-  card: { width: 168, padding: 14, borderRadius: 20, backgroundColor: colors.surface, gap: 12, justifyContent: 'space-between' },
-  cardTop: { alignItems: 'center', gap: 4 },
-  cardName: { fontSize: 15, fontWeight: '700', color: colors.text, marginTop: 6 },
-  cardHandle: { fontSize: 13, color: colors.textMuted },
-  cardNiches: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, marginTop: 6 },
-  cardNiche: { borderWidth: 2, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#FFFFFF' },
-  cardNicheText: { fontSize: 11, fontWeight: '700' },
-  follow: { minHeight: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  followText: { fontSize: 14, fontWeight: '700' },
-  request: { margin: 20, marginTop: 32, padding: 18, borderRadius: 20, backgroundColor: colors.surface, gap: 12 },
-  requestTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  requestBody: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
-  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 14, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF' },
-  thanks: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
-  mine: { fontSize: 13, color: colors.textMuted },
+  masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20, marginTop: 14 },
+  backBtn: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  cancel: { minHeight: TOUCH, paddingHorizontal: 8, justifyContent: 'center', marginRight: -8 },
+  cancelText: { fontSize: 16, fontWeight: '600' },
+  block: { marginTop: 30 },
+  nicheGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, columnGap: 12, paddingHorizontal: 20, paddingTop: 12 },
+  rail: { gap: 12, paddingHorizontal: 20, paddingTop: 12 },
+  seeAll: { minHeight: TOUCH, justifyContent: 'center' },
+  seeAllText: { fontSize: 14, fontWeight: '700' },
+  rows: { marginHorizontal: 20, marginTop: 8, borderBottomWidth: 1 },
+  shopGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, columnGap: 12, paddingHorizontal: 20, paddingTop: 12 },
+  request: { margin: 20, marginTop: 28, padding: 18, borderRadius: 20, borderWidth: 1, backgroundColor: '#FFFFFF', gap: 12 },
+  requestTitle: { fontSize: 17, fontWeight: '700' },
+  requestBody: { fontSize: 14, lineHeight: 20 },
+  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontSize: 16, backgroundColor: '#FFFFFF' },
+  mine: { fontSize: 13 },
 });

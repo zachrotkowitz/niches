@@ -11,7 +11,8 @@ import { ListingGrid } from '@/components/shop';
 import { MediaPlaceholder } from '@/components/primitives';
 import { diaryWords } from '@/lib/diary';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, type NicheId } from '@/lib/theme';
+import { SurfaceProvider } from '@/components/surface';
+import { colors, groundSurface, NICHE_ORDER, type NicheId } from '@/lib/theme';
 
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
@@ -31,6 +32,7 @@ export default function SavedScreen() {
   const shownListings = filter.length ? savedListings.filter((l) => filter.includes(l.niche)) : savedListings;
 
   return (
+    <SurfaceProvider value={groundSurface(ground)}>
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}>
       <View style={styles.head}>
         <DisplayText>Saved</DisplayText>
@@ -90,6 +92,7 @@ export default function SavedScreen() {
         </>
       ) : null}
     </ScrollView>
+    </SurfaceProvider>
   );
 }
 
