@@ -6,6 +6,7 @@ import { Text } from '@/components/text';
 import { LockedPanel, NameWithBadges } from '@/components/creator';
 import { BookmarkIcon, CommentIcon, HeartIcon, LockIcon, MoreIcon, PauseIcon, PlayIcon, StarIcon, TrendIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
+import { useSavePost } from '@/components/save';
 import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
@@ -31,6 +32,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const aspect = postAspect(post);
   const photoHeight = aspect ? Math.round(mediaWidth * Math.min(1.25, Math.max(0.8, aspect))) : mediaHeight;
   const inset = surface.flood ? styles.mediaInset : null;
+  const savePost = useSavePost();
   const swiping = useSwipeBlocked();
   const author = usersById[post.authorId];
   const isMine = !!state.me && post.authorId === state.me.id;
@@ -139,7 +141,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
           accessibilityRole="button"
           accessibilityState={{ selected: saved }}
           accessibilityLabel={isMine ? `${saveLabel}${saved ? ', you saved this' : ''}` : saveLabel}
-          onPress={() => !swiping() && actions.toggleSave(post.id)}
+          onPress={() => !swiping() && savePost(post.id)}
           style={({ pressed }) => [styles.action, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
           <BookmarkIcon size={20} filled={saved} color={saved ? active : surface.body} />
           <Text style={[styles.actionText, { color: saved ? active : surface.body }]}>{saveLabel}</Text>

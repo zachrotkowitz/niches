@@ -4,6 +4,7 @@ import { Text } from '@/components/text';
 
 import { BookmarkIcon, LockIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
+import { useSavePost } from '@/components/save';
 import { MediaPlaceholder } from '@/components/primitives';
 import { useSurface } from '@/components/surface';
 import { hasAccess, useNiches, useStore } from '@/lib/store';
@@ -61,6 +62,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
   const niche = useNiches()[post.niche];
   const surface = useSurface();
   const saved = !!state.saves[post.id];
+  const savePost = useSavePost();
   const swiping = useSwipeBlocked();
   const locked = !hasAccess(state, post);
   const title = tileTitle(post);
@@ -101,7 +103,7 @@ export function GridTile({ post, nicheBorder = false, interactive = true }: { po
           accessibilityRole="button"
           accessibilityLabel={saved ? 'Saved' : 'Save'}
           accessibilityState={{ selected: saved }}
-          onPress={() => !swiping() && actions.toggleSave(post.id)}
+          onPress={() => !swiping() && savePost(post.id)}
           hitSlop={4}
           style={[styles.save, { backgroundColor: saved ? niche.accent : 'rgba(255,255,255,0.94)', top: height - 46 - inset, right: 6 + inset }]}>
           <BookmarkIcon size={17} filled={saved} color={saved ? '#FFFFFF' : colors.text} />

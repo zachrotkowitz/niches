@@ -10,6 +10,7 @@ import { seedGoals, type CheckIn, type Goal } from './goals';
 import { sampleFavorites, sampleYear } from './recap';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
 import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
+import { sampleBoards, seedBoards, type Board } from './boards';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { appGround, DEFAULT_APP_GROUND, NICHE_ORDER, resolveNiches, type NicheId } from './theme';
 import type { Comment, Membership, Post, PostKind, ReportReason, User } from './types';
@@ -47,6 +48,8 @@ type State = {
   discoverNiches: NicheId[];
   /** Discover searches, newest first. */
   recentSearches: string[];
+  /** Saved boards: yours, plus public ones on demo profiles. */
+  boards: Board[];
   plans: Plan[];
   /** Home shows each niche's feed or its shop. */
   homeMode: 'feed' | 'shop';
@@ -117,7 +120,13 @@ type Action =
   | { type: 'addSample'; logs: LogEntry[]; goals: Goal[]; userId: string }
   | { type: 'removeSample' }
   | { type: 'setAppGround'; id: string }
-  | { type: 'setRecentSearches'; list: string[] };
+  | { type: 'setRecentSearches'; list: string[] }
+  | { type: 'addBoard'; board: Board }
+  | { type: 'mapBoard'; id: string; fn: (b: Board) => Board }
+  | { type: 'deleteBoard'; id: string }
+  | { type: 'toggleOnBoard'; boardId: string; postId: string }
+  | { type: 'addSampleBoards' }
+  | { type: 'removeSampleBoards' };
 
 function freshState(): Persisted {
   const now = Date.now();
@@ -139,6 +148,7 @@ function freshState(): Persisted {
     palettes: {},
     discoverNiches: [],
     recentSearches: [],
+    boards: seedBoards(now),
     plans: seedPlans(now),
     homeMode: 'feed',
     listings: seedListings(now),
@@ -190,8 +200,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, layout: action.layout };
     case 'toggle': {
       const next = { ...state[action.key] };
-      if (next[action.id]) delete next[action.id];
+      const wasOn = !!next[action.id];
+      if (wasOn) delete next[action.id];
       else next[action.id] = true;
+      // Unsaving a post takes it off your boards too.
+      if (action.key === 'saves' && wasOn) {
+        const meId = state.me?.id;
+        return { ...state, saves: next, boards: state.boards.map((b) => (b.ownerId === meId && b.postIds.includes(action.id) ? { ...b, postIds: b.postIds.filter((id) => id !== action.id) } : b)) };
+      }
       return { ...state, [action.key]: next };
     }
     case 'addComment':
@@ -289,6 +305,33 @@ function reducer(state: State, action: Action): State {
       return { ...state, appGround: action.id };
     case 'setRecentSearches':
       return { ...state, recentSearches: action.list };
+    case 'addBoard':
+      return { ...state, boards: [action.board, ...state.boards] };
+    case 'mapBoard':
+      return { ...state, boards: state.boards.map((b) => (b.id === action.id ? action.fn(b) : b)) };
+    case 'deleteBoard':
+      return { ...state, boards: state.boards.filter((b) => b.id !== action.id) };
+    case 'toggleOnBoard': {
+      // Adding a post to a board also saves it.
+      const on = state.boards.find((b) => b.id === action.boardId)?.postIds.includes(action.postId);
+      return {
+        ...state,
+        saves: on ? state.saves : { ...state.saves, [action.postId]: true },
+        boards: state.boards.map((b) =>
+          b.id !== action.boardId ? b : { ...b, updatedAt: Date.now(), postIds: on ? b.postIds.filter((id) => id !== action.postId) : [action.postId, ...b.postIds] },
+        ),
+      };
+    }
+    case 'addSampleBoards': {
+      if (!state.me) return state;
+      const { saves, boards } = sampleBoards(state.me.id, Date.now());
+      const have = new Set(state.boards.map((b) => b.id));
+      const next = { ...state.saves };
+      for (const id of saves) next[id] = true;
+      return { ...state, saves: next, boards: [...boards.filter((b) => !have.has(b.id)), ...state.boards] };
+    }
+    case 'removeSampleBoards':
+      return { ...state, boards: state.boards.filter((b) => !b.sample) };
     case 'addGoal':
       return { ...state, goals: [action.goal, ...state.goals] };
     case 'mapGoal':
@@ -606,6 +649,20 @@ function useStoreValue() {
       removeSampleYear: () => dispatch({ type: 'removeSample' }),
       setAppGround: (id: string) => dispatch({ type: 'setAppGround', id }),
       setRecentSearches: (list: string[]) => dispatch({ type: 'setRecentSearches', list: list.slice(0, 8) }),
+      /** Makes a board and returns its id. */
+      createBoard: (ownerId: string, name: string, visibility: Board['visibility'] = 'private', firstPostId?: string) => {
+        const id = `b_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const now = Date.now();
+        dispatch({ type: 'addBoard', board: { id, ownerId, name: name.trim(), postIds: [], visibility, createdAt: now, updatedAt: now } });
+        if (firstPostId) dispatch({ type: 'toggleOnBoard', boardId: id, postId: firstPostId });
+        return id;
+      },
+      renameBoard: (id: string, name: string) => dispatch({ type: 'mapBoard', id, fn: (b) => ({ ...b, name: name.trim() || b.name, updatedAt: Date.now() }) }),
+      setBoardVisibility: (id: string, visibility: Board['visibility']) => dispatch({ type: 'mapBoard', id, fn: (b) => ({ ...b, visibility }) }),
+      deleteBoard: (id: string) => dispatch({ type: 'deleteBoard', id }),
+      toggleOnBoard: (boardId: string, postId: string) => dispatch({ type: 'toggleOnBoard', boardId, postId }),
+      addSampleBoards: () => dispatch({ type: 'addSampleBoards' }),
+      removeSampleBoards: () => dispatch({ type: 'removeSampleBoards' }),
     }),
     [],
   );

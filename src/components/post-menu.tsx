@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { Sheet, type SheetItem } from '@/components/sheet';
+import { useSavePost } from '@/components/save';
 import { useToast } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { useStore } from '@/lib/store';
@@ -26,6 +27,7 @@ type Step = 'menu' | 'confirmDelete' | 'report';
 export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visible: boolean; onClose: () => void; onGone?: () => void }) {
   const router = useRouter();
   const toast = useToast();
+  const savePost = useSavePost();
   const { state, actions, usersById } = useStore();
   const [step, setStep] = useState<Step>('menu');
   const isMine = !!state.me && post.authorId === state.me.id;
@@ -140,7 +142,14 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
         { label: 'Delete', destructive: true, onPress: () => setStep('confirmDelete') },
       ]
     : [
-        { label: saved ? 'Remove from saved' : 'Save', onPress: run(() => actions.toggleSave(post.id), saved ? 'Removed from saved' : 'Saved') },
+        {
+          label: saved ? 'Remove from saved' : 'Save',
+          onPress: () => {
+            close();
+            savePost(post.id);
+          },
+        },
+        { label: 'Save to a board', detail: 'Pick a board or start a new one.', onPress: run(() => router.push({ pathname: '/boards/add', params: { postId: post.id } })) },
         { label: 'Not interested', detail: 'Hide this post from your feeds.', onPress: run(() => {
           actions.toggleHidden(post.id);
           onGone?.();

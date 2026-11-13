@@ -6,6 +6,7 @@ import { Text } from '@/components/text';
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
 import { DiaryRow, TopFour } from '@/components/diary';
+import { BoardCard, useCardWidth } from '@/components/boards';
 import { GoalCard } from '@/components/goals';
 import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
@@ -13,6 +14,7 @@ import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
 import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { pickPhoto } from '@/lib/photos';
+import { boardPosts } from '@/lib/boards';
 import { isoDay } from '@/lib/plans';
 import { diaryWords } from '@/lib/diary';
 import { progress, visibleGoals } from '@/lib/goals';
@@ -20,7 +22,7 @@ import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } f
 import { colors, fonts, NICHE_ORDER, type NicheId, type Surface } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
-type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals';
+type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
 export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
@@ -36,10 +38,13 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
     .sort((a, b) => b.createdAt - a.createdAt);
   const nicheTabs = NICHE_ORDER.filter((id) => posts.some((p) => p.niche === id));
   const listings = state.listings.filter((l) => l.sellerId === user.id);
+  // Boards on the profile: only the ones put there (yours included, so you see what others see).
+  const boards = state.boards.filter((b) => b.ownerId === user.id && b.visibility === 'profile').sort((a, b) => b.updatedAt - a.updatedAt);
+  const cardW = useCardWidth();
   const logs = visibleLogs(state, user.id);
   const goals = visibleGoals(state.goals, user.id, state.me?.id).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt) || b.createdAt - a.createdAt);
   const weekly = goals.filter((g) => g.kind === 'habit' && !g.doneAt);
-  const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals';
+  const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals' && t !== 'boards';
   const shown = tab === 'all' ? posts : isNicheTab(tab) ? posts.filter((p) => p.niche === tab) : [];
   // The niche this person is most active in (posts and diary), so the profile
   // looks the same whichever niche was last open on Home.
@@ -149,7 +154,7 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
         </View>
       ) : null}
 
-      {favNiches.length && tab !== 'shop' && tab !== 'goals' ? (
+      {favNiches.length && tab !== 'shop' && tab !== 'goals' && tab !== 'boards' ? (
         <View style={styles.favs}>
           {favNiches.map((id) => (
             <TopFour key={id} userId={user.id} niche={id} isMe={isMe} />
@@ -159,11 +164,11 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
 
       {/* Tabs keep their natural width (no wrapped labels) and scroll sideways if they don't all fit. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={styles.tabs} contentContainerStyle={styles.tabsRow}>
-        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : [])] as Tab[]).map((t) => {
+        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
-              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : niches[t].label}</Text>
+              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Boards' : niches[t].label}</Text>
             </Pressable>
           );
         })}
@@ -219,6 +224,13 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
             logs.map((l) => <DiaryRow key={l.id} log={l} showPrivacy={isMe} />)
           )}
           {isMe && logs.length ? <Text style={styles.diaryNote}>Entries with a lock are private. Everything else shows here on your profile.</Text> : null}
+        </View>
+      ) : tab === 'boards' ? (
+        <View style={styles.boardGrid}>
+          {boards.map((b) => {
+            const bp = boardPosts(b, state.posts);
+            return <BoardCard key={b.id} name={b.name} posts={bp} count={bp.length} width={cardW} onPress={() => router.push({ pathname: '/boards/[id]', params: { id: b.id } })} />;
+          })}
         </View>
       ) : tab === 'shop' ? (
         <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />
@@ -360,6 +372,7 @@ const makeStyles = (sf: Surface) =>
   plansTitle: { fontSize: 17, fontWeight: '700', color: sf.text },
   seeAll: { minHeight: 36, justifyContent: 'center', paddingLeft: 12 },
   seeAllText: { fontSize: 15, fontWeight: '600', color: sf.body },
+  boardGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 18, columnGap: 12, paddingHorizontal: 20, paddingTop: 16 },
   tabs: { marginTop: 18, borderBottomWidth: 1, borderBottomColor: sf.line, flexGrow: 0 },
   tabsRow: { flexGrow: 1, paddingHorizontal: 8 },
   tab: { flexGrow: 1, minHeight: 46, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
