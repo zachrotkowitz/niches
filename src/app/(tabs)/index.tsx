@@ -1,17 +1,17 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
-import { NicheHeader } from '@/components/niche-header';
+import { FeedPost } from '@/components/feed-post';
+import { NicheHeader, useHeaderHeight } from '@/components/niche-header';
 import { NichePager } from '@/components/niche-swipe';
-import { PostCard } from '@/components/post-card';
 import { Button, DisplayText } from '@/components/primitives';
 import { NicheShop } from '@/components/shop';
+import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { SurfaceProvider, useSurface } from '@/components/surface';
-import { progress } from '@/lib/goals';
 import { SHOP_NICHES } from '@/lib/shop';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { inFeeds, useNiches, useStore } from '@/lib/store';
@@ -23,36 +23,54 @@ export default function HomeScreen() {
   const niches = useNiches();
   // x offset of the row of niche pages; the header blends its color from it.
   const position = useSharedValue(0);
+  // How far each niche's page is scrolled; the header folds its big title away from the current one.
+  const s0 = useSharedValue(0);
+  const s1 = useSharedValue(0);
+  const s2 = useSharedValue(0);
+  const s3 = useSharedValue(0);
+  const scrolls = [s0, s1, s2, s3];
 
   return (
     <View style={styles.screen}>
-      <NicheHeader position={position} />
       <NichePager
         position={position}
         renderPage={(id) => {
           const niche = niches[id];
+          const scroll = scrolls[NICHE_ORDER.indexOf(id)];
           const hasShop = SHOP_NICHES.includes(id);
-          const top = hasShop ? <FeedShopSwitch niche={niche} /> : null;
           // Each niche's page carries its own flood color, so the next niche slides in already tinted.
           return (
             <SurfaceProvider value={floodSurface(niche)}>
               <View style={{ flex: 1, backgroundColor: niche.mid }}>
                 {hasShop && state.homeMode === 'shop' ? (
-                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-                    {top}
+                  <PageScroll scroll={scroll}>
                     <NicheShop niche={niche} />
-                  </ScrollView>
+                  </PageScroll>
                 ) : niche.open ? (
-                  <OpenFeed niche={niche} top={top} />
+                  <OpenFeed niche={niche} scroll={scroll} />
                 ) : (
-                  <ComingSoon niche={niche} top={top} />
+                  <ComingSoon niche={niche} scroll={scroll} />
                 )}
               </View>
             </SurfaceProvider>
           );
         }}
       />
+      <NicheHeader position={position} scrolls={scrolls} />
     </View>
+  );
+}
+
+/** A niche page's scroll view: starts below the header, ends clear of the floating tab bar, and reports its offset. */
+function PageScroll({ scroll, children }: { scroll: SharedValue<number>; children: ReactNode }) {
+  const top = useHeaderHeight();
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scroll.set(e.contentOffset.y);
+  });
+  return (
+    <Animated.ScrollView style={{ flex: 1 }} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
+      {children}
+    </Animated.ScrollView>
   );
 }
 
@@ -70,44 +88,17 @@ function useNicheFeed(niche: Niche) {
   }, [state, niche.id]);
 }
 
-/** Feed | Shop switch at the top of niches that have a shop. */
-function FeedShopSwitch({ niche }: { niche: Niche }) {
-  const { state, actions } = useStore();
-  return (
-    <View accessibilityRole="tablist" style={[styles.modeRow, { borderBottomColor: niche.line }]}>
-      {(['feed', 'shop'] as const).map((m) => {
-        const on = state.homeMode === m;
-        return (
-          <Pressable
-            key={m}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
-            onPress={() => actions.setHomeMode(m)}
-            style={[styles.modeTab, { borderBottomColor: on ? niche.ink : 'transparent' }]}>
-            <Text style={[styles.modeText, { color: on ? niche.ink : niche.inkSoft }]}>{m === 'feed' ? 'Feed' : 'Shop'}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function OpenFeed({ niche, top }: { niche: Niche; top?: ReactNode }) {
+function OpenFeed({ niche, scroll }: { niche: Niche; scroll: SharedValue<number> }) {
   const { state } = useStore();
   const [showOlder, setShowOlder] = useState(false);
   const { fresh, older } = useNicheFeed(niche);
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-      {top}
-      <View style={[styles.metaBar, { borderBottomColor: niche.line }]}>
-        <Text style={[styles.metaText, { color: niche.inkSoft }]}>Newest first</Text>
-        <Text style={[styles.metaText, { color: niche.inkSoft }]}>{fresh.length} new since yesterday</Text>
-      </View>
-
+    <PageScroll scroll={scroll}>
       <FeedSection posts={fresh} layout={state.layout} />
 
-      <CaughtUp niche={niche} count={fresh.length} />
+      {/* No "You're caught up" card (founder, Nov 2026): the feed simply stops. Older posts stay behind a tap. */}
+      {fresh.length === 0 ? <Text style={[styles.endText, { color: niche.inkSoft, paddingTop: 8 }]}>Nothing new in {niche.label} since yesterday.</Text> : null}
 
       {older.length > 0 ? (
         <View style={styles.olderWrap}>
@@ -125,11 +116,11 @@ function OpenFeed({ niche, top }: { niche: Niche; top?: ReactNode }) {
       {showOlder ? (
         <>
           <Divider label="Older than a day" />
+          <View style={{ height: 12 }} />
           <FeedSection posts={older} layout={state.layout} />
-          <Text style={[styles.endText, { color: niche.inkSoft }]}>That’s everything in {niche.label}.</Text>
         </>
       ) : null}
-    </ScrollView>
+    </PageScroll>
   );
 }
 
@@ -139,46 +130,8 @@ function FeedSection({ posts, layout }: { posts: Post[]; layout: 'posts' | 'grid
   return (
     <View>
       {posts.map((p) => (
-        <PostCard key={p.id} post={p} />
+        <FeedPost key={p.id} post={p} />
       ))}
-    </View>
-  );
-}
-
-/** The feed has a real end. Nothing else loads unless you ask. */
-function CaughtUp({ niche, count }: { niche: Niche; count: number }) {
-  const router = useRouter();
-  const { state } = useStore();
-  // Instead of more posts: a nudge toward your own week.
-  const weekly = state.goals.filter((g) => g.userId === state.me?.id && g.niche === niche.id && g.kind === 'habit' && !g.doneAt);
-  return (
-    <View style={styles.caughtUp} accessibilityRole="summary">
-      <DisplayText italic size={42} color={niche.accent}>
-        You’re caught up.
-      </DisplayText>
-      <Text style={[styles.caughtUpBody, { color: niche.ink }]}>
-        {count === 0
-          ? `No new ${niche.label} posts since yesterday. Be the first to share something today.`
-          : `That’s all ${count} new ${niche.label} ${count === 1 ? 'post' : 'posts'} since yesterday. Go make something, then come back and share it.`}
-      </Text>
-      {weekly.length ? (
-        <Pressable accessibilityRole="button" onPress={() => router.push(weekly.length === 1 ? { pathname: '/goals/[id]', params: { id: weekly[0].id } } : '/goals')} style={[styles.weekGoals, { backgroundColor: niche.field }]}>
-          <Text style={[styles.weekGoalsLabel, { color: niche.inkSoft }]}>Your week</Text>
-          {weekly.slice(0, 3).map((g) => {
-            const p = progress(g);
-            return (
-              <View key={g.id} style={styles.weekGoalRow}>
-                <Text style={[styles.weekGoalTitle, { color: niche.ink }]} numberOfLines={1}>{g.title}</Text>
-                <Text style={[styles.weekGoalCount, { color: niche.ink }]}>{p.headline}</Text>
-              </View>
-            );
-          })}
-        </Pressable>
-      ) : null}
-      <View style={{ gap: 8, marginTop: 4 }}>
-        <Button label="Open your saves" color={niche.ink} onPress={() => router.navigate('/saved')} />
-        <Button label="Share what you made" tone="outline" textStyle={{ color: niche.ink }} style={{ borderColor: niche.line }} onPress={() => router.navigate('/create')} />
-      </View>
     </View>
   );
 }
@@ -195,15 +148,14 @@ function Divider({ label }: { label: string }) {
 }
 
 /** Niches that aren't open yet: a notify button, plus a preview from founding creators if there is one. */
-function ComingSoon({ niche, top }: { niche: Niche; top?: ReactNode }) {
+function ComingSoon({ niche, scroll }: { niche: Niche; scroll: SharedValue<number> }) {
   const router = useRouter();
   const { state, actions } = useStore();
   const notified = !!state.notify[niche.id];
   const { all } = useNicheFeed(niche);
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-      {top}
+    <PageScroll scroll={scroll}>
       <View style={styles.soonWrap}>
         <DisplayText italic size={36} color={niche.ink}>
           {niche.label} is coming soon
@@ -224,11 +176,12 @@ function ComingSoon({ niche, top }: { niche: Niche; top?: ReactNode }) {
       {all.length ? (
         <>
           <Divider label="Preview · founding creators" />
+          <View style={{ height: 12 }} />
           <FeedSection posts={all} layout={state.layout} />
           <Text style={[styles.endText, { color: niche.inkSoft }]}>That’s the whole preview. Posting opens soon.</Text>
         </>
       ) : null}
-    </ScrollView>
+    </PageScroll>
   );
 }
 

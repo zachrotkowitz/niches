@@ -93,7 +93,7 @@ export default function DiscoverScreen() {
   return (
     <SurfaceProvider value={surface}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView ref={scroll} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroll} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {/* The masthead hides while you search; the search bar stays the same element so it keeps focus. */}
           {searching ? null : (
             <View style={[styles.masthead, { borderBottomColor: ground.text }]}>

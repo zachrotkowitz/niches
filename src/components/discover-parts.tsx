@@ -103,10 +103,10 @@ function topicLine(niche: Niche): string {
 }
 
 /** Explore by niche: a three-photo collage outlined in the niche's color. */
-export function NicheCard({ niche, posts, onPress, notified }: { niche: Niche; posts: Post[]; onPress: () => void; notified?: boolean }) {
+export function NicheCard({ niche, posts, onPress, notified, current, width: fixed }: { niche: Niche; posts: Post[]; onPress: () => void; notified?: boolean; /** Home's niche list: marks the niche you're in. */ current?: boolean; width?: number }) {
   const surface = useSurface();
   const { width } = useWindowDimensions();
-  const cardW = Math.floor((Math.min(width, 520) - 40 - 12) / 2);
+  const cardW = fixed ?? Math.floor((Math.min(width, 520) - 40 - 12) / 2);
   const photos = posts.map((p) => postPhoto(p)).filter(Boolean).slice(0, 3);
   const open = niche.open;
   return (
@@ -133,7 +133,7 @@ export function NicheCard({ niche, posts, onPress, notified }: { niche: Niche; p
       )}
       <Text style={[styles.cardName, { color: surface.text }]}>{niche.label}</Text>
       <Text style={[styles.cardSub, { color: surface.muted }]} numberOfLines={1}>
-        {open ? topicLine(niche) : notified ? 'We’ll let you know' : 'Tap to get notified'}
+        {current ? 'You’re here' : open ? topicLine(niche) : notified ? 'We’ll let you know' : fixed ? 'Opening soon' : 'Tap to get notified'}
       </Text>
     </Pressable>
   );

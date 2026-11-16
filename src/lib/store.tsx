@@ -608,6 +608,7 @@ function useStoreValue() {
       toggleWant: (postId: string) => dispatch({ type: 'toggleWant', postId }),
       setFavorites: (userId: string, niche: NicheId, refs: FavoriteRef[]) => dispatch({ type: 'setFavorites', userId, niche, refs }),
       setAvatar: (avatarUri: string) => dispatch({ type: 'updateMe', patch: { avatarUri } }),
+      setCover: (cover: Me['cover']) => dispatch({ type: 'updateMe', patch: { cover } }),
       setDemoMembers: (n: number) => dispatch({ type: 'setDemoMembers', n }),
       setOrderStatus: (id: string, status: OrderStatus) => dispatch({ type: 'setOrderStatus', id, status }),
       chooseDish: (id: string, ideaId: string | undefined) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, chosenDishId: ideaId }) }),

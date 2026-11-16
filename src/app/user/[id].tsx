@@ -32,7 +32,7 @@ function UserScreenInner() {
         <View style={{ width: 80 }} />
       </View>
       {user ? (
-        <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 40 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
           <ProfileView user={user} isMe={user.id === state.me?.id} />
         </ScrollView>
       ) : (

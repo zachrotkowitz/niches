@@ -38,10 +38,11 @@ function ProfileScreenInner() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 40 }}>
+    <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
       <ProfileView
         user={me}
         isMe
+        topInset={insets.top}
         footer={
           <View style={styles.settings}>
             <Text style={styles.settingsTitle}>Archive</Text>

@@ -155,7 +155,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
 }
 
 /** Video never autoplays: it waits for a tap. (Demo: no real video yet.) */
-function VideoPlaceholder({ post, height }: { post: Post; height: number }) {
+export function VideoPlaceholder({ post, height }: { post: Post; height: number }) {
   const [playing, setPlaying] = useState(false);
   return (
     <View>

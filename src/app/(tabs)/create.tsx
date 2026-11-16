@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
   share: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-  form: { padding: 20, gap: 18 },
+  form: { padding: 20, gap: 18, paddingBottom: 120 },
   membersRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 8 },
   membersTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   membersSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },

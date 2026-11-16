@@ -7,7 +7,9 @@ import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
 import { DiaryRow, TopFour } from '@/components/diary';
 import { BoardCard, useCardWidth } from '@/components/boards';
+import { CoverCollage } from '@/components/cover';
 import { GoalCard } from '@/components/goals';
+import { Sheet } from '@/components/sheet';
 import { LockIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
@@ -15,6 +17,7 @@ import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/prim
 import { useSurface, useSurfaceStyles } from '@/components/surface';
 import { pickPhoto } from '@/lib/photos';
 import { boardPosts } from '@/lib/boards';
+import { coverFor } from '@/lib/cover';
 import { isoDay } from '@/lib/plans';
 import { diaryWords } from '@/lib/diary';
 import { progress, visibleGoals } from '@/lib/goals';
@@ -25,13 +28,15 @@ import type { Post, User } from '@/lib/types';
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
-export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean; footer?: ReactNode }) {
+export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; isMe: boolean; footer?: ReactNode; /** Space to leave above the name when there's no cover (the status bar on your own profile). */ topInset?: number }) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const router = useRouter();
   const { state, actions } = useStore();
   const niches = useNiches();
   const [tab, setTab] = useState<Tab>('all');
+  const [editing, setEditing] = useState(false);
+  const cover = coverFor(user, state.posts);
 
   const posts = state.posts
     .filter((p) => p.authorId === user.id && (isMe ? !p.archived : isVisible(state, p)))
@@ -76,67 +81,79 @@ export function ProfileView({ user, isMe, footer }: { user: User; isMe: boolean;
 
   return (
     <View>
+      {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
       <View style={styles.head}>
-        <View style={styles.identity}>
+        <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>
+          <View style={styles.avatarRing}>
+            <Avatar user={user} size={84} />
+          </View>
           {isMe ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={user.avatarUri ? 'Change profile photo' : 'Add a profile photo'}
-              onPress={async () => {
-                const picked = await pickPhoto([1, 1]);
-                if (picked) actions.setAvatar(picked.uri);
-              }}>
-              <Avatar user={user} size={72} />
-              <View style={styles.avatarEdit}>
-                <Text style={styles.avatarEditText}>{user.avatarUri ? 'Edit' : '+'}</Text>
-              </View>
+            <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={({ pressed }) => [styles.editButton, { opacity: pressed ? 0.6 : 1 }]}>
+              <Text style={styles.editButtonText}>Edit profile</Text>
             </Pressable>
           ) : (
-            <Avatar user={user} size={72} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: following }}
+              onPress={() => actions.toggleFollow(user.id)}
+              style={({ pressed }) => [styles.editButton, following ? null : { backgroundColor: surface.text }, { opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={[styles.editButtonText, following ? null : { color: surface.ground }]}>{following ? 'Following' : 'Follow'}</Text>
+            </Pressable>
           )}
-          <View style={styles.counts}>
-            <Count value={posts.length} label={posts.length === 1 ? 'post' : 'posts'} />
-            <Count value={followers.length} label={followers.length === 1 ? 'follower' : 'followers'} onPress={() => openList('followers')} />
-            <Count value={follows.length} label="following" onPress={() => openList('following')} />
-          </View>
         </View>
-        <View style={{ gap: 2 }}>
+        <View style={{ gap: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <DisplayText size={36} color={surface.text}>{user.displayName}</DisplayText>
+            <DisplayText size={44} color={surface.text} style={{ flexShrink: 1 }}>{user.displayName}</DisplayText>
             <Badges user={user} size={20} />
           </View>
-          <Text style={styles.handle}>{user.username}</Text>
+          {/* Niches are plain words underlined in their color, not pills. */}
+          <Text style={styles.handle}>
+            {user.username}
+            {nicheTabs.length ? ' · ' : ''}
+            {nicheTabs.map((id, i) => (
+              <Text key={id}>
+                {i > 0 ? (i === nicheTabs.length - 1 ? ' and ' : ', ') : ''}
+                <Text style={{ color: surface.text, fontWeight: '600', textDecorationLine: 'underline', textDecorationColor: niches[id].accent }}>{niches[id].label}</Text>
+              </Text>
+            ))}
+          </Text>
         </View>
         {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
-        {user.membership ? (
-          <MembershipCard
-            creator={user}
-            accent={surface.text}
-            field="#FFFFFF"
-            ink={surface.text}
-          />
-        ) : null}
-        {nicheTabs.length ? (
-          <View style={styles.nicheRow}>
-            {nicheTabs.map((id) => (
-              <View key={id} style={[styles.nichePill, { backgroundColor: niches[id].field }]}>
-                <Text style={[styles.nichePillText, { color: niches[id].ink }]}>{niches[id].label}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        {isMe ? null : (
-          <Button
-            label={following ? 'Following' : 'Follow'}
-            tone={following ? 'outline' : 'solid'}
-            color={surface.text}
-            textStyle={following ? { color: surface.text } : undefined}
-            style={following ? { borderColor: surface.line, backgroundColor: 'rgba(255,255,255,0.35)' } : undefined}
-            onPress={() => actions.toggleFollow(user.id)}
-            accessibilityState={{ selected: following }}
-          />
-        )}
+        <View style={styles.counts}>
+          <Count value={posts.length} label={posts.length === 1 ? 'post' : 'posts'} />
+          <Count value={followers.length} label={followers.length === 1 ? 'follower' : 'followers'} onPress={() => openList('followers')} />
+          <Count value={follows.length} label="following" onPress={() => openList('following')} />
+        </View>
+        {user.membership ? <MembershipCard creator={user} accent={surface.text} field="#FFFFFF" ink={surface.text} /> : null}
       </View>
+
+      {isMe ? (
+        <Sheet
+          visible={editing}
+          onClose={() => setEditing(false)}
+          items={[
+            {
+              label: user.avatarUri ? 'Change profile photo' : 'Add a profile photo',
+              onPress: () => {
+                setEditing(false);
+                // Let the sheet close before the photo picker opens.
+                setTimeout(async () => {
+                  const picked = await pickPhoto([1, 1]);
+                  if (picked) actions.setAvatar(picked.uri);
+                }, 350);
+              },
+            },
+            {
+              label: 'Style your cover',
+              detail: 'One, two or three of your photos at the top of your profile.',
+              onPress: () => {
+                setEditing(false);
+                router.push('/cover');
+              },
+            },
+          ]}
+        />
+      ) : null}
 
       {plans.length ? (
         <View style={styles.plans}>
@@ -344,14 +361,18 @@ const GRID_GAP = 2;
 
 const makeStyles = (sf: Surface) =>
   StyleSheet.create({
-  head: { paddingHorizontal: 20, gap: 12 },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  cover: { height: 268, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  head: { paddingHorizontal: 20, gap: 10 },
+  avatarRing: { borderRadius: 46, borderWidth: 4, borderColor: sf.ground },
+  editButton: { minHeight: 44, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1.5, borderColor: sf.text, alignItems: 'center', justifyContent: 'center' },
+  editButtonText: { fontSize: 14, fontWeight: '700', color: sf.text },
+  identity: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   handle: { fontSize: 14, color: sf.muted },
   avatarEdit: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: sf.text, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarEditText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
-  counts: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  count: { minWidth: 64, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  countValue: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, color: sf.text, fontVariant: ['tabular-nums'] },
+  counts: { flexDirection: 'row', gap: 20 },
+  count: { minHeight: 44, flexDirection: 'row', alignItems: 'baseline', gap: 5, paddingTop: 6 },
+  countValue: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, color: sf.text, fontVariant: ['tabular-nums'] },
   countLabel: { fontSize: 13, color: sf.muted },
   bio: { fontSize: 15, lineHeight: 21, color: sf.text },
   nicheRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

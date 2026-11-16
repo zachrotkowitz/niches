@@ -20,6 +20,8 @@ export type User = {
   verified?: boolean;
   /** Premium creator: can charge for members-only content. Invite-only. */
   membership?: Membership;
+  /** Profile cover the person styled. Without one, the cover is made from their most-saved photos. */
+  cover?: import('./cover').Cover;
 };
 
 /** What a premium creator offers members. */

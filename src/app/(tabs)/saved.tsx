@@ -42,7 +42,7 @@ export default function SavedScreen() {
 
   return (
     <SurfaceProvider value={groundSurface(ground)}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 120 }}>
         <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
           <DisplayText size={42} color={ground.text}>Saved</DisplayText>
           {total ? <Eyebrow>{savesLabel(total)}</Eyebrow> : null}
