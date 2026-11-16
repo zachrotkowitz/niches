@@ -5,6 +5,7 @@ import type { Tabs } from 'expo-router/js-tabs';
 
 import { BookmarkIcon, HomeIcon, PersonIcon, PlusIcon, SearchIcon } from '@/components/icons';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { emitTabReselect } from '@/lib/tab-events';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -32,7 +33,8 @@ export function FloatingTabBar({ state, navigateToTab }: TabBarProps) {
         {state.routes.map((route, i) => {
           const focused = state.index === i;
           const color = focused ? ink : '#655B4F';
-          const onPress = () => navigateToTab(route.key);
+          // Tapping the tab you're on scrolls it back to the top (and, on Discover, leaves a niche page or a search).
+          const onPress = () => (focused ? emitTabReselect(route.name) : navigateToTab(route.key));
           return (
             <Pressable
               key={route.key}

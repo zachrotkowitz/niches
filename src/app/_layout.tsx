@@ -71,7 +71,6 @@ function RootStack() {
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="post/edit/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="user/[id]" />
-        <Stack.Screen name="discover/[niche]" />
         <Stack.Screen name="cover" options={{ presentation: 'modal' }} />
         <Stack.Screen name="boards/[id]" />
         <Stack.Screen name="boards/add" options={{ presentation: 'modal' }} />

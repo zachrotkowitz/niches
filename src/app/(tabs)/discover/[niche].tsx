@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -13,6 +13,8 @@ import { Text } from '@/components/text';
 import { UnderlineTabs } from '@/components/underline-tabs';
 import { normalize, weekFavorites, weekOfLabel } from '@/lib/discover';
 import { SEED_USERS } from '@/lib/seed';
+import { useTabReselect } from '@/lib/tab-events';
+import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { inFeeds, useAppGround, useNiches, useStore } from '@/lib/store';
 import { floodSurface, fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 import { matchesTopic, postText, TOPICS } from '@/lib/topics';
@@ -31,6 +33,13 @@ export default function DiscoverNicheScreen() {
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
   // Scroll back up a little and a slim search bar drops in at the top, like on Discover.
   const drop = useDropInSearch(insets.top + 190);
+  const focused = useIsFocused();
+  // Tap the Discover icon on a niche page: back to main Discover (the Instagram way).
+  useTabReselect('discover', () => {
+    if (!focused) return;
+    if (router.canGoBack()) router.back();
+    else router.replace('/discover');
+  });
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const ground = useAppGround();
@@ -81,7 +90,7 @@ export default function DiscoverNicheScreen() {
 
   return (
     <SurfaceProvider value={surface}>
-      <Animated.ScrollView ref={scrollRef} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView ref={scrollRef} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
         <View style={{ paddingHorizontal: 14 }}>
           <BackLink label="Discover" onPress={goBack} />
         </View>

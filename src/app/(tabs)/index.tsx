@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, type ComponentRef, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import Animated, { useAnimatedScrollHandler, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -14,8 +14,9 @@ import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { SurfaceProvider, useSurface } from '@/components/surface';
 import { SHOP_NICHES } from '@/lib/shop';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
+import { useTabReselect } from '@/lib/tab-events';
 import { inFeeds, useNiches, useStore } from '@/lib/store';
-import { floodSurface, NICHE_ORDER, type Niche } from '@/lib/theme';
+import { floodSurface, NICHE_ORDER, type Niche, type NicheId } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
 export default function HomeScreen() {
@@ -43,7 +44,7 @@ export default function HomeScreen() {
             <SurfaceProvider value={floodSurface(niche)}>
               <View style={{ flex: 1, backgroundColor: niche.mid }}>
                 {hasShop && state.homeMode === 'shop' ? (
-                  <PageScroll scroll={scroll}>
+                  <PageScroll scroll={scroll} nicheId={id}>
                     <NicheShop niche={niche} />
                   </PageScroll>
                 ) : niche.open ? (
@@ -62,13 +63,19 @@ export default function HomeScreen() {
 }
 
 /** A niche page's scroll view: starts below the header, ends clear of the floating tab bar, and reports its offset. */
-function PageScroll({ scroll, children }: { scroll: SharedValue<number>; children: ReactNode }) {
+function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>; nicheId: NicheId; children: ReactNode }) {
   const top = useHeaderHeight();
+  const { state } = useStore();
+  const ref = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
+  // Tap Home while on Home: the niche you're looking at glides back to the top.
+  useTabReselect('index', () => {
+    if (state.niche === nicheId) ref.current?.scrollTo({ y: 0, animated: true });
+  });
   const onScroll = useAnimatedScrollHandler((e) => {
     scroll.set(e.contentOffset.y);
   });
   return (
-    <Animated.ScrollView style={{ flex: 1 }} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
+    <Animated.ScrollView ref={ref} style={{ flex: 1 }} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
       {children}
     </Animated.ScrollView>
   );
@@ -95,7 +102,7 @@ function OpenFeed({ niche, scroll }: { niche: Niche; scroll: SharedValue<number>
   // One continuous feed, newest first (founder, Nov 2026): no "older posts"
   // button, no divider, no end card. It stops after the last post.
   return (
-    <PageScroll scroll={scroll}>
+    <PageScroll scroll={scroll} nicheId={niche.id}>
       <FeedSection posts={all} layout={state.layout} />
       {all.length === 0 ? <Text style={[styles.endText, { color: niche.inkSoft, paddingTop: 8 }]}>No {niche.label} posts yet.</Text> : null}
     </PageScroll>
@@ -133,7 +140,7 @@ function ComingSoon({ niche, scroll }: { niche: Niche; scroll: SharedValue<numbe
   const { all } = useNicheFeed(niche);
 
   return (
-    <PageScroll scroll={scroll}>
+    <PageScroll scroll={scroll} nicheId={niche.id}>
       <View style={styles.soonWrap}>
         <DisplayText italic size={36} color={niche.ink}>
           {niche.label} is coming soon

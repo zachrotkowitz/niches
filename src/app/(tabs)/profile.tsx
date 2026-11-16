@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,12 +9,15 @@ import { Button } from '@/components/primitives';
 import { PostSquares, ProfileView } from '@/components/profile-view';
 import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { useTabReselect } from '@/lib/tab-events';
 import { groundSurface, NICHE_ORDER, TOUCH, type Surface } from '@/lib/theme';
 
 function ProfileScreenInner() {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useTabReselect('profile', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
   const router = useRouter();
   const { state, actions } = useStore();
   const niches = useNiches();
@@ -38,7 +41,7 @@ function ProfileScreenInner() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
       <ProfileView
         user={me}
         isMe

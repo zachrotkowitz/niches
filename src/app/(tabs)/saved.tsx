@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { Text } from '@/components/text';
 import { boardPosts, savesLabel } from '@/lib/boards';
 import { diaryWords } from '@/lib/diary';
 import { useAppGround, useStore } from '@/lib/store';
+import { useTabReselect } from '@/lib/tab-events';
 import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
 /**
@@ -27,6 +28,8 @@ export default function SavedScreen() {
   const ground = useAppGround();
   const cardW = useCardWidth();
   const [filter, setFilter] = useState<NicheId[]>([]);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  useTabReselect('saved', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
 
   // Saved posts stay here even if you hid them from feeds; archived ones are the author's to hide.
   const saved = state.posts.filter((p) => state.saves[p.id] && !p.archived);
@@ -42,7 +45,7 @@ export default function SavedScreen() {
 
   return (
     <SurfaceProvider value={groundSurface(ground)}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 120 }}>
+      <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 120 }}>
         <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
           <DisplayText size={42} color={ground.text}>Saved</DisplayText>
           {total ? <Eyebrow>{savesLabel(total)}</Eyebrow> : null}

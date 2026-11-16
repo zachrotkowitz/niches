@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -14,6 +14,7 @@ import { Text } from '@/components/text';
 import { normalize, weekFavorites, weekOfLabel } from '@/lib/discover';
 import { postPhoto } from '@/lib/demo-photos';
 import { SEED_USERS } from '@/lib/seed';
+import { useTabReselect } from '@/lib/tab-events';
 import { inFeeds, postStats, useAppGround, useNiches, useStore } from '@/lib/store';
 import { groundSurface, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
@@ -94,6 +95,14 @@ export default function DiscoverScreen() {
 
   // Scroll back up a little and a slim search bar drops in at the top.
   const drop = useDropInSearch(insets.top + 150);
+  const focused = useIsFocused();
+  // Tap Discover while on Discover: close any search and glide back to the top.
+  useTabReselect('discover', () => {
+    if (!focused) return;
+    if (mode !== 'browse') cancel();
+    drop.hide();
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  });
   const openSearch = () => {
     drop.hide();
     scroll.current?.scrollTo({ y: 0, animated: false });
