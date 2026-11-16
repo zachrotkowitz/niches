@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import Animated, { useAnimatedScrollHandler, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -90,36 +90,14 @@ function useNicheFeed(niche: Niche) {
 
 function OpenFeed({ niche, scroll }: { niche: Niche; scroll: SharedValue<number> }) {
   const { state } = useStore();
-  const [showOlder, setShowOlder] = useState(false);
-  const { fresh, older } = useNicheFeed(niche);
+  const { all } = useNicheFeed(niche);
 
+  // One continuous feed, newest first (founder, Nov 2026): no "older posts"
+  // button, no divider, no end card. It stops after the last post.
   return (
     <PageScroll scroll={scroll}>
-      <FeedSection posts={fresh} layout={state.layout} />
-
-      {/* No "You're caught up" card (founder, Nov 2026): the feed simply stops. Older posts stay behind a tap. */}
-      {fresh.length === 0 ? <Text style={[styles.endText, { color: niche.inkSoft, paddingTop: 8 }]}>Nothing new in {niche.label} since yesterday.</Text> : null}
-
-      {older.length > 0 ? (
-        <View style={styles.olderWrap}>
-          <Button
-            tone="outline"
-            label={showOlder ? 'Hide older posts' : `Show older posts (${older.length})`}
-            onPress={() => setShowOlder((v) => !v)}
-            accessibilityState={{ expanded: showOlder }}
-            style={{ borderColor: niche.line, backgroundColor: 'rgba(255,255,255,0.35)' }}
-            textStyle={{ color: niche.ink }}
-          />
-        </View>
-      ) : null}
-
-      {showOlder ? (
-        <>
-          <Divider label="Older than a day" />
-          <View style={{ height: 12 }} />
-          <FeedSection posts={older} layout={state.layout} />
-        </>
-      ) : null}
+      <FeedSection posts={all} layout={state.layout} />
+      {all.length === 0 ? <Text style={[styles.endText, { color: niche.inkSoft, paddingTop: 8 }]}>No {niche.label} posts yet.</Text> : null}
     </PageScroll>
   );
 }
@@ -199,7 +177,6 @@ const styles = StyleSheet.create({
   weekGoalTitle: { fontSize: 15, fontWeight: '600', flex: 1 },
   weekGoalCount: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
   caughtUpBody: { fontSize: 15, lineHeight: 22 },
-  olderWrap: { paddingHorizontal: 20 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 4 },
   rule: { flex: 1, height: 1 },
   dividerText: { fontSize: 12, fontWeight: '600' },
