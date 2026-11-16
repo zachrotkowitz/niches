@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 type Listener = () => void;
 const listeners = new Map<string, Set<Listener>>();
@@ -24,4 +24,25 @@ export function useTabReselect(tab: string, fn: Listener) {
       set.delete(call);
     };
   }, [tab]);
+}
+
+// Whether the floating tab bar is tucked away (the Post tab's photo step, like Instagram).
+let barHidden = false;
+const barListeners = new Set<Listener>();
+
+export function setTabBarHidden(hidden: boolean) {
+  if (barHidden === hidden) return;
+  barHidden = hidden;
+  barListeners.forEach((fn) => fn());
+}
+
+export function useTabBarHidden() {
+  return useSyncExternalStore(
+    (fn) => {
+      barListeners.add(fn);
+      return () => barListeners.delete(fn);
+    },
+    () => barHidden,
+    () => barHidden,
+  );
 }

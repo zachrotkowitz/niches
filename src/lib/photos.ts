@@ -23,7 +23,24 @@ export async function pickPhoto(aspect?: [number, number]): Promise<PickedPhoto 
     quality: 1,
   });
   if (result.canceled || !result.assets?.length) return null;
-  const asset = result.assets[0];
+  return keep(result.assets[0]);
+}
+
+/**
+ * Opens the camera and returns a resized copy, or null if the person cancelled
+ * or said no to camera access. On the web this falls back to choosing a file.
+ */
+export async function takePhoto(): Promise<PickedPhoto | null> {
+  if (Platform.OS !== 'web') {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return null;
+  }
+  const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+  if (result.canceled || !result.assets?.length) return null;
+  return keep(result.assets[0]);
+}
+
+async function keep(asset: ImagePicker.ImagePickerAsset): Promise<PickedPhoto> {
 
   const longest = Math.max(asset.width || MAX_EDGE, asset.height || MAX_EDGE);
   const resize = longest > MAX_EDGE ? [{ resize: asset.width >= asset.height ? { width: MAX_EDGE } : { height: MAX_EDGE } }] : [];

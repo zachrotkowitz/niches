@@ -1,13 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CameraIcon, CheckIcon, LockIcon } from '@/components/icons';
+import { CameraIcon, CheckIcon, ChevronLeftIcon, CloseIcon, LockIcon, TextIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
@@ -17,9 +17,10 @@ import { postPhoto } from '@/lib/demo-photos';
 import { diaryWords } from '@/lib/diary';
 import { shortTitle } from '@/lib/format';
 import { goalRule, weekNumber, weekStrip } from '@/lib/goals';
-import { pickPhoto, type PickedPhoto } from '@/lib/photos';
+import { pickPhoto, takePhoto, type PickedPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { setTabBarHidden } from '@/lib/tab-events';
 import { BODY_FONTS, fonts, groundSurface, NICHE_ORDER, TOUCH, type Niche, type NicheId } from '@/lib/theme';
 import type { Post, PostKind } from '@/lib/types';
 
@@ -35,6 +36,12 @@ type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLab
  * The Post tab (founder, Nov 2026): option A "Studio" for writing a post (the
  * cream look of Discover and Saved, a big serif caption, quiet tabs, plain
  * rows) and option C's celebration once it's shared, in the niche's color.
+ *
+ * It starts on a photo step like Instagram's (founder, Nov 16 2026: "option 1,
+ * the lighter version"): tapping + opens the phone's own photo picker straight
+ * away, the photo shows big with Next, and "Just text" skips it. The tab bar
+ * tucks away on that step. With a development build this becomes a grid of
+ * your recent photos inside Niches (expo-media-library); see CLAUDE.md.
  */
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
@@ -52,18 +59,40 @@ export default function CreateScreen() {
   const [picking, setPicking] = useState(false);
   const [posted, setPosted] = useState<Posted | null>(null);
   const [membersOnly, setMembersOnly] = useState(false);
+  // Photo first, then the words.
+  const [step, setStep] = useState<'photo' | 'write'>('photo');
+  const focused = useIsFocused();
+  const autoOpened = useRef(false);
   // Post to the niche you're in, if it's open for posting.
   const [nicheId, setNicheId] = useState<NicheId>(NICHES[state.niche].open ? state.niche : 'cooking');
 
-  const choosePhoto = async () => {
+  const choosePhoto = async (from: 'roll' | 'camera' = 'roll') => {
     setPicking(true);
     try {
-      const picked = await pickPhoto();
+      const picked = await (from === 'camera' ? takePhoto() : pickPhoto());
       if (picked) setPhoto(picked);
     } finally {
       setPicking(false);
     }
   };
+
+  // Tapping + goes straight to your photos, once each time you open the tab.
+  // (Browsers only open a file picker after a tap, so the web build waits for one.)
+  useEffect(() => {
+    if (!focused) {
+      autoOpened.current = false;
+      return;
+    }
+    if (autoOpened.current || step !== 'photo' || photo || picking || posted) return;
+    autoOpened.current = true;
+    if (Platform.OS !== 'web') void choosePhoto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused]);
+  // The tab bar steps aside on the photo step, like Instagram.
+  useEffect(() => {
+    setTabBarHidden(focused && step === 'photo' && !posted);
+    return () => setTabBarHidden(false);
+  }, [focused, step, posted]);
 
   // The Post tab stays open in the background, so follow the niche you switch to on Home.
   useEffect(() => {
@@ -119,10 +148,29 @@ export default function CreateScreen() {
     setPosted(null);
     setMembersOnly(false);
     setKind('post');
+    setStep('photo');
     if (params.goalId) router.setParams({ goalId: undefined });
   };
 
   if (posted) return <PostedScreen posted={posted} onDone={reset} />;
+  if (step === 'photo') {
+    return (
+      <PhotoStep
+        photo={photo}
+        picking={picking}
+        onPick={choosePhoto}
+        onNext={() => setStep('write')}
+        onText={() => {
+          setPhoto(null);
+          setStep('write');
+        }}
+        onClose={() => {
+          reset();
+          router.navigate('/');
+        }}
+      />
+    );
+  }
 
   const surface = groundSurface(ground);
   const placeholder =
@@ -166,19 +214,29 @@ export default function CreateScreen() {
                   <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.photoChip}>
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Remove</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={choosePhoto} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
+                  <Pressable accessibilityRole="button" onPress={() => choosePhoto()} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
                     <CameraIcon size={15} color={ground.text} />
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Change</Text>
                   </Pressable>
                 </View>
               </View>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityState={{ busy: picking }} disabled={picking} onPress={choosePhoto} style={({ pressed }) => [styles.addPhoto, { borderColor: ground.muted, opacity: pressed ? 0.7 : 1 }]}>
-                <View style={[styles.addPhotoIcon, { backgroundColor: ground.text }]}>
-                  <CameraIcon size={24} color={ground.ground} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ busy: picking }}
+                disabled={picking}
+                onPress={() => choosePhoto()}
+                style={({ pressed }) => [styles.addRow, { borderColor: ground.line, opacity: pressed ? 0.7 : 1 }]}>
+                <View style={[styles.addRowIcon, { backgroundColor: ground.text }]}>
+                  <CameraIcon size={19} color={ground.ground} />
                 </View>
-                <Text style={[styles.addPhotoTitle, { color: ground.text }]}>{picking ? 'Opening your photos…' : 'Add a photo'}</Text>
-                <Text style={[styles.hint, { color: ground.muted }]}>From your camera roll. Video comes later.</Text>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={[styles.choiceTitle, { color: ground.text }]}>{picking ? 'Opening your photos…' : 'Add a photo'}</Text>
+                  <Text style={[styles.choiceSub, { color: ground.muted }]}>From your camera roll</Text>
+                </View>
+                <View style={{ transform: [{ rotate: '180deg' }] }}>
+                  <ChevronLeftIcon size={18} color={ground.muted} />
+                </View>
               </Pressable>
             )
           ) : null}
@@ -301,6 +359,80 @@ function Check({ on, color, empty }: { on: boolean; color: string; empty: string
   );
 }
 
+/**
+ * Step one, Instagram-style (founder's option 1, lighter version): the photo
+ * big at the top, Next to write the caption. The phone's own picker opens as
+ * the tab opens; Camera roll reopens it, the camera button takes a new one.
+ */
+function PhotoStep({ photo, picking, onPick, onNext, onText, onClose }: { photo: PickedPhoto | null; picking: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const ground = useAppGround();
+  const { width, height } = useWindowDimensions();
+  const w = Math.min(width, 640);
+  // Square-ish, like the feed (between 4:5 and 5:4), but never more than about half the screen.
+  const ratio = photo ? Math.min(1.25, Math.max(0.8, photo.height / photo.width)) : 1;
+  const previewH = Math.min(w * ratio, height * 0.56);
+  const ready = !!photo && !picking;
+
+  return (
+    <SurfaceProvider value={groundSurface(ground)}>
+      <View style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
+        <View style={[styles.stepBar, { width: w }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.stepIcon}>
+            <CloseIcon color={ground.text} />
+          </Pressable>
+          <DisplayText size={24} color={ground.text}>New post</DisplayText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !ready }}
+            disabled={!ready}
+            onPress={onNext}
+            style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.8 : 1) : 0.3 }]}>
+            <Text style={[styles.shareText, { color: ground.ground }]}>Next</Text>
+          </Pressable>
+        </View>
+
+        {photo ? (
+          <Animated.View key={photo.uri} entering={FadeIn.duration(220).reduceMotion(ReduceMotion.System)}>
+            <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={{ width: w, height: previewH, backgroundColor: LOADING_TINT }} />
+          </Animated.View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy: picking }}
+            disabled={picking}
+            onPress={() => onPick()}
+            style={[styles.emptyPreview, { width: w, height: previewH, backgroundColor: ground.line }]}>
+            <Text style={[styles.emptyTitle, { color: ground.text }]}>{picking ? 'Opening your photos…' : 'Pick a photo'}</Text>
+            {picking ? null : <Text style={[styles.choiceSub, { color: ground.muted }]}>Tap here, or take one with the camera.</Text>}
+          </Pressable>
+        )}
+
+        <View style={[styles.stepRow, { width: w }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Choose from your camera roll" disabled={picking} onPress={() => onPick()} style={styles.rollButton}>
+            <Text style={[styles.rollText, { color: ground.text }]}>Camera roll</Text>
+            <View style={{ transform: [{ rotate: '-90deg' }] }}>
+              <ChevronLeftIcon size={16} color={ground.text} />
+            </View>
+          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable accessibilityRole="button" onPress={onText} style={({ pressed }) => [styles.textChip, { borderColor: ground.line, opacity: pressed ? 0.7 : 1 }]}>
+              <TextIcon color={ground.text} />
+              <Text style={[styles.photoChipText, { color: ground.text }]}>Just text</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Take a photo" disabled={picking} onPress={() => onPick('camera')} style={({ pressed }) => [styles.camButton, { backgroundColor: ground.text, opacity: pressed ? 0.8 : 1 }]}>
+              <CameraIcon size={17} color={ground.ground} />
+            </Pressable>
+          </View>
+        </View>
+        <Text style={[styles.hint, { color: ground.muted, marginTop: 8, paddingHorizontal: 32 }]}>
+          {photo ? 'Happy with it? Tap Next to write about it.' : 'Just words or a question? Tap Just text.'}
+        </Text>
+      </View>
+    </SurfaceProvider>
+  );
+}
+
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 /**
@@ -418,9 +550,18 @@ const styles = StyleSheet.create({
   photoButtons: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 8 },
   photoChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   photoChipText: { fontSize: 13, fontWeight: '700' },
-  addPhoto: { marginHorizontal: 20, marginTop: 18, height: 220, borderRadius: 24, borderWidth: 1.5, borderStyle: 'dashed', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 },
-  addPhotoIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  addPhotoTitle: { fontFamily: fonts.display, fontSize: 24 },
+  addRow: { marginHorizontal: 20, marginTop: 14, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },
+  addRowIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  // Photo step
+  stepBar: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 6, paddingRight: 14, marginBottom: 6 },
+  stepIcon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  emptyPreview: { alignItems: 'center', justifyContent: 'center', gap: 6 },
+  emptyTitle: { fontFamily: fonts.displayItalic, fontSize: 34, lineHeight: 38 },
+  stepRow: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
+  rollButton: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
+  rollText: { fontSize: 15, fontWeight: '700' },
+  textChip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 19, borderWidth: 1, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  camButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   caption: { marginHorizontal: 20, marginTop: 18, minHeight: 90, fontSize: 28, lineHeight: 32, paddingVertical: 4, textAlignVertical: 'top' },
   rows: { marginHorizontal: 20, marginTop: 12, borderTopWidth: 1 },
   row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },

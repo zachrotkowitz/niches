@@ -36,7 +36,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Niches uses your photos so you can share what you made."
+          "photosPermission": "Niches uses your photos so you can share what you made.",
+          "cameraPermission": "Niches uses your camera so you can take a photo of what you made."
         }
       ]
     ],

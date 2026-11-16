@@ -5,7 +5,7 @@ import type { Tabs } from 'expo-router/js-tabs';
 
 import { BookmarkIcon, HomeIcon, PersonIcon, PlusIcon, SearchIcon } from '@/components/icons';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
-import { emitTabReselect } from '@/lib/tab-events';
+import { emitTabReselect, useTabBarHidden } from '@/lib/tab-events';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -26,6 +26,7 @@ export function FloatingTabBar({ state, navigateToTab }: TabBarProps) {
   const ground = useAppGround();
   const onHome = state.routes[state.index]?.name === 'index';
   const ink = onHome ? niche.ink : ground.text;
+  if (useTabBarHidden()) return null;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) + 6 }]}>

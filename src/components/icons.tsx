@@ -241,3 +241,20 @@ export function PencilIcon({ size = 17, color = '#14161A', strokeWidth = 1.9 }: 
     </Svg>
   );
 }
+
+export function CloseIcon({ size = 22, color = '#14161A', strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M6 6l12 12M18 6L6 18" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/** A "T", for text-only posts. */
+export function TextIcon({ size = 15, color = '#14161A', strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M5 6h14M12 6v13M9 19h6" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
