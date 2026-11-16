@@ -76,7 +76,8 @@ export default function DiscoverNicheScreen() {
   }
 
   const label = niche?.label;
-  const heading = favorites.lately ? 'Saved most lately' : 'Saved most this week';
+  // "Favorites" (founder, Nov 2026): the niche's most-saved posts this week live here on Discover, not on Home.
+  const heading = favorites.lately ? 'Favorites lately' : 'This week’s favorites';
 
   return (
     <SurfaceProvider value={surface}>
@@ -126,7 +127,7 @@ export default function DiscoverNicheScreen() {
           </View>
         ) : null}
 
-        <EndNote title={niche ? `That’s this week in ${niche.label}.` : 'That’s this week’s favorites.'} body={niche ? undefined : 'New picks every Monday.'}>
+        <EndNote title={niche ? `That’s this week’s ${niche.label} favorites.` : 'That’s this week’s favorites.'} body="New picks every Monday.">
           {niche ? (
             <Pressable
               accessibilityRole="link"
