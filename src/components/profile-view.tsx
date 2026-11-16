@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/text';
 
@@ -8,7 +8,7 @@ import { Badges, MembershipCard } from '@/components/creator';
 import { DiaryRow, TopFour } from '@/components/diary';
 import { BoardCard, useCardWidth } from '@/components/boards';
 import { CoverCollage } from '@/components/cover';
-import { PhotoViewer } from '@/components/photo-viewer';
+import { PhotoViewer, type PhotoOrigin } from '@/components/photo-viewer';
 import { GoalCard } from '@/components/goals';
 import { Sheet } from '@/components/sheet';
 import { CheckIcon, LockIcon, PencilIcon, PlusIcon } from '@/components/icons';
@@ -37,7 +37,9 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
   const niches = useNiches();
   const [tab, setTab] = useState<Tab>('all');
   const [editing, setEditing] = useState(false);
-  const [viewingPhoto, setViewingPhoto] = useState(false);
+  // Where the small picture is, so the enlarged one can glide out of it.
+  const [photoOrigin, setPhotoOrigin] = useState<PhotoOrigin | null>(null);
+  const avatarRef = useRef<ComponentRef<typeof View>>(null);
   const cover = coverFor(user, state.posts);
 
   const posts = state.posts
@@ -87,9 +89,10 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
       <View style={styles.head}>
         <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>
           <Pressable
+            ref={avatarRef}
             accessibilityRole="imagebutton"
             accessibilityLabel={`View ${user.displayName}’s profile photo`}
-            onPress={() => setViewingPhoto(true)}
+            onPress={() => avatarRef.current?.measureInWindow((x, y, w) => setPhotoOrigin({ x: x + 4, y: y + 4, size: w - 8 }))}
             style={({ pressed }) => [styles.avatarRing, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
             <Avatar user={user} size={84} />
           </Pressable>
@@ -140,12 +143,12 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
 
       <PhotoViewer
         user={user}
-        visible={viewingPhoto}
-        onClose={() => setViewingPhoto(false)}
+        origin={photoOrigin}
+        onClose={() => setPhotoOrigin(null)}
         onChange={
           isMe
             ? async () => {
-                setViewingPhoto(false);
+                setPhotoOrigin(null);
                 const picked = await pickPhoto([1, 1]);
                 if (picked) actions.setAvatar(picked.uri);
               }

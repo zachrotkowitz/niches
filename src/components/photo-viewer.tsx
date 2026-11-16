@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { Avatar } from '@/components/primitives';
 import { Text } from '@/components/text';
@@ -8,50 +10,85 @@ import { useAppGround } from '@/lib/store';
 import { fonts, TOUCH } from '@/lib/theme';
 import type { User } from '@/lib/types';
 
+/** Where the small profile picture sits on screen, so the big one can grow out of it. */
+export type PhotoOrigin = { x: number; y: number; size: number };
+
+const MOVE = { duration: 320, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System };
+
 /**
- * Tap someone's profile picture to see it up close: a large circle on the app
- * background, with their name. Tap anywhere (or Close) to go back. On your own
- * profile there's also "Change photo".
+ * Tap someone's profile picture to see it up close. The circle glides from
+ * where it was to the middle of the screen and grows, on the cream app
+ * background; nothing bounces or zooms in from nowhere (founder, Nov 2026).
+ * Tap anywhere or Close and it glides back.
  */
-export function PhotoViewer({ user, visible, onClose, onChange }: { user: User; visible: boolean; onClose: () => void; onChange?: () => void }) {
+export function PhotoViewer({ user, origin, onClose, onChange }: { user: User; origin: PhotoOrigin | null; onClose: () => void; onChange?: () => void }) {
   const ground = useAppGround();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const size = Math.min(width - 64, height * 0.5, 420);
+  // Where the big circle rests: centered, a little above the middle to leave room for the name.
+  const restX = (width - size) / 2;
+  const restY = Math.max(insets.top + 60, (height - size) / 2 - 60);
+  const t = useSharedValue(0);
+  const visible = !!origin;
+
+  useEffect(() => {
+    if (visible) t.set(withTiming(1, MOVE));
+  }, [visible, t]);
+
+  const from = origin ?? { x: restX, y: restY, size };
+  const close = () => {
+    t.set(withTiming(0, { ...MOVE, duration: 260 }, (done) => done && scheduleOnRN(onClose)));
+  };
+
+  const circle = useAnimatedStyle(() => {
+    const p = t.get();
+    const s = from.size / size + (1 - from.size / size) * p;
+    // Move the circle's center from the small picture's center to the resting spot.
+    const dx = (from.x + from.size / 2 - (restX + size / 2)) * (1 - p);
+    const dy = (from.y + from.size / 2 - (restY + size / 2)) * (1 - p);
+    return { transform: [{ translateX: dx }, { translateY: dy }, { scale: s }] };
+  });
+  const backdrop = useAnimatedStyle(() => ({ opacity: Math.min(1, t.get() * 1.6) }));
+  const details = useAnimatedStyle(() => ({ opacity: Math.max(0, (t.get() - 0.6) / 0.4) }));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Animated.View entering={FadeIn.duration(160)} style={[StyleSheet.absoluteFill, { backgroundColor: ground.ground }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close photo" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View pointerEvents="box-none" style={[styles.top, { paddingTop: insets.top + 8 }]}>
-          <Pressable accessibilityRole="button" onPress={onClose} hitSlop={8} style={styles.close}>
-            <Text style={[styles.closeText, { color: ground.text }]}>Close</Text>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: ground.ground }, backdrop]} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close photo" onPress={close} style={StyleSheet.absoluteFill} />
+
+      <Animated.View pointerEvents="none" style={[styles.circle, { left: restX, top: restY, width: size, height: size }, circle]}>
+        <View accessibilityRole="image" accessibilityLabel={`${user.displayName}’s profile photo`}>
+          <Avatar user={user} size={size} />
+        </View>
+      </Animated.View>
+
+      <Animated.View pointerEvents="box-none" style={[styles.details, { top: restY + size + 24 }, details]}>
+        <Text style={[styles.name, { color: ground.text }]}>{user.displayName}</Text>
+        <Text style={[styles.handle, { color: ground.muted }]}>{user.username}</Text>
+        {onChange ? (
+          <Pressable accessibilityRole="button" onPress={onChange} hitSlop={6} style={styles.change}>
+            <Text style={[styles.changeText, { color: ground.text }]}>{user.avatarUri ? 'Change photo' : 'Add a photo'}</Text>
           </Pressable>
-        </View>
-        <View pointerEvents="box-none" style={styles.center}>
-          <Animated.View entering={ZoomIn.springify().damping(18).stiffness(180)} accessibilityRole="image" accessibilityLabel={`${user.displayName}’s profile photo`} style={styles.shadow}>
-            <Avatar user={user} size={size} />
-          </Animated.View>
-          <Text style={[styles.name, { color: ground.text }]}>{user.displayName}</Text>
-          <Text style={[styles.handle, { color: ground.muted }]}>{user.username}</Text>
-          {onChange ? (
-            <Pressable accessibilityRole="button" onPress={onChange} hitSlop={6} style={styles.change}>
-              <Text style={[styles.changeText, { color: ground.text }]}>{user.avatarUri ? 'Change photo' : 'Add a photo'}</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        ) : null}
+      </Animated.View>
+
+      <Animated.View pointerEvents="box-none" style={[styles.top, { paddingTop: insets.top + 8 }, details]}>
+        <Pressable accessibilityRole="button" onPress={close} hitSlop={8} style={styles.close}>
+          <Text style={[styles.closeText, { color: ground.text }]}>Close</Text>
+        </Pressable>
       </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16 },
+  circle: { position: 'absolute' },
+  details: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  top: { position: 'absolute', top: 0, right: 0, paddingHorizontal: 16 },
   close: { minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 4 },
   closeText: { fontSize: 16, fontWeight: '700' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  shadow: { borderRadius: 999, shadowColor: '#1F1A14', shadowOpacity: 0.18, shadowRadius: 30, shadowOffset: { width: 0, height: 16 }, elevation: 12 },
-  name: { fontFamily: fonts.display, fontSize: 38, lineHeight: 42, marginTop: 24 },
+  name: { fontFamily: fonts.display, fontSize: 38, lineHeight: 42 },
   handle: { fontSize: 15, marginTop: 2 },
   change: { minHeight: TOUCH, justifyContent: 'center', marginTop: 8 },
   changeText: { fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
