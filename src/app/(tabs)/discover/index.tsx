@@ -1,7 +1,8 @@
 import { useIsFocused, useRouter } from 'expo-router';
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EndNote, Eyebrow, NicheCard, PersonRow, RailTile, SearchBar, SectionTitle, ShopTile } from '@/components/discover-parts';
@@ -99,10 +100,25 @@ export default function DiscoverScreen() {
   // Tap Discover while on Discover: close any search and glide back to the top.
   useTabReselect('discover', () => {
     if (!focused) return;
-    if (mode !== 'browse') cancel();
     drop.hide();
-    scroll.current?.scrollTo({ y: 0, animated: true });
+    if (mode !== 'browse') leaveSearch();
+    else scroll.current?.scrollTo({ y: 0, animated: true });
   });
+
+  // Leaving a search from the tab bar looks like leaving a niche page: the
+  // search slides off to the right and Discover slides in under it
+  // (founder, Nov 2026). `leaving` keeps a copy of the search on top while it moves.
+  const [leaving, setLeaving] = useState<{ mode: Mode; text: string; query: string } | null>(null);
+  const slide = useSharedValue(1);
+  const leaveSearch = () => {
+    setLeaving({ mode, text, query });
+    cancel();
+    scroll.current?.scrollTo({ y: 0, animated: false });
+    slide.set(0);
+    slide.set(withTiming(1, { duration: 340, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }, (done) => done && scheduleOnRN(setLeaving, null)));
+  };
+  const topLayer = useAnimatedStyle(() => ({ transform: [{ translateX: slide.get() * width }] }));
+  const underLayer = useAnimatedStyle(() => ({ transform: [{ translateX: -(1 - slide.get()) * width * 0.3 }] }));
   const openSearch = () => {
     drop.hide();
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -113,7 +129,7 @@ export default function DiscoverScreen() {
   return (
     <SurfaceProvider value={surface}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Animated.ScrollView ref={scroll} onScroll={drop.onScroll} scrollEventThrottle={16} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <Animated.ScrollView ref={scroll} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, leaving ? underLayer : null]} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {/* The masthead hides while you search; the search bar stays the same element so it keeps focus. */}
           {searching ? null : (
             <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
@@ -242,12 +258,36 @@ export default function DiscoverScreen() {
         {searching ? null : (
           <DropInSearch drop={drop} placeholder="Search dishes, people, prints…" onPress={openSearch} />
         )}
+
+        {leaving ? (
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.leaving, { backgroundColor: ground.ground }, topLayer]}>
+            <View style={{ paddingTop: insets.top + 10 }}>
+              <View style={[styles.searchRow, { paddingLeft: leaving.mode === 'results' ? 8 : 20 }]}>
+                {leaving.mode === 'results' ? (
+                  <View style={styles.backBtn}>
+                    <ChevronLeftIcon size={22} color={ground.text} />
+                  </View>
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <SearchBar compact={leaving.mode === 'results'} focused={leaving.mode === 'typing'} value={leaving.text} editable={false} placeholder="Search dishes, people, prints…" />
+                </View>
+                {leaving.mode === 'typing' ? (
+                  <View style={styles.cancel}>
+                    <Text style={[styles.cancelText, { color: ground.text }]}>Cancel</Text>
+                  </View>
+                ) : null}
+              </View>
+              {leaving.mode === 'typing' ? <SearchSuggestions q={normalize(leaving.text)} onPick={() => {}} /> : <SearchResults q={leaving.query} onSearch={() => {}} />}
+            </View>
+          </Animated.View>
+        ) : null}
       </KeyboardAvoidingView>
     </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  leaving: { overflow: 'hidden', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: -4, height: 0 }, elevation: 8 },
   screen: { flex: 1, backgroundColor: 'transparent' },
   masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20, marginTop: 14 },
