@@ -164,6 +164,9 @@ export default function CreateScreen() {
           setPhoto(null);
           setStep('write');
         }}
+        // Once you've written something, the corner button goes back to it instead of throwing it away.
+        hasDraft={caption.trim().length > 0}
+        onBack={() => setStep('write')}
         onClose={() => {
           reset();
           router.navigate('/');
@@ -197,7 +200,11 @@ export default function CreateScreen() {
               label="Post type"
               inset={10}
               value={kind}
-              onChange={(k) => setKind(k as Kind)}
+              onChange={(k) => {
+                // Coming back to Photo shows the same big photo screen you started on (founder, Nov 2026).
+                if (k === 'post' && kind !== 'post') setStep('photo');
+                setKind(k as Kind);
+              }}
               items={[
                 { key: 'post', label: 'Photo' },
                 { key: 'progress', label: 'Progress' },
@@ -364,7 +371,7 @@ function Check({ on, color, empty }: { on: boolean; color: string; empty: string
  * big at the top, Next to write the caption. The phone's own picker opens as
  * the tab opens; Camera roll reopens it, the camera button takes a new one.
  */
-function PhotoStep({ photo, picking, onPick, onNext, onText, onClose }: { photo: PickedPhoto | null; picking: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onClose: () => void }) {
+function PhotoStep({ photo, picking, hasDraft, onPick, onNext, onText, onBack, onClose }: { photo: PickedPhoto | null; picking: boolean; hasDraft: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onBack: () => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const ground = useAppGround();
   const { width, height } = useWindowDimensions();
@@ -378,9 +385,15 @@ function PhotoStep({ photo, picking, onPick, onNext, onText, onClose }: { photo:
     <SurfaceProvider value={groundSurface(ground)}>
       <View style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
         <View style={[styles.stepBar, { width: w }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.stepIcon}>
-            <CloseIcon color={ground.text} />
-          </Pressable>
+          {hasDraft ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Back to your post" onPress={onBack} style={styles.stepIcon}>
+              <ChevronLeftIcon color={ground.text} />
+            </Pressable>
+          ) : (
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.stepIcon}>
+              <CloseIcon color={ground.text} />
+            </Pressable>
+          )}
           <DisplayText size={24} color={ground.text}>New post</DisplayText>
           <Pressable
             accessibilityRole="button"
