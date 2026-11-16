@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, type ComponentRef, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import Animated, { useAnimatedScrollHandler, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
@@ -74,8 +75,24 @@ function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>
   const onScroll = useAnimatedScrollHandler((e) => {
     scroll.set(e.contentOffset.y);
   });
+  // Pull down at the top to refresh, like Instagram (founder, Nov 2026). The
+  // whole page, header included, slides down to show the spinner above it.
+  // In the demo everything is on this phone, so it just re-reads the feed.
+  const niche = useNiches()[nicheId];
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeout(() => setRefreshing(false), 900);
+  };
   return (
-    <Animated.ScrollView ref={ref} style={{ flex: 1 }} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
+    <Animated.ScrollView
+      ref={ref}
+      style={{ flex: 1 }}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={niche.ink} colors={[niche.ink]} progressBackgroundColor="#FFFFFF" progressViewOffset={top} />}
+      contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
       {children}
     </Animated.ScrollView>
   );
