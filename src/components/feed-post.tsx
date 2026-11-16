@@ -13,7 +13,7 @@ import { useSavePost } from '@/components/save';
 import { ShopThisBar } from '@/components/shop';
 import { Text } from '@/components/text';
 import { postAspect } from '@/lib/demo-photos';
-import { timeAgo } from '@/lib/format';
+import { shortTitle, timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { fonts, TOUCH } from '@/lib/theme';
 import type { Post } from '@/lib/types';
@@ -50,6 +50,7 @@ export function FeedPost({ post }: { post: Post }) {
     if (isMine) router.navigate('/profile');
     else router.push({ pathname: '/user/[id]', params: { id: post.authorId } });
   };
+  const { title, body } = titleAndBody(post);
   const meta = [timeAgo(post.createdAt), post.editedAt ? 'edited' : '', post.progressLabel ?? '', post.premium ? 'Members only' : ''].filter(Boolean).join(' · ');
   // Only the author sees numbers.
   const mine = isMine ? [post.hideCheers ? '' : `${stats.cheers} ${stats.cheers === 1 ? 'like' : 'likes'}`, `${stats.saves} ${stats.saves === 1 ? 'save' : 'saves'}`].filter(Boolean).join(' · ') : '';
@@ -145,8 +146,12 @@ export function FeedPost({ post }: { post: Post }) {
 
       <View style={styles.below}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} style={styles.text}>
-          {post.mediaLabel ? <Text style={[styles.title, { color: niche.ink }]} numberOfLines={2}>{post.mediaLabel}</Text> : null}
-          <Text style={[styles.caption, { color: niche.ink }]} numberOfLines={2}>{post.caption}</Text>
+          {title ? (
+            <Text style={[styles.title, title.length > 38 ? styles.titleLong : null, { color: niche.ink }]} numberOfLines={3}>
+              {title}
+            </Text>
+          ) : null}
+          {body ? <Text style={[styles.caption, { color: niche.ink }]} numberOfLines={2}>{body}</Text> : null}
           {mine ? <Text style={[styles.mine, { color: niche.inkSoft }]}>{mine}</Text> : null}
         </Pressable>
         {buttons}
@@ -155,6 +160,23 @@ export function FeedPost({ post }: { post: Post }) {
       <PostMenu post={post} visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
+}
+
+/**
+ * The serif title and the caption under it. Older posts stored a title that
+ * was cut mid-word ("homemade buffal"); those get a fresh title from the
+ * caption, ending at a word. When the caption only repeats the title, it's
+ * left out so the same words don't show twice.
+ */
+function titleAndBody(post: Post): { title: string; body: string } {
+  const caption = post.caption.trim();
+  let title = (post.previewTitle || post.mediaLabel || '').trim();
+  const cutMidWord = !!title && caption.startsWith(title) && caption.length > title.length && /[\p{L}\p{N}]/u.test(caption[title.length]);
+  if (cutMidWord) title = shortTitle(caption, 80);
+  if (!title) return { title: '', body: caption };
+  const bare = title.replace(/[.!?…]+$/, '');
+  const body = caption.startsWith(bare) ? caption.slice(bare.length).replace(/^[\s.,;:!?…—-]+/, '') : caption;
+  return { title, body };
 }
 
 const styles = StyleSheet.create({
@@ -170,6 +192,8 @@ const styles = StyleSheet.create({
   below: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 20, paddingRight: 4, paddingTop: 10 },
   text: { flex: 1, minWidth: 0, paddingTop: 4, gap: 4 },
   title: { fontFamily: fonts.display, fontSize: 27, lineHeight: 29, letterSpacing: -0.3 },
+  /** Longer titles step down a size so they fit in two or three lines instead of being cut. */
+  titleLong: { fontSize: 23, lineHeight: 26 },
   caption: { fontSize: 14, lineHeight: 20 },
   mine: { fontSize: 13, fontWeight: '600' },
   buttons: { flexDirection: 'row', alignItems: 'center' },
