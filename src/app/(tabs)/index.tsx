@@ -108,7 +108,9 @@ function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>
     </Animated.ScrollView>
     {ios ? (
       <Animated.View pointerEvents="none" style={[styles.pullSpinner, { top: top + 10 }, spinner]}>
-        <ActivityIndicator color={niche.ink} />
+        <View style={styles.pullChip}>
+          <ActivityIndicator color={niche.ink} />
+        </View>
       </Animated.View>
     ) : null}
     </View>
@@ -206,6 +208,8 @@ function ComingSoon({ niche, scroll }: { niche: Niche; scroll: SharedValue<numbe
 
 const styles = StyleSheet.create({
   pullSpinner: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  // Same white circle as the refresh spinner on the other tabs.
+  pullChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#1F1A14', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
   screen: { flex: 1, overflow: 'hidden' },
   modeRow: { flexDirection: 'row', paddingHorizontal: 12, borderBottomWidth: 1 },
   modeTab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2.5 },
