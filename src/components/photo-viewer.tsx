@@ -30,24 +30,37 @@ export function PhotoViewer({ user, origin, onClose, onChange }: { user: User; o
   const restX = (width - size) / 2;
   const restY = Math.max(insets.top + 60, (height - size) / 2 - 60);
   const t = useSharedValue(0);
+  // The small picture's position lives in shared values, set once before the
+  // animation starts. Reading it from props instead let a re-render mid-way
+  // (or the reset when closing) snap the circle to full size for a frame.
+  const fx = useSharedValue(0);
+  const fy = useSharedValue(0);
+  const fs = useSharedValue(size);
   const visible = !!origin;
 
   useEffect(() => {
-    if (visible) t.set(withTiming(1, MOVE));
-  }, [visible, t]);
+    if (!origin) return;
+    fx.set(origin.x);
+    fy.set(origin.y);
+    fs.set(origin.size);
+    t.set(0);
+    t.set(withTiming(1, MOVE));
+    // Only when it opens; later re-renders must not restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
-  const from = origin ?? { x: restX, y: restY, size };
   const close = () => {
     t.set(withTiming(0, { ...MOVE, duration: 260 }, (done) => done && scheduleOnRN(onClose)));
   };
 
   const circle = useAnimatedStyle(() => {
     const p = t.get();
-    const s = from.size / size + (1 - from.size / size) * p;
+    const start = fs.get() / size;
+    const s = start + (1 - start) * p;
     // Move the circle's center from the small picture's center to the resting spot.
-    const dx = (from.x + from.size / 2 - (restX + size / 2)) * (1 - p);
-    const dy = (from.y + from.size / 2 - (restY + size / 2)) * (1 - p);
-    return { transform: [{ translateX: dx }, { translateY: dy }, { scale: s }] };
+    const dx = (fx.get() + fs.get() / 2 - (restX + size / 2)) * (1 - p);
+    const dy = (fy.get() + fs.get() / 2 - (restY + size / 2)) * (1 - p);
+    return { opacity: p > 0 ? 1 : 0, transform: [{ translateX: dx }, { translateY: dy }, { scale: s }] };
   });
   const backdrop = useAnimatedStyle(() => ({ opacity: Math.min(1, t.get() * 1.6) }));
   const details = useAnimatedStyle(() => ({ opacity: Math.max(0, (t.get() - 0.6) / 0.4) }));
