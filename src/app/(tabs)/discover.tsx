@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import Animated, { Easing, ReduceMotion, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EndNote, Eyebrow, NicheCard, PersonRow, RailTile, SearchBar, SectionTitle, ShopTile } from '@/components/discover-parts';
 import { SearchResults, SearchSuggestions } from '@/components/discover-search';
-import { ChevronLeftIcon } from '@/components/icons';
+import { ChevronLeftIcon, SearchIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
@@ -13,7 +15,7 @@ import { normalize, weekFavorites, weekOfLabel } from '@/lib/discover';
 import { postPhoto } from '@/lib/demo-photos';
 import { SEED_USERS } from '@/lib/seed';
 import { inFeeds, postStats, useAppGround, useNiches, useStore } from '@/lib/store';
-import { groundSurface, NICHE_ORDER, TOUCH } from '@/lib/theme';
+import { fonts, groundSurface, NICHE_ORDER, TOUCH } from '@/lib/theme';
 
 type Mode = 'browse' | 'typing' | 'results';
 
@@ -32,7 +34,7 @@ export default function DiscoverScreen() {
   const ground = useAppGround();
   const surface = groundSurface(ground);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
-  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scroll = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   const [mode, setMode] = useState<Mode>('browse');
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
@@ -90,10 +92,42 @@ export default function DiscoverScreen() {
 
   const searching = mode !== 'browse';
 
+  // A search bar that drops in from the top when you scroll back up a little,
+  // once the real one has scrolled out of sight (founder, Nov 2026). Scrolling
+  // down tucks it away again, so it never covers what you're looking at.
+  const lastY = useSharedValue(0);
+  const target = useSharedValue(0);
+  const shown = useSharedValue(0);
+  const [stickyOn, setStickyOn] = useState(false);
+  const hideAfter = insets.top + 150;
+  const onScroll = useAnimatedScrollHandler((e) => {
+    const y = e.contentOffset.y;
+    const dy = y - lastY.get();
+    lastY.set(y);
+    let next = target.get();
+    if (y < hideAfter) next = 0;
+    else if (dy < -6) next = 1;
+    else if (dy > 6) next = 0;
+    if (next !== target.get()) {
+      target.set(next);
+      shown.set(withTiming(next, { duration: 220, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }));
+      scheduleOnRN(setStickyOn, next === 1);
+    }
+  });
+  const stickyStyle = useAnimatedStyle(() => ({ opacity: shown.get(), transform: [{ translateY: (shown.get() - 1) * 24 }] }));
+  const openSearch = () => {
+    target.set(0);
+    shown.set(0);
+    setStickyOn(false);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+    setMode('typing');
+    setTimeout(() => input.current?.focus(), 50);
+  };
+
   return (
     <SurfaceProvider value={surface}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView ref={scroll} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <Animated.ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={16} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {/* The masthead hides while you search; the search bar stays the same element so it keeps focus. */}
           {searching ? null : (
             <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
@@ -217,7 +251,16 @@ export default function DiscoverScreen() {
               </View>
             </>
           )}
-        </ScrollView>
+        </Animated.ScrollView>
+
+        {searching ? null : (
+          <Animated.View pointerEvents={stickyOn ? 'auto' : 'none'} style={[styles.sticky, { paddingTop: insets.top + 6, backgroundColor: ground.ground, borderBottomColor: ground.line }, stickyStyle]}>
+            <Pressable accessibilityRole="search" accessibilityLabel="Search Niches" onPress={openSearch} style={({ pressed }) => [styles.stickyBar, { opacity: pressed ? 0.85 : 1 }]}>
+              <SearchIcon size={18} color={ground.text} />
+              <Text style={[styles.stickyText, { color: ground.muted }]} numberOfLines={1}>Search dishes, people, prints…</Text>
+            </Pressable>
+          </Animated.View>
+        )}
       </KeyboardAvoidingView>
     </SurfaceProvider>
   );
@@ -225,6 +268,9 @@ export default function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: 'transparent' },
+  sticky: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  stickyBar: { height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(31,26,20,0.10)', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
+  stickyText: { flex: 1, fontFamily: fonts.displayItalic, fontSize: 19 },
   masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20, marginTop: 14 },
   backBtn: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
