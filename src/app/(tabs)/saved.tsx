@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BoardCard, NewBoardCard, useCardWidth } from '@/components/boards';
-import { EndNote, Eyebrow, RailTile, SectionTitle, ShopTile } from '@/components/discover-parts';
+import { Eyebrow, RailTile, SectionTitle, ShopTile } from '@/components/discover-parts';
 import { FeedGrid } from '@/components/feed-grid';
 import { NicheFilter } from '@/components/niche-filter';
 import { Button, DisplayText } from '@/components/primitives';
@@ -131,7 +131,6 @@ export default function SavedScreen() {
               </View>
             ) : null}
 
-            <EndNote title="That’s everything you’ve saved." body="Collections are private unless you put one on your profile." />
           </>
         )}
 

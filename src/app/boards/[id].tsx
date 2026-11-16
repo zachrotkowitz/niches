@@ -122,7 +122,7 @@ export default function BoardScreen() {
           </View>
         )}
 
-        {shown.length ? <EndNote title={all ? 'That’s everything you’ve saved.' : `That’s everything on ${name}.`} /> : null}
+        {shown.length && !all ? <EndNote title={`That’s everything on ${name}.`} /> : null}
       </ScrollView>
 
       {board && isMine ? (
