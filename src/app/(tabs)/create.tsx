@@ -1,29 +1,47 @@
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from '@/components/text';
+import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CalendarIcon, CameraIcon, CheckIcon } from '@/components/icons';
-import { Button, DisplayText } from '@/components/primitives';
-import { goalRule, weekNumber } from '@/lib/goals';
-import { useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
+import { Eyebrow } from '@/components/discover-parts';
+import { CameraIcon, CheckIcon, LockIcon } from '@/components/icons';
+import { DisplayText } from '@/components/primitives';
+import { SurfaceProvider } from '@/components/surface';
+import { TAB_BAR_SPACE } from '@/components/tab-bar';
+import { Text } from '@/components/text';
+import { UnderlineTabs } from '@/components/underline-tabs';
+import { postPhoto } from '@/lib/demo-photos';
+import { diaryWords } from '@/lib/diary';
 import { shortTitle } from '@/lib/format';
+import { goalRule, weekNumber, weekStrip } from '@/lib/goals';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
-import type { PostKind } from '@/lib/types';
+import { isoDay } from '@/lib/plans';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { BODY_FONTS, fonts, groundSurface, NICHE_ORDER, TOUCH, type Niche, type NicheId } from '@/lib/theme';
+import type { Post, PostKind } from '@/lib/types';
 
 type Kind = 'post' | 'progress' | 'question';
 
 // Shown behind a photo while it loads.
 const LOADING_TINT = '#E3E5E1';
 
+/** What was just shared, for the "Shared with Cooking." screen. */
+type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLabel?: string; membersOnly: boolean };
+
+/**
+ * The Post tab (founder, Nov 2026): option A "Studio" for writing a post (the
+ * cream look of Discover and Saved, a big serif caption, quiet tabs, plain
+ * rows) and option C's celebration once it's shared, in the niche's color.
+ */
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, actions } = useStore();
   const NICHES = useNiches();
+  const ground = useAppGround();
   const params = useLocalSearchParams<{ goalId?: string }>();
   const [kind, setKind] = useState<Kind>('post');
   const [caption, setCaption] = useState('');
@@ -32,6 +50,11 @@ export default function CreateScreen() {
   const [goalId, setGoalId] = useState<string | null>(null);
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
+  const [posted, setPosted] = useState<Posted | null>(null);
+  const [membersOnly, setMembersOnly] = useState(false);
+  // Post to the niche you're in, if it's open for posting.
+  const [nicheId, setNicheId] = useState<NicheId>(NICHES[state.niche].open ? state.niche : 'cooking');
+
   const choosePhoto = async () => {
     setPicking(true);
     try {
@@ -41,14 +64,11 @@ export default function CreateScreen() {
       setPicking(false);
     }
   };
-  // Post to the niche you're in, if it's open for posting; tap another chip to change.
-  const [nicheId, setNicheId] = useState<NicheId>(NICHES[state.niche].open ? state.niche : 'cooking');
-  const [postedId, setPostedId] = useState<string | null>(null);
-  const [membersOnly, setMembersOnly] = useState(false);
 
   // The Post tab stays open in the background, so follow the niche you switch to on Home.
   useEffect(() => {
-    if (NICHES[state.niche].open) setNicheId(state.niche);
+    if (NICHES[state.niche].open && !posted) setNicheId(state.niche);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.niche, NICHES]);
   // Opening from a goal's "Progress post" button preselects it (and its niche).
   useEffect(() => {
@@ -59,6 +79,7 @@ export default function CreateScreen() {
     setGoalId(params.goalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.goalId]);
+
   const niche = NICHES[nicheId];
   const needsPhoto = kind !== 'question';
   const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
@@ -69,6 +90,7 @@ export default function CreateScreen() {
   const share = () => {
     if (!ready || !state.me) return;
     const postKind: PostKind = kind === 'question' || !photo ? 'text' : 'photo';
+    const premium = membersOnly && !!state.me.membership;
     const id = actions.createPost({
       authorId: state.me.id,
       niche: nicheId,
@@ -81,10 +103,12 @@ export default function CreateScreen() {
       // Progress labels say "week 4", never the numbers: those stay private on the goal.
       progressLabel: kind === 'progress' ? (pickedGoal ? `${pickedGoal.title}, week ${weekNumber(pickedGoal)}` : goal.trim()) : undefined,
       goalId: kind === 'progress' && pickedGoal ? pickedGoal.id : undefined,
-      premium: membersOnly && !!state.me.membership ? true : undefined,
+      premium: premium ? true : undefined,
     });
     actions.setNiche(nicheId);
-    setPostedId(id);
+    // A soft tap to say it went through (founder, Nov 2026).
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+    setPosted({ id, kind, niche: nicheId, goalId: kind === 'progress' ? pickedGoal?.id : undefined, goalLabel: kind === 'progress' && !pickedGoal ? goal.trim() : undefined, membersOnly: premium });
   };
 
   const reset = () => {
@@ -92,203 +116,348 @@ export default function CreateScreen() {
     setGoal('');
     setGoalId(null);
     setPhoto(null);
-    setPostedId(null);
+    setPosted(null);
+    setMembersOnly(false);
+    setKind('post');
     if (params.goalId) router.setParams({ goalId: undefined });
   };
 
-  if (postedId) {
-    return (
-      <View style={[styles.done, { backgroundColor: niche.field, paddingTop: insets.top }]}>
-        <View style={[styles.doneCheck, { backgroundColor: niche.accent }]}>
-          <CheckIcon size={30} />
-        </View>
-        <DisplayText size={34} color={niche.ink}>{kind === 'progress' ? 'Progress shared' : `Posted to ${niche.label}`}</DisplayText>
-        <Text style={[styles.doneBody, { color: niche.inkSoft }]}>It’s at the top of the {niche.label} feed now, newest first.</Text>
-        <Button label="See your post" color={niche.accent} onPress={() => { const id = postedId; reset(); router.push({ pathname: '/post/[id]', params: { id } }); }} />
-        <Button label="Back to the feed" tone="inverse" color={niche.ink} onPress={() => { reset(); router.navigate('/'); }} />
-      </View>
-    );
-  }
+  if (posted) return <PostedScreen posted={posted} onDone={reset} />;
 
-  const kinds: { id: Kind; label: string }[] = [
-    { id: 'post', label: 'Post' },
-    { id: 'progress', label: 'Progress' },
-    { id: 'question', label: 'Question' },
-  ];
+  const surface = groundSurface(ground);
+  const placeholder =
+    kind === 'question' ? `Ask the ${niche.label} niche anything…` : kind === 'progress' ? 'How did it go?' : nicheId === 'photography' ? 'What did you shoot?' : 'What did you make?';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.nav, { paddingTop: insets.top + 6 }]}>
-        <Text style={styles.navTitle}>New post</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !ready }}
-          disabled={!ready}
-          onPress={share}
-          style={[styles.share, { backgroundColor: niche.accent, opacity: ready ? 1 : 0.45 }]}>
-          <Text style={styles.shareText}>Share</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView style={{ flex: 1, backgroundColor: 'transparent' }} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/plans/new', params: { niche: nicheId } })} style={[styles.planLink, { backgroundColor: niche.field }]}>
-          <CalendarIcon size={20} color={niche.ink} />
-          <Text style={[styles.planLinkText, { color: niche.ink }]}>Planning something instead? Make a plan</Text>
-        </Pressable>
-        <View accessibilityRole="radiogroup" accessibilityLabel="Post type" style={styles.segment}>
-          {kinds.map((k) => {
-            const selected = k.id === kind;
-            return (
-              <Pressable key={k.id} accessibilityRole="radio" accessibilityState={{ checked: selected }} onPress={() => setKind(k.id)} style={[styles.segmentOption, selected ? styles.segmentSelected : null]}>
-                <Text style={[styles.segmentText, { color: selected ? colors.text : colors.textMuted }]}>{k.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {needsPhoto ? (
-          photo ? (
-            <View style={{ gap: 8 }}>
-              <Image
-                source={{ uri: photo.uri }}
-                accessibilityLabel="Your photo"
-                contentFit="cover"
-                style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), height: undefined, backgroundColor: LOADING_TINT }]}
-              />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button tone="outline" label="Change photo" style={{ flex: 1 }} onPress={choosePhoto} />
-                <Button tone="ghost" label="Remove" onPress={() => setPhoto(null)} />
-              </View>
-            </View>
-          ) : (
-            <Pressable accessibilityRole="button" accessibilityState={{ busy: picking }} disabled={picking} onPress={choosePhoto} style={styles.picker}>
-              <CameraIcon color={colors.textBody} />
-              <Text style={styles.pickerTitle}>{picking ? 'Opening your photos…' : 'Add a photo'}</Text>
-              <Text style={styles.hint}>From your camera roll. Videos up to 90 seconds come next.</Text>
-            </Pressable>
-          )
-        ) : null}
-
-        {kind === 'progress' ? (
-          <View style={{ gap: 8 }}>
-            <Text style={styles.label}>Which goal is this progress toward?</Text>
-            {myGoals.map((g) => {
-              const on = g.id === goalId;
-              return (
-                <Pressable key={g.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setGoalId(g.id)} style={[styles.goalOption, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                  <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.goalTitle}>{g.title}</Text>
-                    <Text style={styles.goalSub}>{goalRule(g)} · counts as a check-in</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-            <Pressable accessibilityRole="radio" accessibilityState={{ checked: goalId === null }} onPress={() => setGoalId(null)} style={[styles.goalOption, goalId === null ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-              <View style={[styles.radio, goalId === null ? { borderColor: niche.accent } : null]}>{goalId === null ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-              <Text style={[styles.goalTitle, { flex: 1 }]}>{myGoals.length ? 'Something else' : 'Name what you’re working on'}</Text>
-            </Pressable>
-            {goalId === null ? (
-              <TextInput accessibilityLabel="Goal" value={goal} onChangeText={setGoal} placeholder="e.g. Fresh pasta, week 4" placeholderTextColor="#6B7178" maxLength={60} style={styles.input} selectionColor={niche.accent} />
-            ) : null}
-            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: nicheId } })} style={styles.newGoal}>
-              <Text style={[styles.newGoalText, { color: niche.accent }]}>+ Set a new goal</Text>
+    <SurfaceProvider value={surface}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
+          <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
+            <DisplayText size={42} color={ground.text}>New post</DisplayText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !ready }}
+              disabled={!ready}
+              onPress={share}
+              style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.8 : 1) : 0.3 }]}>
+              <Text style={[styles.shareText, { color: ground.ground }]}>Share</Text>
             </Pressable>
           </View>
-        ) : null}
 
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>{kind === 'question' ? 'Your question' : kind === 'progress' ? 'How did it go?' : 'Caption'}</Text>
+          <View style={{ marginTop: 6 }}>
+            <UnderlineTabs
+              label="Post type"
+              inset={10}
+              value={kind}
+              onChange={(k) => setKind(k as Kind)}
+              items={[
+                { key: 'post', label: 'Photo' },
+                { key: 'progress', label: 'Progress' },
+                { key: 'question', label: 'Question' },
+              ]}
+            />
+          </View>
+
+          {needsPhoto ? (
+            photo ? (
+              <View style={styles.photoCard}>
+                <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
+                <View style={styles.photoButtons}>
+                  <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.photoChip}>
+                    <Text style={[styles.photoChipText, { color: ground.text }]}>Remove</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={choosePhoto} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
+                    <CameraIcon size={15} color={ground.text} />
+                    <Text style={[styles.photoChipText, { color: ground.text }]}>Change</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable accessibilityRole="button" accessibilityState={{ busy: picking }} disabled={picking} onPress={choosePhoto} style={({ pressed }) => [styles.addPhoto, { borderColor: ground.muted, opacity: pressed ? 0.7 : 1 }]}>
+                <View style={[styles.addPhotoIcon, { backgroundColor: ground.text }]}>
+                  <CameraIcon size={24} color={ground.ground} />
+                </View>
+                <Text style={[styles.addPhotoTitle, { color: ground.text }]}>{picking ? 'Opening your photos…' : 'Add a photo'}</Text>
+                <Text style={[styles.hint, { color: ground.muted }]}>From your camera roll. Video comes later.</Text>
+              </Pressable>
+            )
+          ) : null}
+
+          {/* Type straight in, in the serif, like a headline. */}
           <TextInput
-            accessibilityLabel="Caption"
+            accessibilityLabel={kind === 'question' ? 'Your question' : 'Caption'}
             value={caption}
             onChangeText={setCaption}
             multiline
             maxLength={2000}
-            placeholder={kind === 'question' ? `Ask the ${niche.label} niche anything` : nicheId === 'photography' ? 'What did you shoot?' : 'What did you make?'}
-            placeholderTextColor="#6B7178"
-            style={[styles.input, styles.textarea]}
-            selectionColor={niche.accent}
+            placeholder={placeholder}
+            placeholderTextColor={ground.muted}
+            selectionColor={ground.text}
+            style={[styles.caption, { color: ground.text, fontFamily: caption ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
           />
-        </View>
 
-        <View style={{ gap: 10 }}>
-          {state.me?.membership ? (
-            <Pressable accessibilityRole="switch" accessibilityState={{ checked: membersOnly }} onPress={() => setMembersOnly(!membersOnly)} style={[styles.membersRow, membersOnly ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.membersTitle}>Members only</Text>
-                <Text style={styles.membersSub}>Only your members can see it. Everyone else sees a locked preview.</Text>
-              </View>
-              <View style={[styles.switchTrack, membersOnly ? { backgroundColor: niche.accent } : null]}>
-                <View style={[styles.switchKnob, membersOnly ? { transform: [{ translateX: 18 }] } : null]} />
-              </View>
-            </Pressable>
-          ) : null}
-          <Text style={styles.label}>Post to one niche</Text>
-          <View style={styles.niches}>
-            {NICHE_ORDER.map((id) => {
-              const n = NICHES[id];
-              const selected = id === nicheId;
-              return (
-                <Pressable
-                  key={id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected, disabled: !n.open }}
-                  disabled={!n.open}
-                  onPress={() => {
-                    setNicheId(id);
-                    setGoalId(null);
-                  }}
-                  style={[styles.nicheChip, selected ? { backgroundColor: n.accent, borderColor: n.accent } : { backgroundColor: '#FFFFFF', borderColor: n.open ? n.accent : '#E3E5E1' }]}>
-                  {selected ? <CheckIcon size={15} strokeWidth={2.6} /> : null}
-                  <Text style={[styles.nicheChipText, { color: selected ? '#FFFFFF' : n.open ? n.ink : '#6B7178' }]}>{n.open ? n.label : `${n.label} · soon`}</Text>
+          <View style={[styles.rows, { borderTopColor: ground.line }]}>
+            {kind === 'progress' ? (
+              <View style={[styles.row, { borderBottomColor: ground.line, alignItems: 'stretch', flexDirection: 'column', paddingVertical: 12, gap: 4 }]}>
+                <Eyebrow>Counts toward</Eyebrow>
+                {myGoals.map((g) => {
+                  const on = g.id === goalId;
+                  const cells = weekStrip(g, 4);
+                  return (
+                    <Pressable key={g.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setGoalId(g.id)} style={styles.choice}>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={[styles.choiceTitle, { color: ground.text }]}>{g.title}</Text>
+                        <Text style={[styles.choiceSub, { color: ground.muted }]}>{goalRule(g)} · week {weekNumber(g)}</Text>
+                      </View>
+                      <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no">
+                        {cells.map((c) => (
+                          <View key={c.key} style={[styles.dot, c.met || c.rest ? { backgroundColor: niche.accent } : { borderWidth: 1.5, borderColor: ground.muted }]} />
+                        ))}
+                      </View>
+                      <Check on={on} color={ground.text} empty={ground.muted} />
+                    </Pressable>
+                  );
+                })}
+                <Pressable accessibilityRole="radio" accessibilityState={{ checked: goalId === null }} onPress={() => setGoalId(null)} style={styles.choice}>
+                  <Text style={[styles.choiceTitle, { color: ground.text, flex: 1 }]}>{myGoals.length ? 'Something else' : 'Name what you’re working on'}</Text>
+                  <Check on={goalId === null} color={ground.text} empty={ground.muted} />
                 </Pressable>
+                {goalId === null ? (
+                  <TextInput
+                    accessibilityLabel="What you're working on"
+                    value={goal}
+                    onChangeText={setGoal}
+                    placeholder="e.g. Fresh pasta, week 4"
+                    placeholderTextColor={ground.muted}
+                    maxLength={60}
+                    selectionColor={ground.text}
+                    style={[styles.goalInput, { color: ground.text, borderColor: ground.line }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+                  />
+                ) : null}
+                <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: nicheId } })} style={styles.link}>
+                  <Text style={[styles.linkText, { color: ground.text }]}>+ Set a new goal</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={[styles.row, { borderBottomColor: ground.line, flexDirection: 'column', alignItems: 'stretch', paddingVertical: 12, gap: 6 }]}>
+              <Eyebrow>Posting to</Eyebrow>
+              <View accessibilityRole="radiogroup" style={styles.niches}>
+                {NICHE_ORDER.map((id) => {
+                  const n = NICHES[id];
+                  const on = id === nicheId;
+                  return (
+                    <Pressable
+                      key={id}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on, disabled: !n.open }}
+                      accessibilityLabel={n.open ? n.label : `${n.label}, opening soon`}
+                      disabled={!n.open}
+                      onPress={() => {
+                        setNicheId(id);
+                        setGoalId(null);
+                      }}
+                      style={styles.nicheWord}>
+                      <Text style={[styles.nicheText, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500', opacity: n.open ? 1 : 0.5 }]}>{n.open ? n.label : `${n.label} · soon`}</Text>
+                      <View style={[styles.nicheLine, { backgroundColor: on ? n.accent : 'transparent' }]} />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {state.me?.membership ? (
+              <Pressable accessibilityRole="switch" accessibilityState={{ checked: membersOnly }} onPress={() => setMembersOnly(!membersOnly)} style={[styles.row, { borderBottomColor: ground.line }]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.choiceTitle, { color: ground.text }]}>Members only</Text>
+                  <Text style={[styles.choiceSub, { color: ground.muted }]}>Only your members can open it. Everyone else sees a locked preview.</Text>
+                </View>
+                <View style={[styles.switchTrack, membersOnly ? { backgroundColor: ground.text } : null]}>
+                  <View style={[styles.switchKnob, membersOnly ? { transform: [{ translateX: 18 }] } : null]} />
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/plans/new', params: { niche: nicheId } })} style={styles.planLink}>
+            <Text style={[styles.planText, { color: ground.muted }]}>
+              Planning something instead? <Text style={{ color: ground.text, fontWeight: '700', textDecorationLine: 'underline' }}>Make a plan</Text>
+            </Text>
+          </Pressable>
+          <Text style={[styles.hint, { color: ground.muted, marginHorizontal: 20, marginTop: 6 }]}>
+            Only you will see how many people liked or saved it.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SurfaceProvider>
+  );
+}
+
+function Check({ on, color, empty }: { on: boolean; color: string; empty: string }) {
+  return (
+    <View style={[styles.check, on ? { backgroundColor: color, borderColor: color } : { borderColor: empty }]}>
+      {on ? <CheckIcon size={14} strokeWidth={2.8} /> : null}
+    </View>
+  );
+}
+
+const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+/**
+ * Option C's moment after sharing: the niche's color, a white check,
+ * "Shared with Cooking.", what it counted toward, and your week in that niche.
+ * Rewards are about your own progress, never likes or other people's numbers.
+ */
+function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { state } = useStore();
+  const niche: Niche = useNiches()[posted.niche];
+  const words = diaryWords(posted.niche);
+  const post = state.posts.find((p) => p.id === posted.id);
+  const goal = posted.goalId ? state.goals.find((g) => g.id === posted.goalId) : undefined;
+  const question = posted.kind === 'question';
+
+  // This week (Monday to Sunday): your posts in this niche, by day.
+  const monday = new Date();
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const mine = state.posts.filter((p) => p.authorId === state.me?.id && p.niche === posted.niche && !p.archived && p.createdAt >= monday.getTime());
+  const byDay: (Post | undefined)[] = DAY_LETTERS.map((_, i) => {
+    const start = monday.getTime() + i * 86400000;
+    return mine.filter((p) => p.createdAt >= start && p.createdAt < start + 86400000).sort((a, b) => b.createdAt - a.createdAt)[0];
+  });
+  const made = mine.filter((p) => p.kind !== 'text').length;
+  const todayIndex = (new Date().getDay() + 6) % 7;
+
+  const title = question ? `Asked in ${niche.label}.` : `Shared with ${niche.label}.`;
+  const lines: string[] = [];
+  if (posted.kind === 'progress' && goal) lines.push(`Nice work. Week ${weekNumber(goal, isoDay())} of ${goal.title} is checked off.`);
+  else if (posted.kind === 'progress' && posted.goalLabel) lines.push(`Progress on ${posted.goalLabel}, shared.`);
+  else if (question) lines.push('We’ll let you know when someone answers.');
+  else lines.push(`It’s at the top of the ${niche.label} feed.`);
+  if (posted.membersOnly) lines.push('Only your members can open it. Everyone else sees a locked preview.');
+
+  const toFeed = () => {
+    onDone();
+    router.navigate('/');
+  };
+
+  return (
+    <View style={[styles.posted, { backgroundColor: niche.mid, paddingTop: insets.top + 70 }]}>
+      <Animated.View entering={FadeIn.duration(220).reduceMotion(ReduceMotion.System)} style={[styles.bigCheck, { shadowColor: niche.ink }]}>
+        <CheckIcon size={40} color={niche.ink} strokeWidth={2.6} />
+      </Animated.View>
+      <Animated.View entering={FadeInDown.duration(320).delay(80).reduceMotion(ReduceMotion.System)} style={{ alignItems: 'center', gap: 10 }}>
+        <Text accessibilityRole="header" style={[styles.postedTitle, { color: niche.ink }]}>{title}</Text>
+        {lines.map((l) => (
+          <Text key={l} style={[styles.postedLine, { color: niche.ink }]}>{l}</Text>
+        ))}
+      </Animated.View>
+
+      {!question ? (
+        <Animated.View entering={FadeInDown.duration(320).delay(180).reduceMotion(ReduceMotion.System)} style={styles.weekCard}>
+          <View style={styles.weekHead}>
+            <Eyebrow style={{ color: niche.inkSoft }}>Your week in {niche.label}</Eyebrow>
+            <Text style={[styles.weekCount, { color: niche.ink }]}>
+              {made} {made === 1 ? words.thing : words.things}
+            </Text>
+          </View>
+          <View style={styles.weekRow}>
+            {byDay.map((p, i) => {
+              const photo = p ? postPhoto(p) : undefined;
+              return (
+                <View key={i} style={styles.dayCell}>
+                  <View style={[styles.dayTile, p ? { backgroundColor: p.mediaColor ?? '#FFFFFF' } : { backgroundColor: 'rgba(255,255,255,0.4)' }, i === todayIndex ? { borderWidth: 2, borderColor: niche.ink } : null]}>
+                    {photo ? <Image source={photo} contentFit="cover" style={StyleSheet.absoluteFill} /> : p ? <Text style={[styles.dayText, { color: niche.ink }]}>Aa</Text> : null}
+                  </View>
+                  <Text style={[styles.dayLetter, { color: niche.inkSoft }]}>{DAY_LETTERS[i]}</Text>
+                </View>
               );
             })}
           </View>
-        </View>
+        </Animated.View>
+      ) : null}
 
-        <Text style={styles.hint}>Your post shows in the {niche.label} feed and on your profile. Only you will see how many people liked or saved it.</Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Animated.View entering={FadeInDown.duration(320).delay(260).reduceMotion(ReduceMotion.System)} style={{ alignSelf: 'stretch', gap: 4, marginTop: 22 }}>
+        <Pressable accessibilityRole="button" onPress={toFeed} style={({ pressed }) => [styles.primary, { backgroundColor: niche.ink, opacity: pressed ? 0.85 : 1 }]}>
+          <Text style={styles.primaryText}>See it in the feed</Text>
+        </Pressable>
+        {!question && post ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              onDone();
+              router.push({ pathname: '/log/new', params: { postId: posted.id } });
+            }}
+            style={styles.secondary}>
+            <Text style={[styles.secondaryText, { color: niche.ink }]}>Also add it to your {words.diary}</Text>
+          </Pressable>
+        ) : (
+          <Pressable accessibilityRole="button" onPress={() => { onDone(); router.push({ pathname: '/post/[id]', params: { id: posted.id } }); }} style={styles.secondary}>
+            <Text style={[styles.secondaryText, { color: niche.ink }]}>See your question</Text>
+          </Pressable>
+        )}
+        {posted.membersOnly ? (
+          <View style={styles.lockNote}>
+            <LockIcon size={12} color={niche.inkSoft} />
+            <Text style={{ fontSize: 12, color: niche.inkSoft }}>Members only</Text>
+          </View>
+        ) : null}
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: 'transparent' },
-  navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
-  share: { minHeight: 36, paddingHorizontal: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  shareText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
-  form: { padding: 20, gap: 18, paddingBottom: 120 },
-  membersRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, marginBottom: 8 },
-  membersTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  membersSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  switchTrack: { width: 46, height: 28, borderRadius: 14, backgroundColor: '#D5D8D3', padding: 3 },
+  masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  share: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  shareText: { fontSize: 15, fontWeight: '700' },
+  photoCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 4 },
+  photo: { width: '100%' },
+  photoButtons: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 8 },
+  photoChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  photoChipText: { fontSize: 13, fontWeight: '700' },
+  addPhoto: { marginHorizontal: 20, marginTop: 18, height: 220, borderRadius: 24, borderWidth: 1.5, borderStyle: 'dashed', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 },
+  addPhotoIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  addPhotoTitle: { fontFamily: fonts.display, fontSize: 24 },
+  caption: { marginHorizontal: 20, marginTop: 18, minHeight: 90, fontSize: 28, lineHeight: 32, paddingVertical: 4, textAlignVertical: 'top' },
+  rows: { marginHorizontal: 20, marginTop: 12, borderTopWidth: 1 },
+  row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },
+  choice: { minHeight: TOUCH + 4, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  choiceTitle: { fontSize: 15, fontWeight: '700' },
+  choiceSub: { fontSize: 13, lineHeight: 18 },
+  dots: { flexDirection: 'row', gap: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  goalInput: { minHeight: TOUCH + 2, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontSize: 16, fontFamily: BODY_FONTS['500'], backgroundColor: '#FFFFFF' },
+  link: { minHeight: TOUCH, justifyContent: 'center', alignSelf: 'flex-start' },
+  linkText: { fontSize: 14, fontWeight: '700' },
+  niches: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18 },
+  nicheWord: { minHeight: 40, justifyContent: 'center' },
+  nicheText: { fontSize: 15 },
+  nicheLine: { height: 2.5, borderRadius: 2, marginTop: 4 },
+  switchTrack: { width: 46, height: 28, borderRadius: 14, backgroundColor: '#D5D0C6', padding: 3 },
   switchKnob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
-  planLink: { minHeight: TOUCH + 4, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  planLinkText: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  segment: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: '#F0F1EE' },
-  segmentOption: { flex: 1, minHeight: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  segmentSelected: { backgroundColor: '#FFFFFF', shadowColor: '#14161A', shadowOpacity: 0.14, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  segmentText: { fontSize: 14, fontWeight: '600' },
-  picker: { height: 180, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#B9BFB8', backgroundColor: '#F7F8F5', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 },
-  pickerTitle: { fontSize: 15, fontWeight: '600', color: colors.textBody },
-  photo: { height: 220, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF' },
-  textarea: { minHeight: 110, textAlignVertical: 'top' },
-  niches: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  nicheChip: { minHeight: 40, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  nicheChipText: { fontSize: 14, fontWeight: '600' },
-  hint: { fontSize: 13, lineHeight: 18, color: colors.textMuted, textAlign: 'center' },
-  goalOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  goalTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  goalSub: { fontSize: 13, color: colors.textMuted },
-  newGoal: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
-  newGoalText: { fontSize: 15, fontWeight: '700' },
-  done: { flex: 1, paddingHorizontal: 28, justifyContent: 'center', gap: 16 },
-  doneCheck: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  doneBody: { fontSize: 16, lineHeight: 23 },
+  planLink: { minHeight: TOUCH, justifyContent: 'center', marginHorizontal: 20, marginTop: 10 },
+  planText: { fontSize: 14 },
+  hint: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  // Posted
+  posted: { flex: 1, alignItems: 'center', paddingHorizontal: 20 },
+  bigCheck: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
+  postedTitle: { fontFamily: fonts.displayItalic, fontSize: 52, lineHeight: 54, textAlign: 'center' },
+  postedLine: { fontSize: 16, lineHeight: 22, textAlign: 'center', maxWidth: 320 },
+  weekCard: { alignSelf: 'stretch', marginTop: 26, padding: 16, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.55)', gap: 12 },
+  weekHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  weekCount: { fontFamily: fonts.display, fontSize: 22 },
+  weekRow: { flexDirection: 'row', gap: 6 },
+  dayCell: { flex: 1, alignItems: 'center', gap: 6 },
+  dayTile: { width: '100%', height: 62, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  dayText: { fontFamily: fonts.display, fontSize: 18 },
+  dayLetter: { fontSize: 11, fontWeight: '700' },
+  primary: { minHeight: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  secondary: { minHeight: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
+  lockNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
 });
