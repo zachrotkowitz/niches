@@ -232,3 +232,12 @@ export function GridLayoutIcon({ size = 15, color = '#123F2A' }: IconProps) {
     </Svg>
   );
 }
+
+export function PencilIcon({ size = 17, color = '#14161A', strokeWidth = 1.9 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16z" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <Path d="m13.5 6.5 4 4" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}

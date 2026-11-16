@@ -10,7 +10,7 @@ import { BoardCard, useCardWidth } from '@/components/boards';
 import { CoverCollage } from '@/components/cover';
 import { GoalCard } from '@/components/goals';
 import { Sheet } from '@/components/sheet';
-import { LockIcon } from '@/components/icons';
+import { CheckIcon, LockIcon, PencilIcon, PlusIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
@@ -87,17 +87,22 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
           <View style={styles.avatarRing}>
             <Avatar user={user} size={84} />
           </View>
+          {/* Quiet link, not a pill (founder's pick, option A): words, a small icon and an underline, flush right. */}
           {isMe ? (
-            <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={({ pressed }) => [styles.editButton, { opacity: pressed ? 0.6 : 1 }]}>
-              <Text style={styles.editButtonText}>Edit profile</Text>
+            <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={6} style={({ pressed }) => [styles.quietLink, { opacity: pressed ? 0.55 : 1 }]}>
+              <PencilIcon color={surface.text} />
+              <Text style={styles.quietLinkText}>Edit profile</Text>
             </Pressable>
           ) : (
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: following }}
+              accessibilityLabel={following ? `Following ${user.username}` : `Follow ${user.username}`}
               onPress={() => actions.toggleFollow(user.id)}
-              style={({ pressed }) => [styles.editButton, following ? null : { backgroundColor: surface.text }, { opacity: pressed ? 0.7 : 1 }]}>
-              <Text style={[styles.editButtonText, following ? null : { color: surface.ground }]}>{following ? 'Following' : 'Follow'}</Text>
+              hitSlop={6}
+              style={({ pressed }) => [styles.quietLink, { opacity: pressed ? 0.55 : 1 }]}>
+              {following ? <CheckIcon size={17} color={surface.muted} strokeWidth={2.2} /> : <PlusIcon size={17} color={surface.text} />}
+              <Text style={[styles.quietLinkText, following ? { color: surface.muted, textDecorationLine: 'none' } : null]}>{following ? 'Following' : 'Follow'}</Text>
             </Pressable>
           )}
         </View>
@@ -364,8 +369,8 @@ const makeStyles = (sf: Surface) =>
   cover: { height: 268, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
   head: { paddingHorizontal: 20, gap: 10 },
   avatarRing: { borderRadius: 46, borderWidth: 4, borderColor: sf.ground },
-  editButton: { minHeight: 44, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1.5, borderColor: sf.text, alignItems: 'center', justifyContent: 'center' },
-  editButtonText: { fontSize: 14, fontWeight: '700', color: sf.text },
+  quietLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: -2 },
+  quietLinkText: { fontSize: 15, fontWeight: '700', color: sf.text, textDecorationLine: 'underline' },
   identity: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   handle: { fontSize: 14, color: sf.muted },
   avatarEdit: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: sf.text, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
