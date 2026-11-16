@@ -19,15 +19,18 @@ import { fonts } from '@/lib/theme';
  */
 export function useDropInSearch(hideAfter: number) {
   const lastY = useSharedValue(0);
+  /** The page's scroll offset, shared with the pull-to-refresh spinner. */
+  const y = useSharedValue(0);
   const target = useSharedValue(0);
   const shown = useSharedValue(0);
   const [on, setOn] = useState(false);
   const onScroll = useAnimatedScrollHandler((e) => {
-    const y = e.contentOffset.y;
-    const dy = y - lastY.get();
-    lastY.set(y);
+    const top = e.contentOffset.y;
+    y.set(top);
+    const dy = top - lastY.get();
+    lastY.set(top);
     let next = target.get();
-    if (y < hideAfter) next = 0;
+    if (top < hideAfter) next = 0;
     else if (dy < -6) next = 1;
     else if (dy > 6) next = 0;
     if (next !== target.get()) {
@@ -42,7 +45,7 @@ export function useDropInSearch(hideAfter: number) {
     shown.set(0);
     setOn(false);
   };
-  return { onScroll, style, on, hide };
+  return { onScroll, style, on, hide, y };
 }
 
 export function DropInSearch({ drop, placeholder, onPress }: { drop: ReturnType<typeof useDropInSearch>; placeholder: string; onPress: () => void }) {

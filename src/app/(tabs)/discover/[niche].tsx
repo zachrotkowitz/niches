@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { usePullRefresh } from '@/components/pull-refresh';
 import { DropInSearch, useDropInSearch } from '@/components/drop-in-search';
 import { BackLink, EndNote, Eyebrow, PersonRow, SearchBar, SectionTitle } from '@/components/discover-parts';
 import { FeedGrid } from '@/components/feed-grid';
@@ -51,6 +52,7 @@ export default function DiscoverNicheScreen() {
   const niche = nicheId ? niches[nicheId] : null;
   const surface = niche ? floodSurface(niche) : groundSurface(ground);
   const background = niche ? niche.mid : ground.ground;
+  const pull = usePullRefresh(surface.text, drop.y);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/discover'));
 
   const favorites = useMemo(() => weekFavorites(state, nicheId ? [nicheId] : [], 8), [state, nicheId]);
@@ -90,7 +92,7 @@ export default function DiscoverNicheScreen() {
 
   return (
     <SurfaceProvider value={surface}>
-      <Animated.ScrollView ref={scrollRef} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView ref={scrollRef} onScroll={drop.onScroll} scrollEventThrottle={16} refreshControl={pull.refreshControl} style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
         <View style={{ paddingHorizontal: 14 }}>
           <BackLink label="Discover" onPress={goBack} />
         </View>
@@ -150,6 +152,7 @@ export default function DiscoverNicheScreen() {
           ) : null}
         </EndNote>
       </Animated.ScrollView>
+      {pull.spinner}
       <DropInSearch
         drop={drop}
         placeholder={label ? `Search ${label}…` : 'Search this week’s favorites…'}

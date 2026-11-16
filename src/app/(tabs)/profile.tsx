@@ -4,7 +4,10 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Animated from 'react-native-reanimated';
+
 import { ChevronLeftIcon } from '@/components/icons';
+import { usePullRefresh } from '@/components/pull-refresh';
 import { Button } from '@/components/primitives';
 import { PostSquares, ProfileView } from '@/components/profile-view';
 import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
@@ -16,7 +19,8 @@ function ProfileScreenInner() {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
+  const pull = usePullRefresh(surface.text);
   useTabReselect('profile', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
   const router = useRouter();
   const { state, actions } = useStore();
@@ -41,7 +45,8 @@ function ProfileScreenInner() {
   };
 
   return (
-    <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
+    <View style={{ flex: 1 }}>
+    <Animated.ScrollView ref={scrollRef} onScroll={pull.onScroll} scrollEventThrottle={16} refreshControl={pull.refreshControl} style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
       <ProfileView
         user={me}
         isMe
@@ -108,7 +113,9 @@ function ProfileScreenInner() {
           </View>
         }
       />
-    </ScrollView>
+    </Animated.ScrollView>
+    {pull.spinner}
+    </View>
   );
 }
 

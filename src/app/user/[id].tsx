@@ -1,5 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +21,13 @@ function UserScreenInner() {
   const insets = useSafeAreaInsets();
   const { state, usersById } = useStore();
   const user = usersById[id];
+  // Pull down to refresh. The page starts below the back bar, so the phone's own spinner shows fine here.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeout(() => setRefreshing(false), 900);
+  };
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/discover'));
 
   return (
@@ -32,7 +41,7 @@ function UserScreenInner() {
         <View style={{ width: 80 }} />
       </View>
       {user ? (
-        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
           <ProfileView user={user} isMe={user.id === state.me?.id} />
         </ScrollView>
       ) : (

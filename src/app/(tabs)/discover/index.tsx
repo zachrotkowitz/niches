@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EndNote, Eyebrow, NicheCard, PersonRow, RailTile, SearchBar, SectionTitle, ShopTile } from '@/components/discover-parts';
 import { SearchResults, SearchSuggestions } from '@/components/discover-search';
+import { usePullRefresh } from '@/components/pull-refresh';
 import { DropInSearch, useDropInSearch } from '@/components/drop-in-search';
 import { ChevronLeftIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
@@ -96,6 +97,8 @@ export default function DiscoverScreen() {
 
   // Scroll back up a little and a slim search bar drops in at the top.
   const drop = useDropInSearch(insets.top + 150);
+  // Pull down to refresh (not while searching).
+  const pull = usePullRefresh(ground.text, drop.y);
   const focused = useIsFocused();
   // Tap Discover while on Discover: close any search and glide back to the top.
   useTabReselect('discover', () => {
@@ -129,7 +132,7 @@ export default function DiscoverScreen() {
   return (
     <SurfaceProvider value={surface}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Animated.ScrollView ref={scroll} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, leaving ? underLayer : null]} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <Animated.ScrollView ref={scroll} onScroll={drop.onScroll} scrollEventThrottle={16} refreshControl={searching ? undefined : pull.refreshControl} style={[styles.screen, leaving ? underLayer : null]} contentContainerStyle={{ paddingTop: insets.top + (searching ? 10 : 16), paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {/* The masthead hides while you search; the search bar stays the same element so it keeps focus. */}
           {searching ? null : (
             <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
@@ -254,6 +257,7 @@ export default function DiscoverScreen() {
             </>
           )}
         </Animated.ScrollView>
+        {searching ? null : pull.spinner}
 
         {searching ? null : (
           <DropInSearch drop={drop} placeholder="Search dishes, people, prints…" onPress={openSearch} />

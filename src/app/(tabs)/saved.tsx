@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BoardCard, NewBoardCard, useCardWidth } from '@/components/boards';
@@ -8,6 +9,7 @@ import { Eyebrow, RailTile, SectionTitle, ShopTile } from '@/components/discover
 import { FeedGrid } from '@/components/feed-grid';
 import { NicheFilter } from '@/components/niche-filter';
 import { Button, DisplayText } from '@/components/primitives';
+import { usePullRefresh } from '@/components/pull-refresh';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { boardPosts, savesLabel } from '@/lib/boards';
@@ -26,9 +28,10 @@ export default function SavedScreen() {
   const router = useRouter();
   const { state, actions } = useStore();
   const ground = useAppGround();
+  const pull = usePullRefresh(ground.text);
   const cardW = useCardWidth();
   const [filter, setFilter] = useState<NicheId[]>([]);
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   useTabReselect('saved', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
 
   // Saved posts stay here even if you hid them from feeds; archived ones are the author's to hide.
@@ -45,7 +48,7 @@ export default function SavedScreen() {
 
   return (
     <SurfaceProvider value={groundSurface(ground)}>
-      <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 120 }}>
+      <Animated.ScrollView ref={scrollRef} onScroll={pull.onScroll} scrollEventThrottle={16} refreshControl={pull.refreshControl} style={styles.screen} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 120 }}>
         <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
           <DisplayText size={42} color={ground.text}>Saved</DisplayText>
           {total ? <Eyebrow>{savesLabel(total)}</Eyebrow> : null}
@@ -146,7 +149,8 @@ export default function SavedScreen() {
         <Pressable accessibilityRole="button" onPress={hasSample ? actions.removeSampleBoards : actions.addSampleBoards} style={styles.demo}>
           <Text style={[styles.demoText, { color: ground.muted }]}>{hasSample ? 'Demo: remove the sample collections' : 'Demo: add sample saves and collections'}</Text>
         </Pressable>
-      </ScrollView>
+      </Animated.ScrollView>
+      {pull.spinner}
     </SurfaceProvider>
   );
 }
