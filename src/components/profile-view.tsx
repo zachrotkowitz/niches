@@ -8,6 +8,7 @@ import { Badges, MembershipCard } from '@/components/creator';
 import { DiaryRow, TopFour } from '@/components/diary';
 import { BoardCard, useCardWidth } from '@/components/boards';
 import { CoverCollage } from '@/components/cover';
+import { PhotoViewer } from '@/components/photo-viewer';
 import { GoalCard } from '@/components/goals';
 import { Sheet } from '@/components/sheet';
 import { CheckIcon, LockIcon, PencilIcon, PlusIcon } from '@/components/icons';
@@ -36,6 +37,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
   const niches = useNiches();
   const [tab, setTab] = useState<Tab>('all');
   const [editing, setEditing] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   const cover = coverFor(user, state.posts);
 
   const posts = state.posts
@@ -84,9 +86,13 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
       {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
       <View style={styles.head}>
         <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>
-          <View style={styles.avatarRing}>
+          <Pressable
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`View ${user.displayName}’s profile photo`}
+            onPress={() => setViewingPhoto(true)}
+            style={({ pressed }) => [styles.avatarRing, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
             <Avatar user={user} size={84} />
-          </View>
+          </Pressable>
           {/* Quiet link, not a pill (founder's pick, option A): words, a small icon and an underline, flush right. */}
           {isMe ? (
             <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={6} style={({ pressed }) => [styles.quietLink, { opacity: pressed ? 0.55 : 1 }]}>
@@ -131,6 +137,21 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
         </View>
         {user.membership ? <MembershipCard creator={user} accent={surface.text} field="#FFFFFF" ink={surface.text} /> : null}
       </View>
+
+      <PhotoViewer
+        user={user}
+        visible={viewingPhoto}
+        onClose={() => setViewingPhoto(false)}
+        onChange={
+          isMe
+            ? async () => {
+                setViewingPhoto(false);
+                const picked = await pickPhoto([1, 1]);
+                if (picked) actions.setAvatar(picked.uri);
+              }
+            : undefined
+        }
+      />
 
       {isMe ? (
         <Sheet
