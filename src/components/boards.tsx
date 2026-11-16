@@ -74,13 +74,13 @@ export function BoardCard({ name, posts, count, isPrivate, onPress, width }: { n
 export function NewBoardCard({ onPress, width }: { onPress: () => void; width: number }) {
   const surface = useSurface();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="New board" onPress={onPress} style={({ pressed }) => [{ width, gap: 6 }, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="New collection" onPress={onPress} style={({ pressed }) => [{ width, gap: 6 }, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
       <View style={[styles.newCard, { borderColor: surface.muted }]}>
         <View style={[styles.plus, { backgroundColor: surface.text }]}>
           <PlusIcon size={18} color={surface.ground} />
         </View>
       </View>
-      <Text style={[styles.name, { color: surface.text }]}>New board</Text>
+      <Text style={[styles.name, { color: surface.text }]}>New collection</Text>
       <Text style={[styles.metaText, { color: surface.muted }]}>Private until you share it</Text>
     </Pressable>
   );

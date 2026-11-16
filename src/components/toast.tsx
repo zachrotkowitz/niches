@@ -8,7 +8,7 @@ export type ToastAction = { label: string; onPress: () => void };
 
 const ToastContext = createContext<(message: string, action?: ToastAction) => void>(() => {});
 
-/** Short confirmation messages ("Link copied", "Post archived"), optionally with one button ("Saved · Add to board"). */
+/** Short confirmation messages ("Link copied", "Post archived"), optionally with one button ("Saved · Add to collection"). */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<string | null>(null);

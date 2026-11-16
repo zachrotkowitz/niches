@@ -49,7 +49,7 @@ export default function BoardScreen() {
       <SurfaceProvider value={groundSurface(ground)}>
         <View style={[styles.screen, { backgroundColor: ground.ground, paddingTop: insets.top + 4, paddingHorizontal: 14 }]}>
           <BackLink label="Back" onPress={goBack} />
-          <Text style={{ fontSize: 17, color: ground.text, padding: 6, marginTop: 20 }}>This board isn’t available.</Text>
+          <Text style={{ fontSize: 17, color: ground.text, padding: 6, marginTop: 20 }}>This collection isn’t available.</Text>
         </View>
       </SurfaceProvider>
     );
@@ -58,8 +58,8 @@ export default function BoardScreen() {
   const eyebrow = all
     ? savesLabel(posts.length)
     : isMine
-      ? `${board!.visibility === 'private' ? 'Private board' : 'On your profile'} · ${savesLabel(posts.length)}`
-      : `Board by ${usersById[board!.ownerId]?.username ?? 'someone'} · ${savesLabel(posts.length)}`;
+      ? `${board!.visibility === 'private' ? 'Private collection' : 'On your profile'} · ${savesLabel(posts.length)}`
+      : `Collection by ${usersById[board!.ownerId]?.username ?? 'someone'} · ${savesLabel(posts.length)}`;
 
   const saveName = () => {
     if (board && draft.trim()) actions.renameBoard(board.id, draft);
@@ -72,7 +72,7 @@ export default function BoardScreen() {
         <View style={styles.nav}>
           <BackLink label={isMine || all ? 'Saved' : 'Back'} onPress={goBack} />
           {isMine ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Board options" onPress={() => setMenu(true)} style={styles.more}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Collection options" onPress={() => setMenu(true)} style={styles.more}>
               <MoreIcon size={22} color={ground.text} />
             </Pressable>
           ) : null}
@@ -83,7 +83,7 @@ export default function BoardScreen() {
           {renaming ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TextInput
-              accessibilityLabel="Board name"
+              accessibilityLabel="Collection name"
               value={draft}
               onChangeText={setDraft}
               autoFocus
@@ -116,7 +116,7 @@ export default function BoardScreen() {
           <View style={styles.empty}>
             <Text style={[styles.emptyTitle, { color: ground.text }]}>Nothing here yet.</Text>
             <Text style={[styles.emptyBody, { color: ground.body }]}>
-              {all ? 'Tap Save on any post and it lands here.' : 'Tap Save on any post, then “Add to board”. Or use “Save to a board” in a post’s ⋯ menu.'}
+              {all ? 'Tap Save on any post and it lands here.' : 'Tap Save on any post, then “Add to collection”. Or use “Save to a collection” in a post’s ⋯ menu.'}
             </Text>
             <Button label="Explore Discover" color={ground.text} onPress={() => router.navigate('/discover')} />
           </View>
@@ -137,13 +137,13 @@ export default function BoardScreen() {
             confirmDelete
               ? [
                   {
-                    label: 'Delete board',
+                    label: 'Delete collection',
                     detail: 'The posts stay in your saves.',
                     destructive: true,
                     onPress: () => {
                       setMenu(false);
                       actions.deleteBoard(board.id);
-                      toast('Board deleted. Your saves are still there.');
+                      toast('Collection deleted. Your saves are still there.');
                       goBack();
                     },
                   },
@@ -158,9 +158,9 @@ export default function BoardScreen() {
                     },
                   },
                   board.visibility === 'private'
-                    ? { label: 'Show on my profile', detail: 'Anyone can see this board on your profile.', onPress: () => (setMenu(false), actions.setBoardVisibility(board.id, 'profile'), toast('Now on your profile')) }
-                    : { label: 'Make private', detail: 'Only you will see this board.', onPress: () => (setMenu(false), actions.setBoardVisibility(board.id, 'private'), toast('Board is private')) },
-                  { label: 'Delete board', destructive: true, onPress: () => setConfirmDelete(true) },
+                    ? { label: 'Show on my profile', detail: 'Anyone can see this collection on your profile.', onPress: () => (setMenu(false), actions.setBoardVisibility(board.id, 'profile'), toast('Now on your profile')) }
+                    : { label: 'Make private', detail: 'Only you will see this collection.', onPress: () => (setMenu(false), actions.setBoardVisibility(board.id, 'private'), toast('Collection is private')) },
+                  { label: 'Delete collection', destructive: true, onPress: () => setConfirmDelete(true) },
                 ]
           }
         />

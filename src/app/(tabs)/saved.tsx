@@ -52,7 +52,7 @@ export default function SavedScreen() {
           <View style={styles.emptyWrap}>
             <Text style={[styles.emptyTitle, { color: ground.text }]}>Nothing saved yet.</Text>
             <Text style={[styles.emptyBody, { color: ground.body }]}>
-              Tap Save on any post and it lands here, outlined in its niche’s color. Then sort your saves into boards, like “Weeknight dinners” or “Film ideas”.
+              Tap Save on any post and it lands here, outlined in its niche’s color. Then sort your saves into collections, like “Weeknight dinners” or “Film ideas”.
             </Text>
             <Button label="Explore Discover" color={ground.text} onPress={() => router.navigate('/discover')} />
           </View>
@@ -62,10 +62,10 @@ export default function SavedScreen() {
               <SectionTitle
                 right={
                   <Pressable accessibilityRole="button" onPress={newBoard} style={styles.link}>
-                    <Text style={[styles.linkText, { color: ground.text }]}>New board</Text>
+                    <Text style={[styles.linkText, { color: ground.text }]}>New collection</Text>
                   </Pressable>
                 }>
-                Boards
+                Collections
               </SectionTitle>
               <View style={styles.grid}>
                 <BoardCard name="All saves" posts={saved} count={saved.length} width={cardW} onPress={() => router.push({ pathname: '/boards/[id]', params: { id: 'all' } })} />
@@ -131,18 +131,18 @@ export default function SavedScreen() {
               </View>
             ) : null}
 
-            <EndNote title="That’s everything you’ve saved." body="Boards are private unless you put one on your profile." />
+            <EndNote title="That’s everything you’ve saved." body="Collections are private unless you put one on your profile." />
           </>
         )}
 
         <View style={[styles.importCard, { borderColor: ground.line }]}>
           <Eyebrow>Coming soon</Eyebrow>
           <Text style={[styles.importTitle, { color: ground.text }]}>Bring your saves from Instagram and TikTok</Text>
-          <Text style={[styles.importBody, { color: ground.body }]}>Share a post to Niches straight from Instagram or TikTok, or import your saved collections once. They become boards here.</Text>
+          <Text style={[styles.importBody, { color: ground.body }]}>Share a post to Niches straight from Instagram or TikTok, or import your saved collections once. They become collections here.</Text>
         </View>
 
         <Pressable accessibilityRole="button" onPress={hasSample ? actions.removeSampleBoards : actions.addSampleBoards} style={styles.demo}>
-          <Text style={[styles.demoText, { color: ground.muted }]}>{hasSample ? 'Demo: remove the sample boards' : 'Demo: add sample saves and boards'}</Text>
+          <Text style={[styles.demoText, { color: ground.muted }]}>{hasSample ? 'Demo: remove the sample collections' : 'Demo: add sample saves and collections'}</Text>
         </Pressable>
       </ScrollView>
     </SurfaceProvider>

@@ -214,7 +214,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
           const selected = t === tab;
           return (
             <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
-              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Boards' : niches[t].label}</Text>
+              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label}</Text>
             </Pressable>
           );
         })}

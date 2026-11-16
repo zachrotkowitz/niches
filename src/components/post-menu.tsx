@@ -149,7 +149,7 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
             savePost(post.id);
           },
         },
-        { label: 'Save to a board', detail: 'Pick a board or start a new one.', onPress: run(() => router.push({ pathname: '/boards/add', params: { postId: post.id } })) },
+        { label: 'Save to a collection', detail: 'Pick a collection or start a new one.', onPress: run(() => router.push({ pathname: '/boards/add', params: { postId: post.id } })) },
         { label: 'Not interested', detail: 'Hide this post from your feeds.', onPress: run(() => {
           actions.toggleHidden(post.id);
           onGone?.();

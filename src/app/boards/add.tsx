@@ -49,7 +49,7 @@ export default function AddToBoardScreen() {
     <SurfaceProvider value={groundSurface(ground)}>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.top, { paddingTop: Platform.OS === 'ios' ? 14 : insets.top + 8, borderBottomColor: ground.line }]}>
-          <DisplayText size={30} color={ground.text}>{post ? 'Save to a board' : 'New board'}</DisplayText>
+          <DisplayText size={30} color={ground.text}>{post ? 'Save to a collection' : 'New collection'}</DisplayText>
           <Pressable accessibilityRole="button" onPress={close} style={styles.done}>
             <Text style={[styles.doneText, { color: ground.text }]}>Done</Text>
           </Pressable>
@@ -70,9 +70,9 @@ export default function AddToBoardScreen() {
 
           {creating ? (
             <View style={styles.form}>
-              <Eyebrow>Name your board</Eyebrow>
+              <Eyebrow>Name your collection</Eyebrow>
               <TextInput
-                accessibilityLabel="Board name"
+                accessibilityLabel="Collection name"
                 value={name}
                 onChangeText={setName}
                 placeholder="Weeknight dinners, Film ideas…"
@@ -84,21 +84,21 @@ export default function AddToBoardScreen() {
                 selectionColor={ground.text}
                 style={[styles.input, { borderColor: ground.line, color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
               />
-              <Text style={[styles.note, { color: ground.muted }]}>Boards are private. You can put one on your profile later from the board.</Text>
+              <Text style={[styles.note, { color: ground.muted }]}>Collections are private. You can put one on your profile later from the collection.</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button label={post ? 'Create and save' : 'Create board'} color={ground.text} disabled={!name.trim()} onPress={create} style={{ flex: 1 }} />
+                <Button label={post ? 'Create and save' : 'Create collection'} color={ground.text} disabled={!name.trim()} onPress={create} style={{ flex: 1 }} />
                 {post && mine.length ? <Button label="Cancel" tone="outline" onPress={() => setCreating(false)} style={{ flex: 1 }} /> : null}
               </View>
             </View>
           ) : (
             <Pressable accessibilityRole="button" onPress={() => setCreating(true)} style={[styles.row, styles.newRow, { borderColor: ground.muted }]}>
-              <Text style={[styles.newText, { color: ground.text }]}>+  New board</Text>
+              <Text style={[styles.newText, { color: ground.text }]}>+  New collection</Text>
             </Pressable>
           )}
 
           {post && mine.length ? (
             <View>
-              <Eyebrow style={{ marginBottom: 6 }}>Your boards</Eyebrow>
+              <Eyebrow style={{ marginBottom: 6 }}>Your collections</Eyebrow>
               {mine.map((b, i) => {
                 const on = b.postIds.includes(post.id);
                 return (
