@@ -50,8 +50,6 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
 
   const bg = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(-position.get() / width, stops, mids),
-    // Pulling down to refresh (iPhone): the header moves with the page so the spinner shows above it.
-    transform: [{ translateY: Math.max(0, -scroll.get()) }],
   }));
   // 0 at the top of the feed, 1 once the big name has folded away.
   const big = useAnimatedStyle(() => {

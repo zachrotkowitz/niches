@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Platform, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
-import Animated, { useAnimatedScrollHandler, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
 import { FeedPost } from '@/components/feed-post';
@@ -76,8 +76,11 @@ function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>
     scroll.set(e.contentOffset.y);
   });
   // Pull down at the top to refresh, like Instagram (founder, Nov 2026). The
-  // whole page, header included, slides down to show the spinner above it.
-  // In the demo everything is on this phone, so it just re-reads the feed.
+  // header stays put and the posts pull away from it, so the spinner shows in
+  // the gap right under the header from the first bit of the pull (iPhone's own
+  // spinner sat behind the header until you pulled very far). Android keeps its
+  // own spinner, placed below the header. In the demo it just re-reads the feed.
+  const ios = Platform.OS === 'ios';
   const niche = useNiches()[nicheId];
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = () => {
@@ -85,16 +88,30 @@ function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => setRefreshing(false), 900);
   };
+  const spinner = useAnimatedStyle(() => {
+    const pull = -scroll.get();
+    return {
+      opacity: refreshing ? 1 : interpolate(pull, [8, 48], [0, 1], 'clamp'),
+      transform: [{ scale: refreshing ? 1 : interpolate(pull, [8, 60], [0.6, 1], 'clamp') }],
+    };
+  });
   return (
+    <View style={{ flex: 1 }}>
     <Animated.ScrollView
       ref={ref}
       style={{ flex: 1 }}
       onScroll={onScroll}
       scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={niche.ink} colors={[niche.ink]} progressBackgroundColor="#FFFFFF" progressViewOffset={top} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ios ? 'transparent' : niche.ink} colors={[niche.ink]} progressBackgroundColor="#FFFFFF" progressViewOffset={top} />}
       contentContainerStyle={{ paddingTop: top + 4, paddingBottom: TAB_BAR_SPACE }}>
       {children}
     </Animated.ScrollView>
+    {ios ? (
+      <Animated.View pointerEvents="none" style={[styles.pullSpinner, { top: top + 10 }, spinner]}>
+        <ActivityIndicator color={niche.ink} />
+      </Animated.View>
+    ) : null}
+    </View>
   );
 }
 
@@ -188,6 +205,7 @@ function ComingSoon({ niche, scroll }: { niche: Niche; scroll: SharedValue<numbe
 }
 
 const styles = StyleSheet.create({
+  pullSpinner: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   screen: { flex: 1, overflow: 'hidden' },
   modeRow: { flexDirection: 'row', paddingHorizontal: 12, borderBottomWidth: 1 },
   modeTab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2.5 },
