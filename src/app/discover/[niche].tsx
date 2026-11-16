@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DropInSearch, useDropInSearch } from '@/components/drop-in-search';
 import { BackLink, EndNote, Eyebrow, PersonRow, SearchBar, SectionTitle } from '@/components/discover-parts';
 import { FeedGrid } from '@/components/feed-grid';
 import { Button, DisplayText } from '@/components/primitives';
@@ -25,6 +27,10 @@ export default function DiscoverNicheScreen() {
   const { niche: param } = useLocalSearchParams<{ niche: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
+  const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
+  // Scroll back up a little and a slim search bar drops in at the top, like on Discover.
+  const drop = useDropInSearch(insets.top + 190);
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const ground = useAppGround();
@@ -74,7 +80,7 @@ export default function DiscoverNicheScreen() {
 
   return (
     <SurfaceProvider value={surface}>
-      <ScrollView style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView ref={scrollRef} onScroll={drop.onScroll} scrollEventThrottle={16} style={[styles.screen, { backgroundColor: background }]} contentContainerStyle={{ paddingTop: insets.top + 4, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         <View style={{ paddingHorizontal: 14 }}>
           <BackLink label="Discover" onPress={goBack} />
         </View>
@@ -88,7 +94,7 @@ export default function DiscoverNicheScreen() {
             </DisplayText>
           )}
           <View style={{ marginTop: 12 }}>
-            <SearchBar compact value={text} onChangeText={setText} placeholder={label ? `Search ${label}…` : 'Search this week’s favorites…'} accessibilityLabel={label ? `Search ${label}` : 'Search favorites'} onClear={() => setText('')} />
+            <SearchBar ref={searchRef} compact value={text} onChangeText={setText} placeholder={label ? `Search ${label}…` : 'Search this week’s favorites…'} accessibilityLabel={label ? `Search ${label}` : 'Search favorites'} onClear={() => setText('')} />
           </View>
         </View>
 
@@ -133,7 +139,16 @@ export default function DiscoverNicheScreen() {
             </Pressable>
           ) : null}
         </EndNote>
-      </ScrollView>
+      </Animated.ScrollView>
+      <DropInSearch
+        drop={drop}
+        placeholder={label ? `Search ${label}…` : 'Search this week’s favorites…'}
+        onPress={() => {
+          drop.hide();
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+          setTimeout(() => searchRef.current?.focus(), 250);
+        }}
+      />
     </SurfaceProvider>
   );
 }
