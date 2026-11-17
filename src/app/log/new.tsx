@@ -196,8 +196,6 @@ export default function NewLogScreen() {
               onChangeText={setNotes}
               multiline
               maxLength={500}
-              placeholder="What would you change?"
-              placeholderTextColor={ground.muted}
               selectionColor={ground.text}
               style={[styles.notesInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
             />
@@ -227,11 +225,11 @@ export default function NewLogScreen() {
             <View accessibilityRole="radiogroup" style={styles.words}>
               {(['private', 'profile'] as LogVisibility[]).map((v) => (
                 <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: v === visibility }} onPress={() => setVisibility(v)} style={styles.wordHit}>
-                  <Text style={quiet(v === visibility, ground.text)}>{v === 'private' ? 'Just me' : 'On my profile'}</Text>
+                  <Text style={quiet(v === visibility, ground.text)}>{v === 'private' ? 'Private' : 'Public'}</Text>
                 </Pressable>
               ))}
             </View>
-            <Text style={[styles.goalSub, { color: ground.muted }]}>{visibility === 'private' ? 'Your private diary. Nobody else sees it.' : 'Shows in the Diary tab on your profile.'}</Text>
+            <Text style={[styles.goalSub, { color: ground.muted }]}>{visibility === 'private' ? 'Only you can see it.' : 'Shows in the Diary tab on your profile.'}</Text>
           </View>
         </View>
       </ScrollView>
