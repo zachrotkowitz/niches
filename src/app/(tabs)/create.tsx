@@ -12,12 +12,16 @@ import { DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { Text } from '@/components/text';
+import { CropFrame } from '@/components/crop-frame';
+import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
+import { AdjustSlider } from '@/components/slider';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
 import { diaryWords } from '@/lib/diary';
 import { shortTitle } from '@/lib/format';
 import { goalRule, weekNumber, weekStrip } from '@/lib/goals';
-import { pickPhoto, takePhoto, type PickedPhoto } from '@/lib/photos';
+import { cropRect, editMatrix, FILTERS, ADJUSTMENTS, frameRatio, isUnedited, NO_EDITS, START_FRAMING, type Framing, type PhotoEdits } from '@/lib/photo-edit';
+import { cropPhoto, pickPhoto, takePhoto, type PickedPhoto } from '@/lib/photos';
 import { isoDay } from '@/lib/plans';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { setTabBarHidden } from '@/lib/tab-events';
@@ -57,6 +61,11 @@ type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLab
  * away, the photo shows big with Next, and "Just text" skips it. The tab bar
  * tucks away on that step. With a development build this becomes a grid of
  * your recent photos inside Niches (expo-media-library); see CLAUDE.md.
+ *
+ * Editing (founder's option A, Nov 17 2026): you frame the photo on that first
+ * screen (pinch, drag, grid lines), then Next opens Edit with Filters and
+ * Adjust, then Next again to write. `source` is the photo as picked; `cropped`
+ * is the framed copy; `photo` is the finished one that gets posted.
  */
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
@@ -70,12 +79,18 @@ export default function CreateScreen() {
   const [goal, setGoal] = useState('');
   // The goal a progress post belongs to; null means "just name it" (free text).
   const [goalId, setGoalId] = useState<string | null>(null);
+  const [source, setSource] = useState<PickedPhoto | null>(null);
+  const [framing, setFraming] = useState<Framing>(START_FRAMING);
+  const [cropped, setCropped] = useState<PickedPhoto | null>(null);
+  const [edits, setEdits] = useState<PhotoEdits>(NO_EDITS);
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
+  // Cropping or saving a filter takes a moment.
+  const [working, setWorking] = useState(false);
   const [posted, setPosted] = useState<Posted | null>(null);
   const [membersOnly, setMembersOnly] = useState(false);
   // Photo first, then the words.
-  const [step, setStep] = useState<'photo' | 'write'>('photo');
+  const [step, setStep] = useState<'photo' | 'edit' | 'write'>('photo');
   // True when you've come back to the photo step from writing, so it slides in from the left.
   const [cameBack, setCameBack] = useState(false);
   const focused = useIsFocused();
@@ -87,7 +102,13 @@ export default function CreateScreen() {
     setPicking(true);
     try {
       const picked = await (from === 'camera' ? takePhoto() : pickPhoto());
-      if (picked) setPhoto(picked);
+      if (picked) {
+        setSource(picked);
+        setFraming(START_FRAMING);
+        setEdits(NO_EDITS);
+        setCropped(null);
+        setPhoto(null);
+      }
     } finally {
       setPicking(false);
     }
@@ -100,14 +121,14 @@ export default function CreateScreen() {
       autoOpened.current = false;
       return;
     }
-    if (autoOpened.current || step !== 'photo' || photo || picking || posted) return;
+    if (autoOpened.current || step !== 'photo' || source || picking || posted) return;
     autoOpened.current = true;
     if (Platform.OS !== 'web') void choosePhoto();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused]);
-  // The tab bar steps aside on the photo step, like Instagram.
+  // The tab bar steps aside on the photo and edit steps, like Instagram.
   useEffect(() => {
-    setTabBarHidden(focused && step === 'photo' && !posted);
+    setTabBarHidden(focused && step !== 'write' && !posted);
     return () => setTabBarHidden(false);
   }, [focused, step, posted]);
 
@@ -133,7 +154,7 @@ export default function CreateScreen() {
   const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
   const pickedGoal = goalId ? myGoals.find((g) => g.id === goalId) : undefined;
   // Wait for a photo that's still being prepared, so it isn't left off the post.
-  const ready = !picking && caption.trim().length > 0 && (kind !== 'progress' || !!pickedGoal || goal.trim().length > 0);
+  const ready = !picking && !working && caption.trim().length > 0 && (kind !== 'progress' || !!pickedGoal || goal.trim().length > 0);
 
   const share = () => {
     if (!ready || !state.me) return;
@@ -164,6 +185,10 @@ export default function CreateScreen() {
     setGoal('');
     setGoalId(null);
     setPhoto(null);
+    setSource(null);
+    setCropped(null);
+    setFraming(START_FRAMING);
+    setEdits(NO_EDITS);
     setPosted(null);
     setMembersOnly(false);
     setKind('post');
@@ -173,16 +198,38 @@ export default function CreateScreen() {
   };
 
   if (posted) return <PostedScreen posted={posted} onDone={reset} />;
+  const backToPhoto = () => {
+    setCameBack(true);
+    setStep('photo');
+  };
+  const clearPhoto = () => {
+    setSource(null);
+    setCropped(null);
+    setPhoto(null);
+  };
+
   if (step === 'photo') {
     return (
       <PhotoStep
-        photo={photo}
+        photo={source}
+        framing={framing}
+        onFraming={setFraming}
         picking={picking}
+        working={working}
         entering={cameBack ? pageIn('left') : FadeIn.duration(240).reduceMotion(ReduceMotion.System)}
         onPick={choosePhoto}
-        onNext={() => setStep('write')}
+        onNext={async (rect) => {
+          if (!source) return;
+          setWorking(true);
+          try {
+            setCropped(await cropPhoto(source, rect));
+            setStep('edit');
+          } finally {
+            setWorking(false);
+          }
+        }}
         onText={() => {
-          setPhoto(null);
+          clearPhoto();
           setStep('write');
         }}
         // Once you've written something, the corner button goes back to it instead of throwing it away.
@@ -191,6 +238,26 @@ export default function CreateScreen() {
         onClose={() => {
           reset();
           router.navigate('/');
+        }}
+      />
+    );
+  }
+  if (step === 'edit' && cropped) {
+    return (
+      <EditStep
+        photo={cropped}
+        edits={edits}
+        onEdits={setEdits}
+        working={working}
+        onBack={backToPhoto}
+        onNext={async () => {
+          setWorking(true);
+          try {
+            setPhoto(isUnedited(edits) ? cropped : await bakePhoto(cropped, editMatrix(edits)));
+            setStep('write');
+          } finally {
+            setWorking(false);
+          }
         }}
       />
     );
@@ -243,10 +310,10 @@ export default function CreateScreen() {
               <Animated.View key="photo" entering={appear} exiting={vanish} layout={glide} style={styles.photoCard}>
                 <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
                 <View style={styles.photoButtons}>
-                  <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.photoChip}>
+                  <Pressable accessibilityRole="button" onPress={clearPhoto} style={styles.photoChip}>
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Remove</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => choosePhoto()} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
+                  <Pressable accessibilityRole="button" onPress={() => { backToPhoto(); void choosePhoto(); }} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
                     <CameraIcon size={15} color={ground.text} />
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Change</Text>
                   </Pressable>
@@ -258,7 +325,10 @@ export default function CreateScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ busy: picking }}
                 disabled={picking}
-                onPress={() => choosePhoto()}
+                onPress={() => {
+                  backToPhoto();
+                  void choosePhoto();
+                }}
                 style={({ pressed }) => [styles.addRow, { borderColor: ground.line, opacity: pressed ? 0.7 : 1 }]}>
                 <View style={[styles.addRowIcon, { backgroundColor: ground.text }]}>
                   <CameraIcon size={19} color={ground.ground} />
@@ -405,15 +475,43 @@ function Check({ on, color, empty }: { on: boolean; color: string; empty: string
  * big at the top, Next to write the caption. The phone's own picker opens as
  * the tab opens; Camera roll reopens it, the camera button takes a new one.
  */
-function PhotoStep({ entering, photo, picking, hasDraft, onPick, onNext, onText, onBack, onClose }: { entering: ComponentProps<typeof Animated.View>['entering']; photo: PickedPhoto | null; picking: boolean; hasDraft: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onBack: () => void; onClose: () => void }) {
+type Rect = { originX: number; originY: number; width: number; height: number };
+
+function PhotoStep({
+  entering,
+  photo,
+  framing,
+  onFraming,
+  picking,
+  working,
+  hasDraft,
+  onPick,
+  onNext,
+  onText,
+  onBack,
+  onClose,
+}: {
+  entering: ComponentProps<typeof Animated.View>['entering'];
+  photo: PickedPhoto | null;
+  framing: Framing;
+  onFraming: (f: Framing) => void;
+  picking: boolean;
+  working: boolean;
+  hasDraft: boolean;
+  onPick: (from?: 'roll' | 'camera') => void;
+  onNext: (rect: Rect) => void;
+  onText: () => void;
+  onBack: () => void;
+  onClose: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const ground = useAppGround();
   const { width, height } = useWindowDimensions();
   const w = Math.min(width, 640);
-  // Square-ish, like the feed (between 4:5 and 5:4), but never more than about half the screen.
-  const ratio = photo ? Math.min(1.25, Math.max(0.8, photo.height / photo.width)) : 1;
-  const previewH = Math.min(w * ratio, height * 0.56);
-  const ready = !!photo && !picking;
+  // The photo's own shape (between 4:5 and 5:4, like the feed) or a square, never more than about half the screen.
+  const ratio = photo ? frameRatio(photo, framing.square) : 1;
+  const previewH = Math.round(Math.min(w * ratio, height * 0.56));
+  const ready = !!photo && !picking && !working;
 
   return (
     <SurfaceProvider value={groundSurface(ground)}>
@@ -433,15 +531,15 @@ function PhotoStep({ entering, photo, picking, hasDraft, onPick, onNext, onText,
             accessibilityRole="button"
             accessibilityState={{ disabled: !ready }}
             disabled={!ready}
-            onPress={onNext}
-            style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.8 : 1) : 0.3 }]}>
-            <Text style={[styles.shareText, { color: ground.ground }]}>Next</Text>
+            onPress={() => photo && onNext(cropRect(photo, w, previewH, framing))}
+            style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.8 : 1) : working ? 0.6 : 0.3 }]}>
+            <Text style={[styles.shareText, { color: ground.ground }]}>{working ? 'One sec…' : 'Next'}</Text>
           </Pressable>
         </View>
 
         {photo ? (
-          <Animated.View key={photo.uri} entering={FadeIn.duration(220).reduceMotion(ReduceMotion.System)}>
-            <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={{ width: w, height: previewH, backgroundColor: LOADING_TINT }} />
+          <Animated.View key={photo.uri} entering={FadeIn.duration(220).reduceMotion(ReduceMotion.System)} layout={glide}>
+            <CropFrame photo={photo} width={w} height={previewH} framing={framing} onChange={onFraming} />
           </Animated.View>
         ) : (
           <Pressable
@@ -472,6 +570,90 @@ function PhotoStep({ entering, photo, picking, hasDraft, onPick, onNext, onText,
             </Pressable>
           </View>
         </View>
+      </Animated.View>
+    </SurfaceProvider>
+  );
+}
+
+/**
+ * Step two (founder's option A): the framed photo with Filters (tiles you tap)
+ * and Adjust (four sliders). Next saves the look into the photo.
+ */
+function EditStep({ photo, edits, onEdits, working, onBack, onNext }: { photo: PickedPhoto; edits: PhotoEdits; onEdits: (e: PhotoEdits) => void; working: boolean; onBack: () => void; onNext: () => void }) {
+  const insets = useSafeAreaInsets();
+  const ground = useAppGround();
+  const { width, height } = useWindowDimensions();
+  const [tab, setTab] = useState<'filters' | 'adjust'>('filters');
+  const w = Math.min(width, 640);
+  const ratio = photo.height / photo.width;
+  const previewH = Math.round(Math.min(w * ratio, height * 0.47));
+  const previewW = Math.round(previewH / ratio);
+  const matrix = editMatrix(edits);
+
+  return (
+    <SurfaceProvider value={groundSurface(ground)}>
+      <Animated.View entering={pageIn('right')} style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
+        <View style={[styles.stepBar, { width: w }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back to framing" onPress={onBack} style={styles.stepIcon}>
+            <ChevronLeftIcon color={ground.text} />
+          </Pressable>
+          <DisplayText size={24} color={ground.text}>Edit</DisplayText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: working, busy: working }}
+            disabled={working}
+            onPress={onNext}
+            style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: working ? 0.6 : pressed ? 0.8 : 1 }]}>
+            <Text style={[styles.shareText, { color: ground.ground }]}>{working ? 'One sec…' : 'Next'}</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ width: w, height: previewH, alignItems: 'center', backgroundColor: ground.line }}>
+          <FilteredPhoto uri={photo.uri} matrix={matrix} width={previewW} height={previewH} />
+        </View>
+
+        <View style={{ width: w, marginTop: 8 }}>
+          <UnderlineTabs
+            label="Edit tools"
+            inset={10}
+            value={tab}
+            onChange={(k) => setTab(k as 'filters' | 'adjust')}
+            items={[
+              { key: 'filters', label: 'Filters' },
+              { key: 'adjust', label: 'Adjust' },
+            ]}
+          />
+        </View>
+
+        {tab === 'filters' ? (
+          <Animated.View key="filters" entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)} style={{ width: w }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {FILTERS.map((f) => {
+                const on = f.id === edits.filter;
+                return (
+                  <Pressable
+                    key={f.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={`${f.label} filter`}
+                    onPress={() => onEdits({ ...edits, filter: f.id })}
+                    style={({ pressed }) => [styles.filterTile, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+                    <View style={[styles.filterThumb, { borderColor: on ? ground.text : 'transparent' }]}>
+                      <FilteredPhoto uri={photo.uri} matrix={editMatrix({ filter: f.id, adjust: edits.adjust })} width={72} height={88} style={{ borderRadius: 11 }} />
+                    </View>
+                    <Text style={[styles.filterName, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]}>{f.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        ) : (
+          <Animated.View key="adjust" entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)} style={{ width: w, paddingTop: 8 }}>
+            {ADJUSTMENTS.map((a) => (
+              <AdjustSlider key={a.key} label={a.label} value={edits.adjust[a.key]} onChange={(v) => onEdits({ ...edits, adjust: { ...edits.adjust, [a.key]: v } })} />
+            ))}
+          </Animated.View>
+        )}
       </Animated.View>
     </SurfaceProvider>
   );
@@ -605,6 +787,10 @@ const styles = StyleSheet.create({
   rollButton: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
   rollText: { fontSize: 15, fontWeight: '700' },
   textChip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 19, borderWidth: 1, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  filterRow: { gap: 10, paddingHorizontal: 20, paddingTop: 16 },
+  filterTile: { alignItems: 'center', gap: 6 },
+  filterThumb: { borderRadius: 14, borderWidth: 2.5, padding: 1.5 },
+  filterName: { fontSize: 12 },
   camButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   caption: { marginHorizontal: 20, marginTop: 18, minHeight: 90, fontSize: 28, lineHeight: 32, paddingVertical: 4, textAlignVertical: 'top' },
   rows: { marginHorizontal: 20, marginTop: 12, borderTopWidth: 1 },

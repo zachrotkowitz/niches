@@ -47,17 +47,39 @@ async function keep(asset: ImagePicker.ImagePickerAsset): Promise<PickedPhoto> {
   const onWeb = Platform.OS === 'web';
   const shrunk = await manipulateAsync(asset.uri, resize, { compress: 0.75, format: SaveFormat.JPEG, base64: onWeb });
 
-  // On the web, keep the photo inline so it survives a page reload.
-  if (onWeb) return { uri: `data:image/jpeg;base64,${shrunk.base64}`, width: shrunk.width, height: shrunk.height };
+  return store(shrunk, onWeb);
+}
 
-  // On phones, move it out of the temporary cache so it's still there tomorrow.
+type Manipulated = { uri: string; width: number; height: number; base64?: string };
+
+/** Web: inline data so it survives a reload. Phones: move it out of the temporary cache. */
+async function store(shrunk: Manipulated, onWeb: boolean): Promise<PickedPhoto> {
+  if (onWeb) return { uri: `data:image/jpeg;base64,${shrunk.base64}`, width: shrunk.width, height: shrunk.height };
   try {
-    const dir = new Directory(Paths.document, 'photos');
-    if (!dir.exists) dir.create({ intermediates: true });
-    const dest = new File(dir, `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`);
+    const dest = newPhotoFile();
     await new File(shrunk.uri).copy(dest);
     return { uri: dest.uri, width: shrunk.width, height: shrunk.height };
   } catch {
     return { uri: shrunk.uri, width: shrunk.width, height: shrunk.height };
   }
+}
+
+function newPhotoFile() {
+  const dir = new Directory(Paths.document, 'photos');
+  if (!dir.exists) dir.create({ intermediates: true });
+  return new File(dir, `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`);
+}
+
+/** Cuts out the framed part of a photo (from the Post tab's pinch-and-drag frame). */
+export async function cropPhoto(photo: PickedPhoto, rect: { originX: number; originY: number; width: number; height: number }): Promise<PickedPhoto> {
+  const onWeb = Platform.OS === 'web';
+  const out = await manipulateAsync(photo.uri, [{ crop: rect }], { compress: 0.85, format: SaveFormat.JPEG, base64: onWeb });
+  return store(out, onWeb);
+}
+
+/** Saves JPEG bytes made on the phone (a filtered photo) and returns it as a photo. */
+export async function saveJpeg(bytes: Uint8Array, width: number, height: number): Promise<PickedPhoto> {
+  const dest = newPhotoFile();
+  await dest.write(bytes);
+  return { uri: dest.uri, width, height };
 }
