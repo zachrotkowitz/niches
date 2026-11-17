@@ -1,9 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInDown, FadeInLeft, FadeInRight, FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
@@ -12,7 +12,7 @@ import { DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { Text } from '@/components/text';
-import { UnderlineTabs } from '@/components/underline-tabs';
+import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
 import { diaryWords } from '@/lib/diary';
 import { shortTitle } from '@/lib/format';
@@ -25,6 +25,21 @@ import { BODY_FONTS, fonts, groundSurface, NICHE_ORDER, TOUCH, type Niche, type 
 import type { Post, PostKind } from '@/lib/types';
 
 type Kind = 'post' | 'progress' | 'question';
+
+// Motion for the Post tab (founder, Nov 2026: "more dynamic, less static").
+// Pages slide in from the side they come from; sections that appear or go
+// away fade and the rest glide into place.
+const ease = Easing.out(Easing.cubic);
+const pageIn = (from: 'left' | 'right') =>
+  (from === 'right' ? FadeInRight : FadeInLeft)
+    .duration(320)
+    .easing(ease)
+    .withInitialValues({ opacity: 0, transform: [{ translateX: from === 'right' ? 56 : -56 }] })
+    .reduceMotion(ReduceMotion.System);
+const glide = LinearTransition.duration(240).easing(ease).reduceMotion(ReduceMotion.System);
+// A short wait lets the rows below glide out of the way before the new section fades in.
+const appear = FadeInDown.delay(170).duration(260).easing(ease).reduceMotion(ReduceMotion.System);
+const vanish = FadeOut.duration(140).reduceMotion(ReduceMotion.System);
 
 // Shown behind a photo while it loads.
 const LOADING_TINT = '#E3E5E1';
@@ -61,6 +76,8 @@ export default function CreateScreen() {
   const [membersOnly, setMembersOnly] = useState(false);
   // Photo first, then the words.
   const [step, setStep] = useState<'photo' | 'write'>('photo');
+  // True when you've come back to the photo step from writing, so it slides in from the left.
+  const [cameBack, setCameBack] = useState(false);
   const focused = useIsFocused();
   const autoOpened = useRef(false);
   // Post to the niche you're in, if it's open for posting.
@@ -110,6 +127,8 @@ export default function CreateScreen() {
   }, [params.goalId]);
 
   const niche = NICHES[nicheId];
+  // The colored line under the niche you're posting to slides between niches.
+  const nicheLine = useSlidingLine(nicheId, niche.accent);
   const needsPhoto = kind !== 'question';
   const myGoals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt);
   const pickedGoal = goalId ? myGoals.find((g) => g.id === goalId) : undefined;
@@ -149,6 +168,7 @@ export default function CreateScreen() {
     setMembersOnly(false);
     setKind('post');
     setStep('photo');
+    setCameBack(false);
     if (params.goalId) router.setParams({ goalId: undefined });
   };
 
@@ -158,6 +178,7 @@ export default function CreateScreen() {
       <PhotoStep
         photo={photo}
         picking={picking}
+        entering={cameBack ? pageIn('left') : FadeIn.duration(240).reduceMotion(ReduceMotion.System)}
         onPick={choosePhoto}
         onNext={() => setStep('write')}
         onText={() => {
@@ -181,6 +202,7 @@ export default function CreateScreen() {
 
   return (
     <SurfaceProvider value={surface}>
+      <Animated.View entering={pageIn('right')} style={{ flex: 1 }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
           <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
@@ -202,7 +224,10 @@ export default function CreateScreen() {
               value={kind}
               onChange={(k) => {
                 // Coming back to Photo shows the same big photo screen you started on (founder, Nov 2026).
-                if (k === 'post' && kind !== 'post') setStep('photo');
+                if (k === 'post' && kind !== 'post') {
+                  setCameBack(true);
+                  setStep('photo');
+                }
                 setKind(k as Kind);
               }}
               items={[
@@ -215,7 +240,7 @@ export default function CreateScreen() {
 
           {needsPhoto ? (
             photo ? (
-              <View style={styles.photoCard}>
+              <Animated.View key="photo" entering={appear} exiting={vanish} layout={glide} style={styles.photoCard}>
                 <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
                 <View style={styles.photoButtons}>
                   <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.photoChip}>
@@ -226,8 +251,9 @@ export default function CreateScreen() {
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Change</Text>
                   </Pressable>
                 </View>
-              </View>
+              </Animated.View>
             ) : (
+              <Animated.View key="add" entering={appear} exiting={vanish} layout={glide}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ busy: picking }}
@@ -245,10 +271,12 @@ export default function CreateScreen() {
                   <ChevronLeftIcon size={18} color={ground.muted} />
                 </View>
               </Pressable>
+              </Animated.View>
             )
           ) : null}
 
           {/* Type straight in, in the serif, like a headline. */}
+          <Animated.View layout={glide}>
           <TextInput
             accessibilityLabel={kind === 'question' ? 'Your question' : 'Caption'}
             value={caption}
@@ -260,10 +288,11 @@ export default function CreateScreen() {
             selectionColor={ground.text}
             style={[styles.caption, { color: ground.text, fontFamily: caption ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
           />
+          </Animated.View>
 
-          <View style={[styles.rows, { borderTopColor: ground.line }]}>
+          <Animated.View layout={glide} style={[styles.rows, { borderTopColor: ground.line }]}>
             {kind === 'progress' ? (
-              <View style={[styles.row, { borderBottomColor: ground.line, alignItems: 'stretch', flexDirection: 'column', paddingVertical: 12, gap: 4 }]}>
+              <Animated.View entering={appear} exiting={vanish} style={[styles.row, { borderBottomColor: ground.line, alignItems: 'stretch', flexDirection: 'column', paddingVertical: 12, gap: 4 }]}>
                 <Eyebrow>Counts toward</Eyebrow>
                 {myGoals.map((g) => {
                   const on = g.id === goalId;
@@ -302,10 +331,10 @@ export default function CreateScreen() {
                 <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: nicheId } })} style={styles.link}>
                   <Text style={[styles.linkText, { color: ground.text }]}>+ Set a new goal</Text>
                 </Pressable>
-              </View>
+              </Animated.View>
             ) : null}
 
-            <View style={[styles.row, { borderBottomColor: ground.line, flexDirection: 'column', alignItems: 'stretch', paddingVertical: 12, gap: 6 }]}>
+            <Animated.View layout={glide} style={[styles.row, { borderBottomColor: ground.line, flexDirection: 'column', alignItems: 'stretch', paddingVertical: 12, gap: 6 }]}>
               <Eyebrow>Posting to</Eyebrow>
               <View accessibilityRole="radiogroup" style={styles.niches}>
                 {NICHE_ORDER.map((id) => {
@@ -322,14 +351,16 @@ export default function CreateScreen() {
                         setNicheId(id);
                         setGoalId(null);
                       }}
+                      onLayout={nicheLine.onItemLayout(id)}
                       style={styles.nicheWord}>
                       <Text style={[styles.nicheText, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500', opacity: n.open ? 1 : 0.5 }]}>{n.open ? n.label : `${n.label} · soon`}</Text>
-                      <View style={[styles.nicheLine, { backgroundColor: on ? n.accent : 'transparent' }]} />
+                      <View style={styles.nicheLine} />
                     </Pressable>
                   );
                 })}
+                {nicheLine.line}
               </View>
-            </View>
+            </Animated.View>
 
             {state.me?.membership ? (
               <Pressable accessibilityRole="switch" accessibilityState={{ checked: membersOnly }} onPress={() => setMembersOnly(!membersOnly)} style={[styles.row, { borderBottomColor: ground.line }]}>
@@ -342,8 +373,9 @@ export default function CreateScreen() {
                 </View>
               </Pressable>
             ) : null}
-          </View>
+          </Animated.View>
 
+          <Animated.View layout={glide}>
           <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/plans/new', params: { niche: nicheId } })} style={styles.planLink}>
             <Text style={[styles.planText, { color: ground.muted }]}>
               Planning something instead? <Text style={{ color: ground.text, fontWeight: '700', textDecorationLine: 'underline' }}>Make a plan</Text>
@@ -352,8 +384,10 @@ export default function CreateScreen() {
           <Text style={[styles.hint, { color: ground.muted, marginHorizontal: 20, marginTop: 6 }]}>
             Only you will see how many people liked or saved it.
           </Text>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </Animated.View>
     </SurfaceProvider>
   );
 }
@@ -371,7 +405,7 @@ function Check({ on, color, empty }: { on: boolean; color: string; empty: string
  * big at the top, Next to write the caption. The phone's own picker opens as
  * the tab opens; Camera roll reopens it, the camera button takes a new one.
  */
-function PhotoStep({ photo, picking, hasDraft, onPick, onNext, onText, onBack, onClose }: { photo: PickedPhoto | null; picking: boolean; hasDraft: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onBack: () => void; onClose: () => void }) {
+function PhotoStep({ entering, photo, picking, hasDraft, onPick, onNext, onText, onBack, onClose }: { entering: ComponentProps<typeof Animated.View>['entering']; photo: PickedPhoto | null; picking: boolean; hasDraft: boolean; onPick: (from?: 'roll' | 'camera') => void; onNext: () => void; onText: () => void; onBack: () => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const ground = useAppGround();
   const { width, height } = useWindowDimensions();
@@ -383,7 +417,7 @@ function PhotoStep({ photo, picking, hasDraft, onPick, onNext, onText, onBack, o
 
   return (
     <SurfaceProvider value={groundSurface(ground)}>
-      <View style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
+      <Animated.View entering={entering} style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
         <View style={[styles.stepBar, { width: w }]}>
           {hasDraft ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Back to your post" onPress={onBack} style={styles.stepIcon}>
@@ -438,10 +472,8 @@ function PhotoStep({ photo, picking, hasDraft, onPick, onNext, onText, onBack, o
             </Pressable>
           </View>
         </View>
-        <Text style={[styles.hint, { color: ground.muted, marginTop: 8, paddingHorizontal: 32 }]}>
-          {photo ? 'Happy with it? Tap Next to write about it.' : 'Just words or a question? Tap Just text.'}
-        </Text>
-      </View>
+        {photo ? <Text style={[styles.hint, { color: ground.muted, marginTop: 8, paddingHorizontal: 32 }]}>Happy with it? Tap Next to write about it.</Text> : null}
+      </Animated.View>
     </SurfaceProvider>
   );
 }
