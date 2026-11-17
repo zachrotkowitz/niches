@@ -1,15 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { interpolate, interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { Easing, FadeInUp, FadeOut, ReduceMotion, interpolate, interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { NicheCard } from '@/components/discover-parts';
-import { BagIcon, BellIcon, CalendarIcon, ChevronLeftIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
-import { Sheet } from '@/components/sheet';
+import { BagIcon, BellIcon, CalendarIcon, CheckIcon, ChevronLeftIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
 import { Text } from '@/components/text';
-import { weekFavorites } from '@/lib/discover';
-import { postPhoto } from '@/lib/demo-photos';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { SHOP_NICHES } from '@/lib/shop';
 import { inFeeds, useNiches, useStore } from '@/lib/store';
@@ -67,7 +64,20 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
   const now = new Date();
   const fresh = state.posts.filter((p) => p.niche === niche.id && inFeeds(state, p) && now.getTime() - p.createdAt < FRESH_WINDOW_MS).length;
   const meta = inShop ? `${niche.label} shop` : `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}${niche.open ? ` · ${fresh} new` : ''}`;
-  const open = () => setPicking(true);
+  // Where the menu drops from: just under the big name, or under the slim bar once it has folded.
+  const [menuTop, setMenuTop] = useState(0);
+  const open = () => {
+    const folded = Math.min(1, Math.max(0, scroll.get() / TITLE));
+    setMenuTop(insets.top + 6 + ROW + TITLE * (1 - folded) + 4);
+    setPicking(true);
+  };
+  const close = () => setPicking(false);
+  const pick = (id: (typeof NICHE_ORDER)[number]) => {
+    close();
+    if (id === state.niche) return;
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    actions.setNiche(id);
+  };
   const label = `${niche.label}. Switch niche`;
 
   const dashes = (
@@ -78,7 +88,7 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
     </View>
   );
   const chevron = (size: number) => (
-    <View style={{ transform: [{ rotate: '-90deg' }] }}>
+    <View style={{ transform: [{ rotate: picking ? '90deg' : '-90deg' }] }}>
       <ChevronLeftIcon size={size} color={niche.ink} />
     </View>
   );
@@ -139,33 +149,42 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
       </Animated.View>
       <Animated.View style={[styles.rule, { backgroundColor: niche.line }, rule]} />
 
-      <Sheet visible={picking} onClose={() => setPicking(false)} title="Your niches · or swipe left and right">
-        <View style={styles.pickGrid}>
-          {NICHE_ORDER.map((id) => (
-            <NicheCard
-              key={id}
-              niche={NICHES[id]}
-              posts={weekFavorites(state, [id], 3).posts.filter((p) => p.kind !== 'text' && postPhoto(p))}
-              notified={!!state.notify[id]}
-              current={id === state.niche}
-              width={Math.floor((Math.min(width, 560) - 34 - 12) / 2)}
-              onPress={() => {
-                setPicking(false);
-                actions.setNiche(id);
-              }}
-            />
-          ))}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            setPicking(false);
-            router.navigate('/discover');
-          }}
-          style={styles.request}>
-          <Text style={styles.requestText}>Missing a niche? Request one</Text>
-        </Pressable>
-      </Sheet>
+      {/* Option A (founder, Nov 17 2026): a small white menu drops from under the name. Nothing behind it is dimmed; tap outside to close. */}
+      <Modal visible={picking} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
+        <Pressable accessibilityLabel="Close the niche list" style={StyleSheet.absoluteFill} onPress={close} />
+        <Animated.View
+          entering={FadeInUp.duration(200).easing(Easing.out(Easing.cubic)).reduceMotion(ReduceMotion.System)}
+          exiting={FadeOut.duration(120).reduceMotion(ReduceMotion.System)}
+          accessibilityRole="menu"
+          style={[styles.menu, { top: menuTop, shadowColor: niche.ink }]}>
+          {NICHE_ORDER.map((id, i) => {
+            const n = NICHES[id];
+            const current = id === state.niche;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="menuitem"
+                accessibilityState={{ selected: current }}
+                accessibilityLabel={n.open ? n.label : `${n.label}, opening soon`}
+                onPress={() => pick(id)}
+                style={({ pressed }) => [styles.menuRow, i > 0 && styles.menuDivider, { backgroundColor: pressed ? 'rgba(31,26,20,0.05)' : 'transparent', opacity: n.open || current ? 1 : 0.5 }]}>
+                <View style={[styles.menuDot, { backgroundColor: n.accent }]} />
+                <Text style={styles.menuName} numberOfLines={1}>{n.label}</Text>
+                {current ? <CheckIcon size={20} color={n.ink} strokeWidth={2.4} /> : n.open ? null : <Text style={styles.menuSoon}>Soon</Text>}
+              </Pressable>
+            );
+          })}
+          <Pressable
+            accessibilityRole="menuitem"
+            onPress={() => {
+              close();
+              router.navigate('/discover');
+            }}
+            style={[styles.menuRequest, styles.menuDivider]}>
+            <Text style={styles.requestText}>Request a niche</Text>
+          </Pressable>
+        </Animated.View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -186,7 +205,12 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', gap: 5, alignItems: 'center' },
   dash: { height: 4, borderRadius: 2 },
   rule: { height: 1, marginTop: 7 },
-  pickGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 12, paddingHorizontal: 0, paddingBottom: 6 },
-  request: { minHeight: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  menu: { position: 'absolute', left: 20, width: 270, borderRadius: 20, backgroundColor: '#FFFFFF', paddingVertical: 4, shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: 14 }, elevation: 12 },
+  menuRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18 },
+  menuDivider: { borderTopWidth: StyleSheet.hairlineWidth * 2, borderTopColor: 'rgba(31,26,20,0.08)' },
+  menuDot: { width: 12, height: 12, borderRadius: 6 },
+  menuName: { flex: 1, fontFamily: fonts.displayItalic, fontSize: 30, lineHeight: 34, color: '#1F1A14' },
+  menuSoon: { fontSize: 12, fontWeight: '700', color: '#655B4F' },
+  menuRequest: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   requestText: { fontSize: 14, fontWeight: '600', color: '#3E444B', textDecorationLine: 'underline' },
 });
