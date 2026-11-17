@@ -82,11 +82,16 @@ export default function LogScreen() {
           </View>
 
           {source ? (
-            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/post/[id]', params: { id: source.id } })} style={styles.source}>
-              <Text style={styles.sourceLabel}>Made from</Text>
-              <Text style={styles.sourceText} numberOfLines={2}>
-                {source.mediaLabel ?? source.caption} · {usersById[source.authorId]?.username}
-              </Text>
+            <Pressable accessibilityRole="link" accessibilityLabel={`See original post: ${source.mediaLabel ?? source.caption}`} onPress={() => router.push({ pathname: '/post/[id]', params: { id: source.id } })} style={styles.source}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.sourceLabel}>See original post</Text>
+                <Text style={styles.sourceText} numberOfLines={2}>
+                  {source.mediaLabel ?? source.caption} · {usersById[source.authorId]?.username}
+                </Text>
+              </View>
+              <View style={{ transform: [{ rotate: '180deg' }] }}>
+                <ChevronLeftIcon size={18} color={colors.textMuted} />
+              </View>
             </Pressable>
           ) : null}
 
@@ -118,6 +123,14 @@ export default function LogScreen() {
         visible={menu}
         onClose={() => setMenu(false)}
         items={[
+          {
+            label: 'Edit entry',
+            detail: source ? 'Only changes your diary, not the original post.' : undefined,
+            onPress: () => {
+              setMenu(false);
+              router.push({ pathname: '/log/new', params: { edit: log.id } });
+            },
+          },
           {
             label: log.visibility === 'private' ? 'Show on my profile' : 'Make private',
             detail: log.visibility === 'private' ? 'It appears in the Diary tab on your profile.' : 'Only you will see it.',
@@ -156,7 +169,7 @@ const styles = StyleSheet.create({
   meta: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: colors.surface },
   badgeText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-  source: { padding: 12, borderRadius: 14, backgroundColor: colors.surface, gap: 2 },
+  source: { padding: 12, borderRadius: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
   sourceLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   sourceText: { fontSize: 14, color: colors.text },
 });

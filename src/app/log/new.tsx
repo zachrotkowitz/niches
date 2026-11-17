@@ -17,29 +17,40 @@ import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
-/** "I made this": add an entry to your diary. Private unless you choose otherwise. */
+/**
+ * "I made this": add an entry to your diary. Private unless you choose otherwise.
+ * With `edit=<entry id>` it edits an entry instead (founder, Nov 17 2026). The
+ * entry is its own copy: editing it never changes the post it came from, and
+ * editing that post never changes the entry.
+ */
 export default function NewLogScreen() {
-  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string }>();
+  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string; edit?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { state, actions, usersById } = useStore();
   const niches = useNiches();
-  const source = params.postId ? state.posts.find((p) => p.id === params.postId) : undefined;
+  const editing = params.edit ? state.logs.find((l) => l.id === params.edit && l.userId === state.me?.id) : undefined;
+  const sourceId = editing ? editing.postId : params.postId;
+  const source = sourceId ? state.posts.find((p) => p.id === sourceId) : undefined;
   const sourceAuthor = source ? usersById[source.authorId] : undefined;
 
-  const [nicheId, setNicheId] = useState<NicheId>(source?.niche ?? (params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche));
+  const [nicheId, setNicheId] = useState<NicheId>(editing?.niche ?? source?.niche ?? (params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche));
   const fromMyPost = !!source && source.authorId === state.me?.id;
   // Your own post's caption is the full text; demo posts have a short title already.
-  const [title, setTitle] = useState(source ? (fromMyPost ? shortTitle(source.caption) : source.mediaLabel ?? shortTitle(source.caption)) : '');
-  const [date, setDate] = useState(isoDay(0));
-  const [rating, setRating] = useState(0);
-  const [notes, setNotes] = useState('');
+  const [title, setTitle] = useState(editing ? editing.title : source ? (fromMyPost ? shortTitle(source.caption) : source.mediaLabel ?? shortTitle(source.caption)) : '');
+  const [date, setDate] = useState(editing?.date ?? isoDay(0));
+  const [rating, setRating] = useState(editing?.rating ?? 0);
+  const [notes, setNotes] = useState(editing?.notes ?? '');
   // Logging your own post brings its photo along.
   const [photo, setPhoto] = useState<PickedPhoto | null>(
-    fromMyPost && source?.imageUri ? { uri: source.imageUri, width: 1000, height: Math.round(1000 * (source.imageAspect ?? 1)) } : null,
+    editing
+      ? editing.imageUri
+        ? { uri: editing.imageUri, width: 1000, height: 1000 }
+        : null
+      : fromMyPost && source?.imageUri ? { uri: source.imageUri, width: 1000, height: Math.round(1000 * (source.imageAspect ?? 1)) } : null,
   );
-  const [visibility, setVisibility] = useState<LogVisibility>('private');
+  const [visibility, setVisibility] = useState<LogVisibility>(editing?.visibility ?? 'private');
   // Goals this entry counts toward. Personal bests need a number, so they're checked in on the goal itself.
   const [goalIds, setGoalIds] = useState<string[]>(params.goalId ? [params.goalId] : []);
 
@@ -48,10 +59,27 @@ export default function NewLogScreen() {
   const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt && g.kind !== 'best');
   const toggleGoal = (id: string) => setGoalIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const ready = !!state.me && title.trim().length > 0 && rating > 0;
-  const days = Array.from({ length: 14 }, (_, i) => isoDay(-i));
+  const recent = Array.from({ length: 14 }, (_, i) => isoDay(-i));
+  // An older entry keeps its own date in the list.
+  const days = editing && !recent.includes(editing.date) ? [...recent, editing.date] : recent;
 
   const save = () => {
     if (!ready || !state.me) return;
+    if (editing) {
+      actions.updateLog(editing.id, {
+        niche: nicheId,
+        title: title.trim(),
+        date,
+        rating,
+        notes: notes.trim() || undefined,
+        imageUri: photo?.uri,
+        mediaColor: photo ? '#E3E5E1' : editing.imageUri ? niche.field : editing.mediaColor,
+        visibility,
+      });
+      toast('Entry updated');
+      router.back();
+      return;
+    }
       const id = actions.addLog(
       {
         userId: state.me.id,
@@ -78,15 +106,17 @@ export default function NewLogScreen() {
         <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/profile'))} style={styles.navButton}>
           <Text style={[styles.navText, { color: niche.accent }]}>Cancel</Text>
         </Pressable>
-        <Text style={styles.navTitle}>{words.did}</Text>
+        <Text style={styles.navTitle}>{editing ? 'Edit entry' : words.did}</Text>
         <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={save} style={[styles.navButton, { alignItems: 'flex-end' }]}>
           <Text style={[styles.navText, { color: niche.accent, fontWeight: '700', opacity: ready ? 1 : 0.4 }]}>Save</Text>
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-        {source ? (
-          <Text style={[styles.from, { backgroundColor: niche.field, color: niche.ink }]}>From {sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}</Text>
+        {editing && !source ? (
+          <Text style={[styles.from, { backgroundColor: niche.field, color: niche.ink }]}>Changes stay in your diary</Text>
+        ) : source ? (
+          <Text style={[styles.from, { backgroundColor: niche.field, color: niche.ink }]}>{editing ? 'Changes stay in your diary. The original post won’t change.' : `From ${sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}`}</Text>
         ) : (
           <Field label="Niche">
             <View style={styles.wrap}>
@@ -157,7 +187,8 @@ export default function NewLogScreen() {
           </View>
         </Field>
 
-        {goals.length ? (
+        {/* Check-ins were counted when it was logged, so editing doesn't count them again. */}
+        {goals.length && !editing ? (
           <Field label="Counts toward">
             <View style={{ gap: 8 }}>
               {goals.map((g) => {
@@ -177,7 +208,7 @@ export default function NewLogScreen() {
         ) : null}
 
 
-        <Button label={rating ? 'Save to diary' : 'Rate it to save'} color={niche.accent} disabled={!ready} onPress={save} />
+        <Button label={editing ? 'Save changes' : rating ? 'Save to diary' : 'Rate it to save'} color={niche.accent} disabled={!ready} onPress={save} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
