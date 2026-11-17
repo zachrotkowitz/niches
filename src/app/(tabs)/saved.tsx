@@ -8,6 +8,7 @@ import { BoardCard, NewBoardCard, useCardWidth } from '@/components/boards';
 import { Eyebrow, RailTile, SectionTitle, ShopTile } from '@/components/discover-parts';
 import { FeedGrid } from '@/components/feed-grid';
 import { NicheFilter } from '@/components/niche-filter';
+import { QuickLog } from '@/components/quick-log';
 import { Button, DisplayText } from '@/components/primitives';
 import { usePullRefresh } from '@/components/pull-refresh';
 import { SurfaceProvider } from '@/components/surface';
@@ -31,6 +32,7 @@ export default function SavedScreen() {
   const pull = usePullRefresh(ground.text);
   const cardW = useCardWidth();
   const [filter, setFilter] = useState<NicheId[]>([]);
+  const [logging, setLogging] = useState<string | null>(null);
   const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   useTabReselect('saved', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
 
@@ -104,7 +106,7 @@ export default function SavedScreen() {
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`${diaryWords(p.niche).did}: ${p.mediaLabel ?? p.caption}`}
-                        onPress={() => router.push({ pathname: '/log/new', params: { postId: p.id } })}
+                        onPress={() => setLogging(p.id)}
                         style={({ pressed }) => [styles.did, { borderColor: ground.text, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
                         <Text style={[styles.didText, { color: ground.text }]}>{diaryWords(p.niche).did}</Text>
                       </Pressable>
@@ -151,6 +153,7 @@ export default function SavedScreen() {
         </Pressable>
       </Animated.ScrollView>
       {pull.spinner}
+      <QuickLog post={state.posts.find((p) => p.id === logging)} visible={!!logging} onClose={() => setLogging(null)} />
     </SurfaceProvider>
   );
 }

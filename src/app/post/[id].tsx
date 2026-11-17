@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
 import { PostCard } from '@/components/post-card';
+import { QuickLog } from '@/components/quick-log';
 import { diaryWords } from '@/lib/diary';
 import { Avatar, Button } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
@@ -20,6 +21,7 @@ export default function PostScreen() {
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const [draft, setDraft] = useState('');
+  const [logging, setLogging] = useState(false);
 
   const post = state.posts.find((p) => p.id === id);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -83,7 +85,7 @@ export default function PostScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push({ pathname: '/log/new', params: { postId: post.id } })}
+              onPress={() => setLogging(true)}
               style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
               <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{diaryWords(post.niche).did}</Text>
             </Pressable>
@@ -168,6 +170,7 @@ export default function PostScreen() {
       </View>
       )}
     </KeyboardAvoidingView>
+    <QuickLog post={post} visible={logging} onClose={() => setLogging(false)} />
     </SurfaceProvider>
   );
 }

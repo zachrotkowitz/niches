@@ -13,6 +13,7 @@ import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
 import { Text } from '@/components/text';
 import { CropFrame } from '@/components/crop-frame';
+import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { AdjustSlider } from '@/components/slider';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
@@ -675,6 +676,7 @@ function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }
   const post = state.posts.find((p) => p.id === posted.id);
   const goal = posted.goalId ? state.goals.find((g) => g.id === posted.goalId) : undefined;
   const question = posted.kind === 'question';
+  const [logging, setLogging] = useState(false);
 
   // This week (Monday to Sunday): your posts in this niche, by day.
   const monday = new Date();
@@ -744,10 +746,7 @@ function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }
         {!question && post ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              onDone();
-              router.push({ pathname: '/log/new', params: { postId: posted.id } });
-            }}
+            onPress={() => setLogging(true)}
             style={styles.secondary}>
             <Text style={[styles.secondaryText, { color: niche.ink }]}>Also add it to your {words.diary}</Text>
           </Pressable>
@@ -763,6 +762,7 @@ function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }
           </View>
         ) : null}
       </Animated.View>
+      <QuickLog post={post} visible={logging} onClose={() => setLogging(false)} />
     </View>
   );
 }

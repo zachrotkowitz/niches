@@ -271,7 +271,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
           {isMe ? (
             <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })} style={styles.logLink}>
               <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
-              <Text style={[styles.logLinkText, { color: surface.text }]}>{diaryWords(mainNiche).did}</Text>
+              <Text style={[styles.logLinkText, { color: surface.text }]}>Add a diary entry</Text>
             </Pressable>
           ) : null}
           {logs.length === 0 ? (

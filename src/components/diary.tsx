@@ -61,7 +61,7 @@ export function Stars({ rating, size = 14, color }: { rating: number; size?: num
  * Tap-to-rate stars, like Letterboxd: tap a star for a full star, tap the
  * same star again for a half star (tap once more to go back to full).
  */
-export function StarInput({ value, onChange, color }: { value: number; onChange: (v: number) => void; color: string }) {
+export function StarInput({ value, onChange, color, size = 32 }: { value: number; onChange: (v: number) => void; color: string; size?: number }) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const tap = (i: number) => onChange(value === i ? i - 0.5 : i);
@@ -82,7 +82,7 @@ export function StarInput({ value, onChange, color }: { value: number; onChange:
             accessibilityLabel={`${i} ${i === 1 ? 'star' : 'stars'}`}
             onPress={() => tap(i)}
             style={({ pressed }) => [styles.starButton, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
-            <PartStar size={32} fill={starFill(value, i)} color={color} empty="#9AA19B" />
+            <PartStar size={size} fill={starFill(value, i)} color={color} empty="#9AA19B" />
           </Pressable>
         ))}
       </View>

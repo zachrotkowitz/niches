@@ -6,16 +6,18 @@ import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StarInput } from '@/components/diary';
-import { CameraIcon, CheckIcon } from '@/components/icons';
-import { Button } from '@/components/primitives';
+import { Eyebrow } from '@/components/discover-parts';
+import { CameraIcon, CheckIcon, CloseIcon } from '@/components/icons';
+import { SurfaceProvider } from '@/components/surface';
+import { DisplayText } from '@/components/primitives';
 import { useToast } from '@/components/toast';
 import { diaryWords, type LogVisibility } from '@/lib/diary';
 import { goalRule } from '@/lib/goals';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { shortTitle } from '@/lib/format';
-import { isoDay } from '@/lib/plans';
-import { useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
+import { isoDay, parseDay } from '@/lib/plans';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
 /**
  * "I made this": add an entry to your diary. Private unless you choose otherwise.
@@ -30,6 +32,7 @@ export default function NewLogScreen() {
   const toast = useToast();
   const { state, actions, usersById } = useStore();
   const niches = useNiches();
+  const appGround = useAppGround();
   const editing = params.edit ? state.logs.find((l) => l.id === params.edit && l.userId === state.me?.id) : undefined;
   const sourceId = editing ? editing.postId : params.postId;
   const source = sourceId ? state.posts.find((p) => p.id === sourceId) : undefined;
@@ -100,150 +103,161 @@ export default function NewLogScreen() {
     router.replace({ pathname: '/log/[id]', params: { id } });
   };
 
+  const ground = groundSurface(appGround);
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/profile'));
+  const dayName = (d: string, i: number) => (i === 0 ? 'Today' : i === 1 ? 'Yesterday' : parseDay(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }));
+  const quiet = (on: boolean, accent: string) => [styles.word, { color: on ? ground.text : ground.muted, fontWeight: on ? ('700' as const) : ('500' as const), borderBottomColor: on ? accent : 'transparent' }];
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: 'transparent' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.nav, { paddingTop: insets.top + 6 }]}>
-        <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/profile'))} style={styles.navButton}>
-          <Text style={[styles.navText, { color: niche.accent }]}>Cancel</Text>
+    <SurfaceProvider value={ground}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={close} style={styles.close}>
+          <CloseIcon color={ground.text} />
         </Pressable>
-        <Text style={styles.navTitle}>{editing ? 'Edit entry' : words.did}</Text>
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={save} style={[styles.navButton, { alignItems: 'flex-end' }]}>
-          <Text style={[styles.navText, { color: niche.accent, fontWeight: '700', opacity: ready ? 1 : 0.4 }]}>Save</Text>
-        </Pressable>
-      </View>
+        <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
+          <DisplayText size={38} color={ground.text}>{editing ? 'Edit entry' : 'Diary entry'}</DisplayText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !ready }}
+            disabled={!ready}
+            onPress={save}
+            style={({ pressed }) => [styles.savePill, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.85 : 1) : 0.3 }]}>
+            <Text style={[styles.saveText, { color: ground.ground }]}>Save</Text>
+          </Pressable>
+        </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-        {editing && !source ? (
-          <Text style={[styles.from, { backgroundColor: niche.field, color: niche.ink }]}>Changes stay in your diary</Text>
-        ) : source ? (
-          <Text style={[styles.from, { backgroundColor: niche.field, color: niche.ink }]}>{editing ? 'Changes stay in your diary. The original post won’t change.' : `From ${sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}`}</Text>
-        ) : (
-          <Field label="Niche">
-            <View style={styles.wrap}>
-              {NICHE_ORDER.map((id) => {
-                const on = id === nicheId;
-                return (
-                  <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setNicheId(id)} style={[styles.chip, { borderColor: niches[id].accent }, on ? { backgroundColor: niches[id].accent } : null]}>
-                    <Text style={[styles.chipText, { color: on ? '#FFFFFF' : colors.textBody }]}>{niches[id].label}</Text>
-                  </Pressable>
-                );
-              })}
+        {/* Photo, and where it came from */}
+        <View style={styles.photoRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={[styles.thumb, { backgroundColor: photo ? '#E3E5E1' : ground.line }]}>
+            {photo ? <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={22} color={ground.text} />}
+          </Pressable>
+          <View style={{ flex: 1, gap: 3 }}>
+            {source ? <Eyebrow>{editing ? 'Changes stay in your diary' : `From ${sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}`}</Eyebrow> : null}
+            <View style={{ flexDirection: 'row', gap: 14 }}>
+              <Pressable accessibilityRole="button" onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={styles.smallLink}>
+                <Text style={[styles.smallLinkText, { color: ground.text }]}>{photo ? 'Change photo' : 'Add a photo'}</Text>
+              </Pressable>
+              {photo ? (
+                <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.smallLink}>
+                  <Text style={[styles.smallLinkText, { color: ground.muted }]}>Remove</Text>
+                </Pressable>
+              ) : null}
             </View>
-          </Field>
-        )}
-
-        <Field label={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}>
-          <TextInput accessibilityLabel="Title" value={title} onChangeText={setTitle} maxLength={60} placeholder={nicheId === 'cooking' ? 'e.g. Weeknight carbonara' : 'Give it a name'} placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-        </Field>
-
-        <Field label="How did it turn out?">
-          <StarInput value={rating} onChange={setRating} color={niche.accent} />
-        </Field>
-
-        <Field label="When">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {days.map((d, i) => {
-              const on = d === date;
-              return (
-                <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setDate(d)} style={[styles.day, on ? { backgroundColor: niche.accent } : null]}>
-                  <Text style={[styles.dayText, on ? { color: '#FFFFFF' } : null]}>
-                    {i === 0 ? 'Today' : i === 1 ? 'Yesterday' : new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </Field>
-
-        {photo ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Change photo" onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={styles.photo}>
-            <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
-          </Pressable>
-        ) : (
-          <Pressable accessibilityRole="button" onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={styles.picker}>
-            <CameraIcon color={colors.textBody} />
-            <Text style={styles.pickerText}>Add a photo of yours (optional)</Text>
-          </Pressable>
-        )}
-
-        <Field label="Notes for next time (optional)">
-          <TextInput accessibilityLabel="Notes" value={notes} onChangeText={setNotes} multiline maxLength={500} placeholder={nicheId === 'cooking' ? 'e.g. Halve the soy, double the garlic' : 'What would you change?'} placeholderTextColor="#6B7178" style={[styles.input, { minHeight: 90, textAlignVertical: 'top', paddingTop: 12 }]} selectionColor={niche.accent} />
-        </Field>
-
-        <Field label="Who can see this entry">
-          <View style={{ gap: 8 }}>
-            {(['private', 'profile'] as LogVisibility[]).map((v) => {
-              const on = v === visibility;
-              return (
-                <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setVisibility(v)} style={[styles.option, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                  <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.optionTitle}>{v === 'private' ? 'Just me' : 'On my profile'}</Text>
-                    <Text style={styles.optionSub}>{v === 'private' ? 'Your private diary. Nobody else sees it.' : 'Shows in the Diary tab on your profile.'}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
           </View>
-        </Field>
+        </View>
 
-        {/* Check-ins were counted when it was logged, so editing doesn't count them again. */}
-        {goals.length && !editing ? (
-          <Field label="Counts toward">
-            <View style={{ gap: 8 }}>
+        <TextInput
+          accessibilityLabel="Title"
+          value={title}
+          onChangeText={setTitle}
+          maxLength={60}
+          multiline
+          placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
+          placeholderTextColor={ground.muted}
+          selectionColor={ground.text}
+          style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+        />
+
+        <View style={{ paddingVertical: 8 }}>
+          <StarInput value={rating} onChange={setRating} color={niche.accent} size={42} />
+        </View>
+
+        <View style={[styles.rows, { borderTopColor: ground.line }]}>
+          {source ? null : (
+            <View style={[styles.block, { borderBottomColor: ground.line }]}>
+              <Eyebrow>Niche</Eyebrow>
+              <View accessibilityRole="radiogroup" style={styles.words}>
+                {NICHE_ORDER.map((id) => (
+                  <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: id === nicheId }} onPress={() => setNicheId(id)} style={styles.wordHit}>
+                    <Text style={quiet(id === nicheId, niches[id].accent)}>{niches[id].label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={[styles.block, { borderBottomColor: ground.line }]}>
+            <Eyebrow>When</Eyebrow>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.words}>
+              {days.map((d, i) => (
+                <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === date }} onPress={() => setDate(d)} style={styles.wordHit}>
+                  <Text style={quiet(d === date, ground.text)}>{dayName(d, i)}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={[styles.block, { borderBottomColor: ground.line }]}>
+            <Eyebrow>Notes for next time</Eyebrow>
+            <TextInput
+              accessibilityLabel="Notes"
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              maxLength={500}
+              placeholder="What would you change?"
+              placeholderTextColor={ground.muted}
+              selectionColor={ground.text}
+              style={[styles.notesInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+            />
+          </View>
+
+          {/* Check-ins were counted when it was logged, so editing doesn't count them again. */}
+          {goals.length && !editing ? (
+            <View style={[styles.block, { borderBottomColor: ground.line }]}>
+              <Eyebrow>Counts toward</Eyebrow>
               {goals.map((g) => {
                 const on = goalIds.includes(g.id);
                 return (
-                  <Pressable key={g.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => toggleGoal(g.id)} style={styles.check}>
-                    <View style={[styles.box, on ? { backgroundColor: niche.accent, borderColor: niche.accent } : null]}>{on ? <CheckIcon size={15} strokeWidth={3} /> : null}</View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={styles.optionTitle}>{g.title}</Text>
-                      <Text style={styles.optionSub}>{goalRule(g)}</Text>
+                  <Pressable key={g.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => toggleGoal(g.id)} style={styles.goal}>
+                    <View style={{ flex: 1, gap: 1 }}>
+                      <Text style={[styles.goalTitle, { color: ground.text }]}>{g.title}</Text>
+                      <Text style={[styles.goalSub, { color: ground.muted }]}>{goalRule(g)}</Text>
                     </View>
+                    <View style={[styles.check, on ? { backgroundColor: ground.text, borderColor: ground.text } : { borderColor: ground.muted }]}>{on ? <CheckIcon size={14} strokeWidth={2.8} /> : null}</View>
                   </Pressable>
                 );
               })}
             </View>
-          </Field>
-        ) : null}
+          ) : null}
 
-
-        <Button label={editing ? 'Save changes' : rating ? 'Save to diary' : 'Rate it to save'} color={niche.accent} disabled={!ready} onPress={save} />
+          <View style={[styles.block, { borderBottomColor: ground.line }]}>
+            <Eyebrow>Who can see it</Eyebrow>
+            <View accessibilityRole="radiogroup" style={styles.words}>
+              {(['private', 'profile'] as LogVisibility[]).map((v) => (
+                <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: v === visibility }} onPress={() => setVisibility(v)} style={styles.wordHit}>
+                  <Text style={quiet(v === visibility, ground.text)}>{v === 'private' ? 'Just me' : 'On my profile'}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[styles.goalSub, { color: ground.muted }]}>{visibility === 'private' ? 'Your private diary. Nobody else sees it.' : 'Shows in the Diary tab on your profile.'}</Text>
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ gap: 8 }}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </View>
+    </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  navButton: { minWidth: 80, minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 12 },
-  navText: { fontSize: 17 },
-  navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
-  from: { alignSelf: 'flex-start', fontSize: 13, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, overflow: 'hidden' },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 19, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  chipText: { fontSize: 14, fontWeight: '600' },
-  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 14, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF' },
-  day: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 14, fontWeight: '600', color: colors.textBody },
-  photo: { height: 220, borderRadius: 18, overflow: 'hidden', backgroundColor: '#E3E5E1' },
-  picker: { minHeight: 64, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#B9BFB8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  pickerText: { fontSize: 15, fontWeight: '600', color: colors.textBody },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  optionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  optionSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  check: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', paddingVertical: 4 },
-  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  close: { width: TOUCH, height: TOUCH, marginLeft: -10, alignItems: 'center', justifyContent: 'center' },
+  masthead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1 },
+  savePill: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  saveText: { fontSize: 15, fontWeight: '700' },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 16 },
+  thumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  smallLink: { minHeight: 32, justifyContent: 'center' },
+  smallLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+  titleInput: { fontSize: 36, lineHeight: 40, paddingTop: 14, paddingBottom: 4, minHeight: 56 },
+  rows: { borderTopWidth: StyleSheet.hairlineWidth * 2, marginTop: 6 },
+  block: { paddingVertical: 14, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  words: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 20 },
+  wordHit: { minHeight: 40, justifyContent: 'center' },
+  word: { fontSize: 15, paddingBottom: 5, borderBottomWidth: 2.5 },
+  notesInput: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 27, minHeight: 60, paddingVertical: 2, textAlignVertical: 'top' },
+  goal: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH },
+  goalTitle: { fontSize: 15, fontWeight: '700' },
+  goalSub: { fontSize: 13, lineHeight: 18 },
+  check: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
