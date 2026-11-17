@@ -5,13 +5,14 @@ import { Text } from '@/components/text';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
 import { Badges, MembershipCard } from '@/components/creator';
-import { DiaryRow, TopFour } from '@/components/diary';
+import { TopFour } from '@/components/diary';
+import { DiaryCalendar, DiaryList } from '@/components/diary-views';
 import { BoardCard, useCardWidth } from '@/components/boards';
 import { CoverCollage } from '@/components/cover';
 import { PhotoViewer, type PhotoOrigin } from '@/components/photo-viewer';
 import { GoalCard } from '@/components/goals';
 import { Sheet } from '@/components/sheet';
-import { CheckIcon, LockIcon, PencilIcon, PlusIcon } from '@/components/icons';
+import { CalendarIcon, CheckIcon, ListIcon, LockIcon, PencilIcon, PlusIcon } from '@/components/icons';
 import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
@@ -23,7 +24,7 @@ import { isoDay } from '@/lib/plans';
 import { diaryWords } from '@/lib/diary';
 import { progress, visibleGoals } from '@/lib/goals';
 import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } from '@/lib/store';
-import { colors, fonts, NICHE_ORDER, type NicheId, type Surface } from '@/lib/theme';
+import { colors, fonts, NICHE_ORDER, TOUCH, type NicheId, type Surface } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
@@ -36,6 +37,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
   const { state, actions } = useStore();
   const niches = useNiches();
   const [tab, setTab] = useState<Tab>('all');
+  const [diaryView, setDiaryView] = useState<'list' | 'calendar'>('list');
   const [editing, setEditing] = useState(false);
   // Where the small picture is, so the enlarged one can glide out of it.
   const [photoOrigin, setPhotoOrigin] = useState<PhotoOrigin | null>(null);
@@ -247,18 +249,30 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
         <View style={styles.diary}>
           {isMe ? <RecapCard niche={mainNiche} /> : null}
           {logs.length ? (
-            <View style={[styles.diaryStats, { backgroundColor: '#FFFFFF' }]}>
-              <Stat value={String(logs.length)} label="logged" ink={surface.text} />
-              <Stat value={String(thisMonth)} label="this month" ink={surface.text} />
-              <Stat value={avg ? avg.toFixed(1) : '–'} label="avg stars" ink={surface.text} />
+            <View style={styles.diaryHead}>
+              <View style={styles.diaryStatsRow}>
+                <SerifStat value={String(logs.length)} label="logged" ink={surface.text} muted={surface.muted} />
+                <SerifStat value={String(thisMonth)} label="this month" ink={surface.text} muted={surface.muted} />
+                <SerifStat value={avg ? avg.toFixed(1) : '–'} label="average ★" ink={surface.text} muted={surface.muted} />
+              </View>
+              {/* List or calendar (founder, Nov 17 2026: A's list, B's calendar, your pick). */}
+              <View accessibilityRole="radiogroup" accessibilityLabel="Diary view" style={styles.viewToggle}>
+                {(['list', 'calendar'] as const).map((v) => {
+                  const on = diaryView === v;
+                  return (
+                    <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={v === 'list' ? 'List' : 'Calendar'} onPress={() => setDiaryView(v)} style={[styles.viewButton, on && { backgroundColor: '#FFFFFF' }]}>
+                      {v === 'list' ? <ListIcon size={19} color={on ? surface.text : surface.muted} /> : <CalendarIcon size={19} color={on ? surface.text : surface.muted} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           ) : null}
           {isMe ? (
-            <Button
-              label={`${diaryWords(mainNiche).did}: log something`}
-              color={surface.text}
-              onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })}
-            />
+            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })} style={styles.logLink}>
+              <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
+              <Text style={[styles.logLinkText, { color: surface.text }]}>{diaryWords(mainNiche).did}</Text>
+            </Pressable>
           ) : null}
           {logs.length === 0 ? (
             <Text style={styles.diaryEmpty}>
@@ -266,8 +280,10 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
                 ? 'Your diary is private by default: a record of everything you make, with stars and notes for next time. Tap “I made this” on any post, or log something of your own.'
                 : 'Nothing in their diary yet.'}
             </Text>
+          ) : diaryView === 'list' ? (
+            <DiaryList logs={logs} showPrivacy={isMe} />
           ) : (
-            logs.map((l) => <DiaryRow key={l.id} log={l} showPrivacy={isMe} />)
+            <DiaryCalendar logs={logs} />
           )}
           {isMe && logs.length ? <Text style={styles.diaryNote}>Entries with a lock are private. Everything else shows here on your profile.</Text> : null}
         </View>
@@ -319,6 +335,15 @@ function RecapCard({ niche: id }: { niche: NicheId }) {
         <Text style={[styles.recapSub, { color: surface.ground }]}>What you made, your go-tos, your best weeks</Text>
       </View>
     </Pressable>
+  );
+}
+
+function SerifStat({ value, label, ink, muted }: { value: string; label: string; ink: string; muted: string }) {
+  return (
+    <View>
+      <Text style={{ fontFamily: fonts.display, fontSize: 30, lineHeight: 32, color: ink, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text style={{ fontSize: 12, color: muted }}>{label}</Text>
+    </View>
   );
 }
 
@@ -410,6 +435,12 @@ const makeStyles = (sf: Surface) =>
   plans: { paddingHorizontal: 20, marginTop: 20, gap: 10 },
   favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
+  diaryHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 4 },
+  diaryStatsRow: { flexDirection: 'row', gap: 22 },
+  viewToggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.06)' },
+  viewButton: { width: 40, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  logLink: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, alignSelf: 'flex-start' },
+  logLinkText: { fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
   diaryStats: { flexDirection: 'row', paddingVertical: 14, borderRadius: 16, marginBottom: 6 },
   diaryEmpty: { fontSize: 15, lineHeight: 21, color: sf.body, padding: 16, borderRadius: 14, backgroundColor: sf.raised },
   goalsSummary: { fontSize: 15, color: sf.body, marginBottom: 4 },

@@ -7,14 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Stars } from '@/components/diary';
 import { ChevronLeftIcon, LockIcon, MoreIcon } from '@/components/icons';
+import { Eyebrow } from '@/components/discover-parts';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
+import { SurfaceProvider } from '@/components/surface';
 import { Sheet } from '@/components/sheet';
 import { useToast } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { dayLabel } from '@/lib/plans';
-import { useNiches, useStore } from '@/lib/store';
-import { logPhoto } from '@/lib/demo-photos';
-import { colors, TOUCH } from '@/lib/theme';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { logPhoto, postPhoto } from '@/lib/demo-photos';
+import { parseDay } from '@/lib/plans';
+import { colors, fonts, groundSurface, TOUCH } from '@/lib/theme';
 
 /** One diary entry. The owner can change who sees it, share it, add it to their Top 4, or delete it. */
 export default function LogScreen() {
@@ -25,6 +28,7 @@ export default function LogScreen() {
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const [menu, setMenu] = useState(false);
+  const appGround = useAppGround();
   const log = state.logs.find((l) => l.id === id);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/profile'));
   const isMine = !!log && log.userId === state.me?.id;
@@ -46,77 +50,104 @@ export default function LogScreen() {
   const inTop = favs.some((r) => r.kind === 'log' && r.id === log.id);
 
 
+  const ground = groundSurface(appGround);
+  // "Your 3rd time making it": other entries of yours from the same post, or with the same name.
+  const tries = state.logs.filter((l) => l.userId === log.userId && (log.postId ? l.postId === log.postId : l.title.trim().toLowerCase() === log.title.trim().toLowerCase()) && (l.date < log.date || (l.date === log.date && l.createdAt <= log.createdAt))).length;
+  const nth = tries === 2 ? '2nd' : tries === 3 ? '3rd' : `${tries}th`;
+  const photo = logPhoto(log);
+  const date = parseDay(log.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+
   return (
-    <View style={styles.screen}>
+    <SurfaceProvider value={ground}>
+    <View style={[styles.screen, { backgroundColor: ground.ground }]}>
       <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.iconButton}>
-          <ChevronLeftIcon color={colors.text} />
+          <ChevronLeftIcon color={ground.text} />
         </Pressable>
         {isMine ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Entry options" onPress={() => setMenu(true)} style={styles.iconButton}>
-            <MoreIcon color={colors.text} />
+            <MoreIcon color={ground.text} />
           </Pressable>
         ) : null}
       </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={[styles.hero, { backgroundColor: log.mediaColor ?? niche.field }]}>
-          {logPhoto(log) ? <Image source={logPhoto(log)} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${log.title}`} /> : null}
-        </View>
-        <View style={styles.body}>
-          <Text style={[styles.kicker, { color: niche.ink, backgroundColor: niche.field }]}>
-            {words.diary} · {dayLabel(log.date)}
-          </Text>
-          <DisplayText size={28}>{log.title}</DisplayText>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 40, gap: 10 }}>
+        <Eyebrow>{`${words.diary} · ${date}`}</Eyebrow>
+        <DisplayText size={42} color={ground.text}>{log.title}</DisplayText>
+        <View style={styles.starRow}>
           <Stars rating={log.rating} size={22} color={niche.accent} />
-          {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
+          {tries > 1 ? <Text style={[styles.tries, { color: ground.muted }]}>{isMine ? 'Your' : 'Their'} {nth} time {log.niche === 'photography' ? 'shooting' : 'making'} it</Text> : null}
+        </View>
+        <View style={[styles.photo, { backgroundColor: log.mediaColor ?? niche.field }]}>
+          {photo ? <Image source={photo} contentFit="cover" style={StyleSheet.absoluteFill} accessibilityLabel={`Photo: ${log.title}`} /> : null}
+        </View>
+        {log.notes ? <Text style={[styles.quote, { color: ground.text }]}>“{log.notes}”</Text> : null}
 
-          <View style={styles.metaRow}>
-            <Avatar user={owner} size={28} />
-            <Text style={styles.meta}>{isMine ? 'Your entry' : owner?.username}</Text>
-            {isMine ? (
-              <View style={styles.badge}>
-                {log.visibility === 'private' ? <LockIcon size={12} color={colors.textSecondary} /> : null}
-                <Text style={styles.badgeText}>{log.visibility === 'private' ? 'Just you' : 'On your profile'}</Text>
-              </View>
-            ) : null}
-          </View>
-
+        <View style={[styles.rows, { borderTopColor: ground.line }]}>
           {source ? (
-            <Pressable accessibilityRole="link" accessibilityLabel={`See original post: ${source.mediaLabel ?? source.caption}`} onPress={() => router.push({ pathname: '/post/[id]', params: { id: source.id } })} style={styles.source}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.sourceLabel}>See original post</Text>
-                <Text style={styles.sourceText} numberOfLines={2}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`See original post: ${source.mediaLabel ?? source.caption}`}
+              onPress={() => router.push({ pathname: '/post/[id]', params: { id: source.id } })}
+              style={({ pressed }) => [styles.row, { borderBottomColor: ground.line, opacity: pressed ? 0.7 : 1 }]}>
+              <View style={[styles.rowThumb, { backgroundColor: source.mediaColor ?? niche.field }]}>
+                {postPhoto(source) ? <Image source={postPhoto(source)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+              </View>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={[styles.rowTitle, { color: ground.text }]}>See original post</Text>
+                <Text style={[styles.rowSub, { color: ground.muted }]} numberOfLines={1}>
                   {source.mediaLabel ?? source.caption} · {usersById[source.authorId]?.username}
                 </Text>
               </View>
               <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <ChevronLeftIcon size={18} color={colors.textMuted} />
+                <ChevronLeftIcon size={18} color={ground.muted} />
               </View>
             </Pressable>
           ) : null}
-
           {isMine ? (
-            <View style={{ gap: 8, marginTop: 8 }}>
-              {log.sharedPostId ? (
-                <Button tone="outline" label="See the post you shared" onPress={() => router.push({ pathname: '/post/[id]', params: { id: log.sharedPostId! } })} />
-              ) : null}
-              <Button
-                tone="outline"
-                label={inTop ? `In your ${words.top}` : favs.length >= MAX_FAVORITES ? `Swap into your ${words.top}` : `Add to your ${words.top}`}
-                disabled={inTop}
-                onPress={() => {
-                  if (!state.me) return;
-                  if (favs.length < MAX_FAVORITES) {
-                    actions.setFavorites(state.me.id, log.niche, [...favs, { kind: 'log', id: log.id }]);
-                    toast(`Added to your ${words.top}`);
-                  } else {
-                    router.push({ pathname: '/favorites/[niche]', params: { niche: log.niche } });
-                  }
-                }}
-              />
+            <View style={[styles.row, { borderBottomColor: ground.line }]}>
+              <View style={styles.rowIcon}>
+                {log.visibility === 'private' ? <LockIcon size={18} color={ground.text} /> : <Avatar user={owner} size={26} />}
+              </View>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={[styles.rowTitle, { color: ground.text }]}>{log.visibility === 'private' ? 'Just you' : 'On your profile'}</Text>
+                <Text style={[styles.rowSub, { color: ground.muted }]}>{log.visibility === 'private' ? 'Tap ⋯ to show it on your profile' : 'Anyone on your profile’s Diary tab can see it'}</Text>
+              </View>
             </View>
-          ) : null}
+          ) : (
+            <Pressable accessibilityRole="link" onPress={() => owner && router.push({ pathname: '/user/[id]', params: { id: owner.id } })} style={[styles.row, { borderBottomColor: ground.line }]}>
+              <View style={styles.rowIcon}><Avatar user={owner} size={26} /></View>
+              <Text style={[styles.rowTitle, { color: ground.text, flex: 1 }]}>{owner?.username}’s diary</Text>
+            </Pressable>
+          )}
         </View>
+
+        {isMine ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 22 }}>
+            {log.sharedPostId ? (
+              <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/post/[id]', params: { id: log.sharedPostId! } })} style={styles.link}>
+                <Text style={[styles.linkText, { color: ground.text }]}>See the post you shared</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: inTop }}
+              disabled={inTop}
+              onPress={() => {
+                if (!state.me) return;
+                if (favs.length < MAX_FAVORITES) {
+                  actions.setFavorites(state.me.id, log.niche, [...favs, { kind: 'log', id: log.id }]);
+                  toast(`Added to your ${words.top}`);
+                } else {
+                  router.push({ pathname: '/favorites/[niche]', params: { niche: log.niche } });
+                }
+              }}
+              style={styles.link}>
+              <Text style={[styles.linkText, { color: inTop ? ground.muted : ground.text, textDecorationLine: inTop ? 'none' : 'underline' }]}>
+                {inTop ? `In your ${words.top}` : favs.length >= MAX_FAVORITES ? `Swap into your ${words.top}` : `Add to your ${words.top}`}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
 
       <Sheet
@@ -154,22 +185,24 @@ export default function LogScreen() {
         ]}
       />
     </View>
+    </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1 },
   nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  hero: { height: 300, overflow: 'hidden' },
-  body: { padding: 20, gap: 10 },
-  kicker: { alignSelf: 'flex-start', fontSize: 12, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
-  notes: { fontSize: 16, lineHeight: 23, color: colors.textBody },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  meta: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: colors.surface },
-  badgeText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-  source: { padding: 12, borderRadius: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sourceLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  sourceText: { fontSize: 14, color: colors.text },
+  starRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  tries: { fontSize: 13 },
+  photo: { height: 300, borderRadius: 22, overflow: 'hidden', marginTop: 6 },
+  quote: { fontFamily: fonts.displayItalic, fontSize: 23, lineHeight: 28, marginTop: 6 },
+  rows: { borderTopWidth: StyleSheet.hairlineWidth * 2, marginTop: 6 },
+  row: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  rowThumb: { width: 40, height: 40, borderRadius: 10, overflow: 'hidden' },
+  rowIcon: { width: 40, alignItems: 'center' },
+  rowTitle: { fontSize: 15, fontWeight: '700' },
+  rowSub: { fontSize: 13 },
+  link: { minHeight: TOUCH, justifyContent: 'center' },
+  linkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
 });

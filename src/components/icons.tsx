@@ -258,3 +258,14 @@ export function TextIcon({ size = 15, color = '#14161A', strokeWidth = 2 }: Icon
     </Svg>
   );
 }
+
+export function ListIcon({ size = 20, color = '#14161A', strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Path d="M9 6h11M9 12h11M9 18h11" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Circle cx={4.5} cy={6} r={1.3} fill={color} />
+      <Circle cx={4.5} cy={12} r={1.3} fill={color} />
+      <Circle cx={4.5} cy={18} r={1.3} fill={color} />
+    </Svg>
+  );
+}
