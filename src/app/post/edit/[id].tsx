@@ -122,7 +122,6 @@ export default function EditPostScreen() {
             <View style={{ width: 172 }}>
               <GridTile post={draft} interactive={false} />
             </View>
-            <Text style={styles.previewNote}>This is how your post appears in the {niche.label} grid, Saved and Discover. The full post doesn’t change.</Text>
           </View>
         </View>
       </ScrollView>
@@ -153,6 +152,6 @@ const styles = StyleSheet.create({
   segmentOption: { flex: 1, minHeight: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   segmentSelected: { backgroundColor: '#FFFFFF', shadowColor: '#14161A', shadowOpacity: 0.14, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   segmentText: { fontSize: 14, fontWeight: '600' },
-  previewWrap: { flexDirection: 'row', gap: 16, alignItems: 'flex-start', padding: 14, borderRadius: 18, backgroundColor: colors.surface },
+  previewWrap: { flexDirection: 'row', justifyContent: 'center', padding: 14, borderRadius: 18, backgroundColor: colors.surface },
   previewNote: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.textMuted },
 });
