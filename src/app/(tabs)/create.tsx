@@ -472,7 +472,6 @@ function PhotoStep({ entering, photo, picking, hasDraft, onPick, onNext, onText,
             </Pressable>
           </View>
         </View>
-        {photo ? <Text style={[styles.hint, { color: ground.muted, marginTop: 8, paddingHorizontal: 32 }]}>Happy with it? Tap Next to write about it.</Text> : null}
       </Animated.View>
     </SurfaceProvider>
   );
