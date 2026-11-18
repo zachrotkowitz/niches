@@ -633,8 +633,12 @@ function useStoreValue() {
       updateGoal: (id: string, patch: Partial<Pick<Goal, 'title' | 'perWeek' | 'target' | 'unit' | 'start' | 'visibility' | 'hideNumbers'>>) =>
         dispatch({ type: 'mapGoal', id, fn: (g) => ({ ...g, ...patch }) }),
       deleteGoal: (id: string) => dispatch({ type: 'deleteGoal', id }),
-      checkIn: (goalId: string, input: Omit<CheckIn, 'id' | 'createdAt'>) =>
-        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: [...g.checkIns, { ...input, id: makeId('ci'), createdAt: Date.now() }] }) }),
+      /** Adds a check-in and returns its id (so a quick check-in can be undone). */
+      checkIn: (goalId: string, input: Omit<CheckIn, 'id' | 'createdAt'>) => {
+        const id = makeId('ci');
+        dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: [...g.checkIns, { ...input, id, createdAt: Date.now() }] }) });
+        return id;
+      },
       removeCheckIn: (goalId: string, checkInId: string) =>
         dispatch({ type: 'mapGoal', id: goalId, fn: (g) => ({ ...g, checkIns: g.checkIns.filter((c) => c.id !== checkInId) }) }),
       /** Rest weeks keep a habit streak alive. Tap again to undo. */

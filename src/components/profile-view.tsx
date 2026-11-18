@@ -225,22 +225,34 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
       {tab === 'goals' ? (
         <View style={styles.diary}>
           {isMe && weekly.length ? (
-            <Text style={styles.goalsSummary}>
-              This week: <Text style={{ fontWeight: '800', color: surface.text }}>{weekly.filter((g) => progress(g).fraction >= 1).length} of {weekly.length}</Text> weekly {weekly.length === 1 ? 'goal' : 'goals'} done
+            <Text style={[styles.goalsLine, { color: surface.text }]}>
+              {(() => {
+                const left = weekly.filter((g) => progress(g).fraction < 1).length;
+                return left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`;
+              })()}
             </Text>
           ) : null}
-          {goals.map((g) => (
-            <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
-          ))}
+          <View style={{ gap: 10 }}>
+            {goals.map((g) => (
+              <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
+            ))}
+          </View>
           {goals.length === 0 ? (
             <Text style={styles.diaryEmpty}>
               {isMe ? 'Set a goal and check in when you work on it. Streaks are weekly, rest weeks never break one, and goals are private unless you choose otherwise.' : 'No public goals.'}
             </Text>
           ) : null}
           {isMe ? (
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-              <Button label="New goal" color={surface.text} style={{ flex: 1 }} onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} />
-              {goals.length ? <Button label="All goals" tone="outline" style={{ flex: 1 }} onPress={() => router.push('/goals')} /> : null}
+            <View style={{ flexDirection: 'row', gap: 22 }}>
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} style={styles.logLink}>
+                <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
+                <Text style={[styles.logLinkText, { color: surface.text }]}>New goal</Text>
+              </Pressable>
+              {goals.length ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push('/goals')} style={styles.logLink}>
+                  <Text style={[styles.logLinkText, { color: surface.text }]}>All goals</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
           {isMe && goals.some((g) => g.visibility === 'private') ? <Text style={styles.diaryNote}>Goals with a lock are private. Others only see the ones you put on your profile.</Text> : null}
@@ -435,6 +447,7 @@ const makeStyles = (sf: Surface) =>
   plans: { paddingHorizontal: 20, marginTop: 20, gap: 10 },
   favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
+  goalsLine: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 26, marginBottom: 4 },
   diaryHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 4 },
   diaryStatsRow: { flexDirection: 'row', gap: 22 },
   viewToggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.06)' },

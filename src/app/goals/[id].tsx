@@ -1,44 +1,57 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ProgressBar, WeekStrip } from '@/components/goals';
-import { CheckIcon, ChevronLeftIcon, LockIcon } from '@/components/icons';
-import { PostSquares } from '@/components/profile-view';
+import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+
+import { Eyebrow } from '@/components/discover-parts';
+import { GoalRing, ringLabel } from '@/components/goals';
+import { CheckIcon, ChevronLeftIcon, LockIcon, MoreIcon } from '@/components/icons';
 import { Button, DisplayText } from '@/components/primitives';
 import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { useToast } from '@/components/toast';
 import { diaryWords } from '@/lib/diary';
-import { currentBest, fmt, goalRule, longestStreak, progress, streak, weekKey, type Goal, type WeekCell } from '@/lib/goals';
+import { currentBest, fmt, goalRule, progress, streak, weekKey, weekNumber, type Goal } from '@/lib/goals';
+import { logPhoto, postPhoto } from '@/lib/demo-photos';
+import { shortTitle } from '@/lib/format';
 import { dayLabel, isoDay } from '@/lib/plans';
-import { isVisible, useNiches, useStore } from '@/lib/store';
-import { floodSurface, fonts, PLAIN_SURFACE, TOUCH, type Surface } from '@/lib/theme';
+import { isVisible, useAppGround, useNiches, useStore } from '@/lib/store';
+import { fonts, groundSurface, PLAIN_SURFACE, TOUCH, type Surface } from '@/lib/theme';
 
+type Moment = { key: string; date: string; title: string; sub: string; photo?: ReturnType<typeof logPhoto>; milestone?: string; open?: () => void; checkInId?: string; rest?: boolean };
+
+/**
+ * One goal (founder, Nov 18 2026): option C's page without the day grid, on
+ * the cream background. Name, a small ring with where you are, check-in
+ * buttons, then your progress as a timeline: photos from diary entries and
+ * progress posts, rest weeks, and milestones (streaks, halfway, new bests).
+ * Settings live in the ⋯ menu.
+ */
 export default function GoalScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, checkin } = useLocalSearchParams<{ id: string; checkin?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
-  const [checkingIn, setCheckingIn] = useState(false);
+  const ground = groundSurface(useAppGround());
+  const [checkingIn, setCheckingIn] = useState(checkin === '1');
   const [editing, setEditing] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   const goal = state.goals.find((g) => g.id === id);
-  // A goal's screen is flooded in its niche's color.
-  const surface = goal ? floodSurface(niches[goal.niche]) : PLAIN_SURFACE;
-  const styles = useMemo(() => makeStyles(surface), [surface]);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/goals'));
   const isMine = !!goal && goal.userId === state.me?.id;
 
   if (!goal || (!isMine && goal.visibility !== 'profile')) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top + 60, padding: 20, gap: 16 }]}>
-        <Text style={{ fontSize: 17 }}>This goal isn’t available.</Text>
-        <Button label="Back" onPress={goBack} />
+      <View style={{ flex: 1, backgroundColor: ground.ground, paddingTop: insets.top + 60, padding: 20, gap: 16 }}>
+        <Text style={{ fontSize: 17, color: ground.text }}>This goal isn’t available.</Text>
+        <Button label="Back" color={ground.text} onPress={goBack} />
       </View>
     );
   }
@@ -47,21 +60,61 @@ export default function GoalScreen() {
   const owner = usersById[goal.userId];
   const p = progress(goal);
   const s = goal.kind === 'habit' ? streak(goal) : 0;
-  const best = goal.kind === 'habit' ? longestStreak(goal) : 0;
   const hidden = !isMine && !!goal.hideNumbers;
   const done = !!goal.doneAt;
   const thisWeek = weekKey(isoDay());
   const resting = goal.restWeeks.includes(thisWeek);
-  const posts = state.posts.filter((x) => x.goalId === goal.id && (isMine ? !x.archived : isVisible(state, x))).sort((a, b) => b.createdAt - a.createdAt);
-  const history = [...goal.checkIns].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
   const words = diaryWords(goal.niche);
+  const label = ringLabel(goal);
 
-  const onWeek = (c: WeekCell) => {
-    if (!isMine || done) return;
-    if (c.met) return toast('You hit your number that week');
-    if (c.key > thisWeek) return;
-    actions.toggleRestWeek(goal.id, c.key);
-    toast(c.rest ? 'Rest week removed' : 'Marked as a rest week. Streak safe.');
+  // The timeline, oldest first while we work out milestones, then newest on top.
+  const moments: Moment[] = [];
+  const asc = [...goal.checkIns].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+  let running = 0;
+  let bestSoFar: number | undefined;
+  const marked = new Set<string>();
+  asc.forEach((c, i) => {
+    const log = c.logId ? state.logs.find((l) => l.id === c.logId) : undefined;
+    const post = c.postId ? state.posts.find((x) => x.id === c.postId) : undefined;
+    const logOk = !!log && (isMine || log.visibility === 'profile');
+    const postOk = !!post && (isMine ? !post.archived : isVisible(state, post));
+    if (!isMine && !logOk && !postOk) return;
+    let milestone: string | undefined = i === 0 ? 'Started' : undefined;
+    if (goal.kind === 'habit') {
+      const st = streak(goal, c.date);
+      for (const m of [4, 8, 12, 26, 52]) if (st === m && !marked.has(`s${m}`)) (marked.add(`s${m}`), (milestone = `${m}-week streak`));
+    } else if (goal.kind === 'total') {
+      const before = running;
+      running += c.value ?? 1;
+      const t = goal.target ?? 0;
+      if (t && before < t && running >= t) milestone = 'Goal reached';
+      else if (t && before < t / 2 && running >= t / 2) milestone = 'Halfway there';
+    } else if (typeof c.value === 'number') {
+      const better = bestSoFar === undefined ? false : goal.direction === 'down' ? c.value < bestSoFar : c.value > bestSoFar;
+      if (better) milestone = 'New personal best';
+      if (goal.target !== undefined && (goal.direction === 'down' ? c.value <= goal.target : c.value >= goal.target) && !marked.has('t')) (marked.add('t'), (milestone = 'Goal reached'));
+      bestSoFar = bestSoFar === undefined ? c.value : goal.direction === 'down' ? Math.min(bestSoFar, c.value) : Math.max(bestSoFar, c.value);
+    }
+    const amount = goal.kind === 'best' && c.value !== undefined ? `${fmt(c.value)} ${goal.unit ?? ''}`.trim() : goal.kind === 'total' && (c.value ?? 1) !== 1 ? `+${fmt(c.value!)}` : '';
+    moments.push({
+      key: c.id,
+      date: c.date,
+      title: logOk ? log!.title : postOk ? post!.mediaLabel ?? shortTitle(post!.caption) : c.note ?? (goal.kind === 'best' && amount ? amount : 'Checked in'),
+      sub: [`Week ${weekNumber(goal, c.date)}`, dayLabel(c.date), logOk ? 'diary' : postOk ? 'progress post' : '', amount && (logOk || postOk) ? amount : ''].filter(Boolean).join(' · '),
+      photo: logOk ? logPhoto(log!) : postOk ? postPhoto(post!) : undefined,
+      milestone: hidden && milestone !== 'Started' ? undefined : milestone,
+      open: logOk ? () => router.push({ pathname: '/log/[id]', params: { id: log!.id } }) : postOk ? () => router.push({ pathname: '/post/[id]', params: { id: post!.id } }) : undefined,
+      checkInId: isMine ? c.id : undefined,
+    });
+  });
+  if (goal.kind === 'habit') for (const w of goal.restWeeks) moments.push({ key: `rest-${w}`, date: w, title: 'Rest week', sub: `Week ${weekNumber(goal, w)} · streak kept`, rest: true });
+  moments.sort((a, b) => b.date.localeCompare(a.date));
+
+  const quick = () => {
+    if (goal.kind === 'best') return setCheckingIn(true);
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const cid = actions.checkIn(goal.id, { date: isoDay() });
+    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : 'Checked in for this week', { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, cid) });
   };
 
   const confirmDelete = () => {
@@ -82,192 +135,237 @@ export default function GoalScreen() {
   };
 
   return (
-    <SurfaceProvider value={surface}>
-    <View style={styles.screen}>
-      <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.back}>
-          <ChevronLeftIcon color={niche.ink} />
-          <Text style={[styles.backText, { color: niche.ink }]}>{isMine ? 'Goals' : owner?.username ?? 'Back'}</Text>
+    <SurfaceProvider value={ground}>
+    <View style={{ flex: 1, backgroundColor: ground.ground }}>
+      <View style={[ds.nav, { paddingTop: insets.top + 4 }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={ds.icon}>
+          <ChevronLeftIcon color={ground.text} />
         </Pressable>
         {isMine ? (
-          <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={styles.editButton}>
-            <Text style={[styles.editText, { color: niche.ink }]}>Edit</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Goal options" onPress={() => setMenu(true)} style={ds.icon}>
+            <MoreIcon color={ground.text} />
           </Pressable>
         ) : null}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={styles.hero}>
-          <View style={styles.heroTop}>
-            <Text style={[styles.rule, { color: niche.inkSoft }]}>
-              {niche.label} · {goalRule(goal)}
-            </Text>
-            {isMine && goal.visibility === 'private' ? (
-              <View style={styles.private}>
-                <LockIcon size={12} color={niche.ink} />
-                <Text style={[styles.privateText, { color: niche.ink }]}>Just you</Text>
-              </View>
-            ) : null}
-          </View>
-          <DisplayText size={30} color={niche.ink}>{goal.title}</DisplayText>
-
-          {done ? (
-            <View style={styles.doneRow}>
-              <View style={[styles.doneCheck, { backgroundColor: niche.accent }]}>
-                <CheckIcon size={18} />
-              </View>
-              <Text style={[styles.doneText, { color: niche.ink }]}>Done {new Date(goal.doneAt!).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</Text>
-            </View>
-          ) : hidden ? null : (
-            <View style={styles.big}>
-              <Text style={[styles.headline, { color: niche.ink }]}>{p.headline}</Text>
-              <Text style={[styles.caption, { color: niche.inkSoft }]}>{p.caption}</Text>
-            </View>
-          )}
-
-          {goal.kind === 'habit' ? (
-            <View style={{ gap: 8 }}>
-              <WeekStrip goal={goal} weeks={12} color={niche.accent} field="#FFFFFF" onPressWeek={isMine && !done ? onWeek : undefined} />
-              <View style={styles.stripLabels}>
-                <Text style={[styles.stripLabel, { color: niche.inkSoft }]}>12 weeks ago</Text>
-                <Text style={[styles.stripLabel, { color: niche.inkSoft }]}>This week</Text>
-              </View>
-              {hidden ? null : (
-                <Text style={[styles.streak, { color: niche.ink }]}>
-                  {s > 0 ? `${s}-week streak` : 'No streak yet'}
-                  {best > s ? ` · best ${best}` : ''}
-                </Text>
-              )}
-            </View>
-          ) : (
-            <ProgressBar fraction={done ? 1 : p.fraction} color={niche.accent} track="#FFFFFF" height={10} />
-          )}
-
-          {isMine && !done && p.reached ? (
-            <View style={styles.reached}>
-              <Text style={[styles.reachedTitle, { color: niche.ink }]}>You reached your target.</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button label="Mark as done" color={niche.accent} style={{ flex: 1 }} onPress={() => { actions.setGoalDone(goal.id, true); toast('Goal done. Nice work.'); }} />
-                <Button label="Raise it" tone="inverse" color={niche.ink} style={{ flex: 1 }} onPress={() => setEditing(true)} />
-              </View>
-            </View>
-          ) : null}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 40 }}>
+        <View style={ds.eyebrowRow}>
+          <Eyebrow>{`${niche.label} goal · ${goalRule(goal)}`}</Eyebrow>
+          {isMine && goal.visibility === 'private' ? <LockIcon size={12} color={ground.muted} /> : null}
+          {!isMine ? <Text style={[ds.by, { color: ground.muted }]}>· {owner?.username}</Text> : null}
         </View>
+        <DisplayText size={44} color={ground.text} style={{ marginTop: 6 }}>{goal.title}</DisplayText>
 
-        {isMine && !done ? (
-          <View style={styles.actions}>
-            <Button label="Check in" color={niche.accent} onPress={() => setCheckingIn(true)} />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button
-                label={words.did}
-                tone="outline"
-                style={{ flex: 1 }}
-                onPress={() => router.push({ pathname: '/log/new', params: { niche: goal.niche, goalId: goal.id } })}
-              />
-              {niche.open ? (
-                <Button label="Progress post" tone="outline" style={{ flex: 1 }} onPress={() => router.navigate({ pathname: '/create', params: { goalId: goal.id } })} />
-              ) : null}
-            </View>
-            {goal.kind === 'habit' ? (
-              <Pressable
-                accessibilityRole="switch"
-                accessibilityState={{ checked: resting }}
-                onPress={() => {
-                  actions.toggleRestWeek(goal.id, thisWeek);
-                  toast(resting ? 'Rest week removed' : 'Rest week. Your streak is safe.');
-                }}
-                style={[styles.restRow, resting ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.restTitle}>Take this week off</Text>
-                  <Text style={styles.restSub}>Rest weeks keep your streak. Rest is part of getting better.</Text>
-                </View>
-                <View style={[styles.switchTrack, resting ? { backgroundColor: niche.accent } : null]}>
-                  <View style={[styles.switchKnob, resting ? { transform: [{ translateX: 18 }] } : null]} />
-                </View>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {posts.length ? (
-          <View style={{ marginTop: 26 }}>
-            <Text style={[styles.sectionTitle, { paddingHorizontal: 20, marginBottom: 10 }]}>Progress posts · {posts.length}</Text>
-            <PostSquares posts={posts} />
-          </View>
-        ) : null}
-
-        {isMine ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Check-ins · {history.length}</Text>
-            {history.length === 0 ? (
-              <Text style={styles.emptyText}>Nothing yet. Check in when you {goal.niche === 'cooking' ? 'cook' : 'do it'}, log it with “{words.did}”, or share a progress post.</Text>
+        <View style={ds.summary}>
+          <GoalRing fraction={done ? 1 : hidden ? 0 : p.fraction} color={niche.accent} size={84} stroke={9}>
+            {done ? <CheckIcon size={28} color={niche.accent} strokeWidth={2.6} /> : hidden ? null : <Text style={[ds.ringText, { color: ground.text, fontSize: label.length > 3 ? 19 : 24 }]}>{label}</Text>}
+          </GoalRing>
+          <View style={{ flex: 1, gap: 2 }}>
+            {done ? (
+              <Text style={[ds.headline, { color: ground.text }]}>Done</Text>
+            ) : hidden ? (
+              <Text style={[ds.caption, { color: ground.muted }]}>{owner?.username} keeps the numbers private.</Text>
             ) : (
-              history.slice(0, 30).map((c) => {
-                const log = c.logId ? state.logs.find((l) => l.id === c.logId) : undefined;
-                const post = c.postId ? state.posts.find((x) => x.id === c.postId) : undefined;
-                const what = log ? log.title : post ? 'Progress post' : c.note ?? 'Checked in';
-                const value = goal.kind === 'best' && c.value !== undefined ? `${fmt(c.value)} ${goal.unit ?? ''}` : goal.kind === 'total' && (c.value ?? 1) !== 1 ? `+${fmt(c.value!)}` : '';
-                return (
-                  <View key={c.id} style={styles.checkRow}>
-                    <View style={[styles.checkDot, { backgroundColor: niche.accent }]} />
-                    <Pressable
-                      accessibilityRole={log || post ? 'button' : 'text'}
-                      disabled={!log && !post}
-                      onPress={() => (log ? router.push({ pathname: '/log/[id]', params: { id: log.id } }) : post ? router.push({ pathname: '/post/[id]', params: { id: post.id } }) : undefined)}
-                      style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                      <Text style={styles.checkWhat} numberOfLines={1}>{what}{value ? ` · ${value}` : ''}</Text>
-                      <Text style={styles.checkWhen}>
-                        {dayLabel(c.date)}
-                        {c.note && (log || post) ? ` · ${c.note}` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Remove check-in" onPress={() => { actions.removeCheckIn(goal.id, c.id); toast('Check-in removed'); }} style={styles.remove}>
-                      <Text style={styles.removeText}>×</Text>
-                    </Pressable>
-                  </View>
-                );
-              })
+              // Says something the ring doesn't: your streak, how many to go, or the target.
+              <>
+                <Text style={[ds.headline, { color: ground.text }]}>{summaryTitle(goal, s)}</Text>
+                <Text style={[ds.caption, { color: ground.muted }]}>{summaryLine(goal)}</Text>
+              </>
             )}
           </View>
+        </View>
+
+        {isMine && !done && p.reached ? (
+          <View style={[ds.reached, { borderColor: ground.line }]}>
+            <Text style={[ds.reachedTitle, { color: ground.text }]}>You reached your target.</Text>
+            <View style={{ flexDirection: 'row', gap: 22 }}>
+              <Pressable accessibilityRole="button" onPress={() => { actions.setGoalDone(goal.id, true); toast('Goal done. Nice work.'); }} style={ds.link}>
+                <Text style={[ds.linkText, { color: ground.text }]}>Mark as done</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={ds.link}>
+                <Text style={[ds.linkText, { color: ground.text }]}>Raise it</Text>
+              </Pressable>
+            </View>
+          </View>
         ) : null}
 
-        {isMine ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Who can see it</Text>
-            <View style={{ gap: 8, marginTop: 10 }}>
-              {(['private', 'profile'] as const).map((v) => {
-                const on = goal.visibility === v;
-                return (
-                  <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => actions.updateGoal(goal.id, { visibility: v })} style={[styles.option, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                    <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={styles.optionTitle}>{v === 'private' ? 'Just me' : 'On my profile'}</Text>
-                      <Text style={styles.optionSub}>{v === 'private' ? 'Nobody else sees it.' : goal.hideNumbers ? 'Shown without numbers.' : 'Shown with your progress.'}</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-              {goal.visibility === 'profile' ? (
-                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!goal.hideNumbers }} onPress={() => actions.updateGoal(goal.id, { hideNumbers: !goal.hideNumbers })} style={styles.check}>
-                  <View style={[styles.box, goal.hideNumbers ? { backgroundColor: niche.accent, borderColor: niche.accent } : null]}>{goal.hideNumbers ? <CheckIcon size={15} strokeWidth={3} /> : null}</View>
-                  <Text style={styles.optionTitle}>Hide my numbers from others</Text>
+        {isMine && !done ? (
+          <View style={{ gap: 4, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable accessibilityRole="button" onPress={quick} style={({ pressed }) => [ds.primary, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
+                <CheckIcon size={16} color={ground.ground} strokeWidth={2.6} />
+                <Text style={[ds.primaryText, { color: ground.ground }]}>{goal.kind === 'habit' ? 'Check in this week' : goal.kind === 'total' ? `Add one${goal.unit ? ` (${goal.unit})` : ''}` : 'Log a new result'}</Text>
+              </Pressable>
+              {goal.kind === 'habit' ? (
+                <Pressable
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: resting }}
+                  onPress={() => {
+                    actions.toggleRestWeek(goal.id, thisWeek);
+                    toast(resting ? 'Rest week removed' : 'Rest week. Your streak is safe.');
+                  }}
+                  style={[ds.secondary, { borderColor: ground.text, backgroundColor: resting ? '#FFFFFF' : 'transparent' }]}>
+                  <Text style={[ds.secondaryText, { color: ground.text }]}>{resting ? 'Resting' : 'Rest'}</Text>
                 </Pressable>
               ) : null}
             </View>
-            <View style={{ gap: 8, marginTop: 18 }}>
-              <Button tone="outline" label={done ? 'Reopen goal' : 'Mark as done'} onPress={() => { actions.setGoalDone(goal.id, !done); toast(done ? 'Goal reopened' : 'Goal done. Nice work.'); }} />
-              <Button tone="ghost" label="Delete goal" textStyle={{ color: niche.ink }} onPress={confirmDelete} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 22 }}>
+              {goal.kind !== 'best' ? (
+                <Pressable accessibilityRole="button" onPress={() => setCheckingIn(true)} style={ds.link}>
+                  <Text style={[ds.linkText, { color: ground.text }]}>Another day or a note</Text>
+                </Pressable>
+              ) : null}
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/log/new', params: { niche: goal.niche, goalId: goal.id } })} style={ds.link}>
+                <Text style={[ds.linkText, { color: ground.text }]}>{words.did}</Text>
+              </Pressable>
+              {niche.open ? (
+                <Pressable accessibilityRole="button" onPress={() => router.navigate({ pathname: '/create', params: { goalId: goal.id } })} style={ds.link}>
+                  <Text style={[ds.linkText, { color: ground.text }]}>Progress post</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}
+
+        <View style={[ds.timelineHead, { borderTopColor: ground.line }]}>
+          <Eyebrow>{isMine ? 'Your progress' : 'Progress'}</Eyebrow>
+        </View>
+        {moments.length === 0 ? (
+          <Text style={[ds.empty, { color: ground.muted }]}>
+            {isMine ? `Nothing yet. Check in, log it with “${words.did}”, or share a progress post, and it shows up here with its photo.` : 'Nothing shared yet.'}
+          </Text>
+        ) : (
+          moments.map((m, i) => {
+            const plain = !m.photo && !m.milestone;
+            return (
+            <View key={m.key} style={ds.moment}>
+              <View style={ds.rail}>
+                <View style={[ds.dot, m.rest ? { backgroundColor: 'transparent', borderWidth: 2, borderColor: niche.accent } : { backgroundColor: niche.accent }]} />
+                {i < moments.length - 1 ? <View style={[ds.line, { backgroundColor: niche.line }]} /> : null}
+              </View>
+              {plain ? (
+                // A check-in with no photo is one quiet line, so the photos stand out.
+                <View style={ds.plainRow}>
+                  <Pressable accessibilityRole={m.open ? 'link' : 'text'} disabled={!m.open} onPress={m.open} style={{ flex: 1, gap: 1 }}>
+                    <Text style={[ds.plainTitle, { color: ground.text }]} numberOfLines={1}>{m.title}</Text>
+                    <Text style={[ds.plainSub, { color: ground.muted }]}>{m.sub}</Text>
+                  </Pressable>
+                  {m.checkInId || (m.rest && isMine) ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={m.rest ? 'Undo rest week' : `Remove check-in: ${m.title}`}
+                      onPress={() => (m.rest ? actions.toggleRestWeek(goal.id, m.date) : (actions.removeCheckIn(goal.id, m.checkInId!), toast('Check-in removed')))}
+                      style={ds.x}>
+                      <Text style={[ds.xText, { color: ground.muted }]}>×</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : (
+              <View style={{ flex: 1, gap: 6, paddingBottom: 20 }}>
+                <Text style={[ds.momentSub, { color: ground.muted }]}>{m.sub.toUpperCase()}</Text>
+                <Pressable accessibilityRole={m.open ? 'link' : 'text'} disabled={!m.open} onPress={m.open}>
+                  <Text style={[ds.momentTitle, { color: ground.text }]}>{m.title}</Text>
+                </Pressable>
+                {m.milestone ? <Text style={[ds.milestone, { color: niche.accent }]}>★ {m.milestone.toUpperCase()}</Text> : null}
+                {m.photo ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Open ${m.title}`} onPress={m.open} style={[ds.photo, { backgroundColor: niche.field }]}>
+                    <Image source={m.photo} contentFit="cover" style={StyleSheet.absoluteFill} />
+                  </Pressable>
+                ) : null}
+                {m.checkInId ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Remove check-in: ${m.title}`} onPress={() => { actions.removeCheckIn(goal.id, m.checkInId!); toast('Check-in removed'); }} style={ds.remove}>
+                    <Text style={[ds.removeText, { color: ground.muted }]}>Remove</Text>
+                  </Pressable>
+                ) : m.rest && isMine ? (
+                  <Pressable accessibilityRole="button" onPress={() => actions.toggleRestWeek(goal.id, m.date)} style={ds.remove}>
+                    <Text style={[ds.removeText, { color: ground.muted }]}>Undo rest week</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              )}
+            </View>
+            );
+          })
+        )}
       </ScrollView>
 
+      {isMine ? (
+        <Sheet
+          visible={menu}
+          onClose={() => setMenu(false)}
+          items={[
+            { label: 'Edit goal', onPress: () => (setMenu(false), setEditing(true)) },
+            goal.visibility === 'private'
+              ? { label: 'Make public', detail: 'Shows on your profile’s Goals tab.', onPress: () => (setMenu(false), actions.updateGoal(goal.id, { visibility: 'profile' }), toast('Now on your profile')) }
+              : { label: 'Make private', detail: 'Only you will see it.', onPress: () => (setMenu(false), actions.updateGoal(goal.id, { visibility: 'private' }), toast('Goal is private')) },
+            ...(goal.visibility === 'profile'
+              ? [{ label: goal.hideNumbers ? 'Show my numbers' : 'Hide my numbers', detail: goal.hideNumbers ? 'Others will see your progress.' : 'Others see the goal and photos, not the numbers.', onPress: () => (setMenu(false), actions.updateGoal(goal.id, { hideNumbers: !goal.hideNumbers })) }]
+              : []),
+            { label: done ? 'Reopen goal' : 'Mark as done', onPress: () => (setMenu(false), actions.setGoalDone(goal.id, !done), toast(done ? 'Goal reopened' : 'Goal done. Nice work.')) },
+            { label: 'Delete goal', destructive: true, onPress: () => (setMenu(false), confirmDelete()) },
+          ]}
+        />
+      ) : null}
       {isMine ? <CheckInSheet goal={goal} visible={checkingIn} onClose={() => setCheckingIn(false)} /> : null}
       {isMine ? <EditSheet goal={goal} visible={editing} onClose={() => setEditing(false)} /> : null}
     </View>
     </SurfaceProvider>
   );
 }
+
+/** The big line next to the ring: what the ring doesn't already say. */
+function summaryTitle(goal: Goal, s: number) {
+  const p = progress(goal);
+  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Rest week' : s > 0 ? `${s}-week streak` : 'This week';
+  if (goal.kind === 'total') {
+    const total = goal.checkIns.reduce((n, c) => n + (c.value ?? 1), 0);
+    const left = Math.max(0, (goal.target ?? 0) - total);
+    return left === 0 ? 'Target reached' : `${fmt(left)} to go`;
+  }
+  return `Goal ${fmt(goal.target ?? 0)} ${goal.unit ?? ''}`.trim();
+}
+function summaryLine(goal: Goal) {
+  const p = progress(goal);
+  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Your streak is safe' : `${p.headline} this week`;
+  if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
+  return currentBest(goal) === undefined ? 'No result logged yet' : `Best so far ${p.headline}`;
+}
+
+const ds = StyleSheet.create({
+  nav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
+  icon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  by: { fontSize: 12 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 18 },
+  ringText: { fontFamily: fonts.display, fontVariant: ['tabular-nums'] },
+  headline: { fontFamily: fonts.display, fontSize: 32, lineHeight: 35, fontVariant: ['tabular-nums'] },
+  caption: { fontSize: 14, lineHeight: 19 },
+  reached: { borderTopWidth: StyleSheet.hairlineWidth * 2, borderBottomWidth: StyleSheet.hairlineWidth * 2, paddingVertical: 10, marginBottom: 10 },
+  reachedTitle: { fontFamily: fonts.displayItalic, fontSize: 22 },
+  primary: { flex: 1, minHeight: 50, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
+  primaryText: { fontSize: 15, fontWeight: '700' },
+  secondary: { minHeight: 50, paddingHorizontal: 20, borderRadius: 25, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { fontSize: 14, fontWeight: '700' },
+  link: { minHeight: TOUCH, justifyContent: 'center' },
+  linkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+  timelineHead: { borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 16, marginTop: 10, marginBottom: 12 },
+  empty: { fontSize: 14, lineHeight: 20 },
+  moment: { flexDirection: 'row', gap: 14 },
+  rail: { width: 12, alignItems: 'center' },
+  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
+  line: { flex: 1, width: 2, marginTop: 4 },
+  momentSub: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  momentTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 25 },
+  milestone: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6 },
+  photo: { height: 170, borderRadius: 16, overflow: 'hidden' },
+  plainRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 14, marginTop: -2 },
+  plainTitle: { fontSize: 15, fontWeight: '700' },
+  plainSub: { fontSize: 12 },
+  x: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  xText: { fontSize: 20 },
+  remove: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  removeText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+});
 
 /** Check in: when, plus the number for totals and personal bests, plus an optional note. */
 function CheckInSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; onClose: () => void }) {

@@ -4,11 +4,16 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { NICHE_BORDER } from '@/components/feed-grid';
-import { CheckIcon, LockIcon } from '@/components/icons';
+import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+
+import { CheckIcon, LockIcon, PlusIcon } from '@/components/icons';
+import { useToast } from '@/components/toast';
 import { goalRule, progress, streak, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
-import { useNiches } from '@/lib/store';
-import { colors } from '@/lib/theme';
+import { isoDay } from '@/lib/plans';
+import { useNiches, useStore } from '@/lib/store';
+import { colors, fonts } from '@/lib/theme';
 
 /** A progress bar that eases to its new value instead of jumping. */
 export function ProgressBar({ fraction, color, track = colors.hairline, height = 8 }: { fraction: number; color: string; track?: string; height?: number }) {
@@ -70,46 +75,91 @@ export function WeekStrip({ goal, weeks = 12, color, field, onPressWeek }: { goa
   );
 }
 
-/** A goal in a list. Goals from different niches sit together, so each card gets its niche border. */
+/** A ring that fills as a goal moves along (founder picked option B's rings, Nov 18 2026). */
+export function GoalRing({ fraction, color, size = 64, stroke = 7, track = 'rgba(31,26,20,0.08)', children }: { fraction: number; color: string; size?: number; stroke?: number; track?: string; children?: React.ReactNode }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const f = Math.max(0, Math.min(1, fraction));
+  return (
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+        {f > 0 ? <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${c * f} ${c}`} /> : null}
+      </Svg>
+      <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>{children}</View>
+    </View>
+  );
+}
+
+/** The short number inside a goal's ring: "1/2" this week, "14" loaves, "25:40" best. */
+export function ringLabel(goal: Goal) {
+  const p = progress(goal);
+  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Rest' : p.headline.replace(' of ', '/');
+  if (goal.kind === 'total') return p.headline.split(' / ')[0];
+  return p.headline.split(' ')[0];
+}
+
+/** The line under a goal's name in a list. */
+export function goalSubline(goal: Goal) {
+  if (goal.doneAt) return `Done ${new Date(goal.doneAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  const p = progress(goal);
+  if (goal.kind === 'habit') {
+    const s = streak(goal);
+    return `${p.headline === 'Rest week' ? 'Rest week' : `${p.headline} this week`}${s > 1 ? ` · ${s}-week streak` : ''}`;
+  }
+  if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
+  return p.caption.replace('best so far · ', 'Best so far · ');
+}
+
+/**
+ * A goal in a list (option B): a white card with its ring in the niche's
+ * color, the name in serif, one line of progress, and a + to check in
+ * without opening it. Weekly goals and totals check in at once (with Undo);
+ * a personal best needs a number, so + opens the goal.
+ */
 export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsOwner?: boolean }) {
   const router = useRouter();
+  const toast = useToast();
+  const { actions } = useStore();
   const niche = useNiches()[goal.niche];
   const p = progress(goal);
-  const s = goal.kind === 'habit' ? streak(goal) : 0;
   const hidden = !viewerIsOwner && goal.hideNumbers;
   const done = !!goal.doneAt;
+  const label = ringLabel(goal);
+  const open = (params: Record<string, string> = {}) => router.push({ pathname: '/goals/[id]', params: { id: goal.id, ...params } });
+
+  const quick = () => {
+    if (goal.kind === 'best') return open({ checkin: '1' });
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const id = actions.checkIn(goal.id, { date: isoDay() });
+    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : 'Checked in for this week', { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, id) });
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${niche.label} goal: ${goal.title}. ${done ? 'Done.' : hidden ? '' : `${p.headline} ${p.caption}.`}${s > 1 && !hidden ? ` ${s} week streak.` : ''}`}
-      onPress={() => router.push({ pathname: '/goals/[id]', params: { id: goal.id } })}
-      style={({ pressed }) => [styles.card, { borderColor: niche.accent, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-      <View style={styles.top}>
-        <Text style={[styles.rule, { color: niche.ink }]}>{done ? 'Done' : goalRule(goal)}</Text>
-        {viewerIsOwner && goal.visibility === 'private' ? <LockIcon size={13} color={colors.textMuted} /> : null}
+      accessibilityLabel={`${niche.label} goal: ${goal.title}. ${hidden ? '' : goalSubline(goal)}`}
+      onPress={() => open()}
+      style={({ pressed }) => [styles.card, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+      <GoalRing fraction={done ? 1 : hidden ? 0 : p.fraction} color={niche.accent}>
+        {done ? (
+          <CheckIcon size={22} color={niche.accent} strokeWidth={2.6} />
+        ) : hidden ? null : (
+          <Text style={[styles.ringText, { color: colors.text, fontSize: label.length > 3 ? 15 : 19 }]} numberOfLines={1}>{label}</Text>
+        )}
+      </GoalRing>
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <Text style={styles.title} numberOfLines={2}>{goal.title}</Text>
+        <View style={styles.subRow}>
+          {viewerIsOwner && goal.visibility === 'private' ? <LockIcon size={11} color={colors.textMuted} /> : null}
+          <Text style={styles.meta} numberOfLines={1}>{hidden ? goalRule(goal) : goalSubline(goal)}</Text>
+        </View>
       </View>
-      <Text style={styles.title} numberOfLines={2}>{goal.title}</Text>
-      {goal.kind === 'habit' && !done ? (
-        <View style={{ gap: 8, marginTop: 4 }}>
-          <WeekStrip goal={goal} weeks={8} color={niche.accent} field={niche.field} />
-          {hidden ? null : (
-            <Text style={styles.meta}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{p.headline}</Text> {p.caption}
-              {s > 1 ? ` · ${s}-week streak` : ''}
-            </Text>
-          )}
-        </View>
-      ) : (
-        <View style={{ gap: 8, marginTop: 6 }}>
-          <ProgressBar fraction={done ? 1 : p.fraction} color={niche.accent} />
-          {hidden ? null : (
-            <Text style={styles.meta}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{p.headline}</Text> {p.caption}
-            </Text>
-          )}
-        </View>
-      )}
+      {viewerIsOwner && !done ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Check in: ${goal.title}`} onPress={quick} hitSlop={6} style={({ pressed }) => [styles.plus, { backgroundColor: niche.mid, transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
+          <PlusIcon size={20} color={niche.ink} strokeWidth={2.4} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -118,9 +168,10 @@ const styles = StyleSheet.create({
   strip: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { padding: 2, borderRadius: 13, borderWidth: 1.5, borderColor: 'transparent' },
   dot: { borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  card: { borderRadius: 18, borderWidth: NICHE_BORDER, backgroundColor: '#FFFFFF', padding: 14, gap: 3 },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rule: { fontSize: 12, fontWeight: '700' },
-  title: { fontSize: 16, fontWeight: '700', color: colors.text, lineHeight: 21 },
-  meta: { fontSize: 13, color: colors.textMuted },
+  card: { borderRadius: 22, backgroundColor: '#FFFFFF', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  ringText: { fontFamily: fonts.display, fontVariant: ['tabular-nums'] },
+  title: { fontFamily: fonts.display, fontSize: 24, lineHeight: 26, color: colors.text },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  meta: { fontSize: 13, color: colors.textMuted, flexShrink: 1 },
+  plus: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });
