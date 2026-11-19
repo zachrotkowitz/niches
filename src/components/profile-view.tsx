@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
@@ -30,13 +31,40 @@ import type { Post, User } from '@/lib/types';
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
-export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; isMe: boolean; footer?: ReactNode; /** Space to leave above the name when there's no cover (the status bar on your own profile). */ topInset?: number }) {
+export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pageTop = 0 }: { user: User; isMe: boolean; footer?: ReactNode; /** Space to leave above the name when there's no cover (the status bar on your own profile). */ topInset?: number; /** Called with the tab row's position when you pick a tab, so the screen can scroll it to the top (founder, Nov 19 2026). */ onTabChange?: (tabsY: number) => void; /** Where the scrolling page starts on screen (0, or under a back bar). */ pageTop?: number }) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const router = useRouter();
   const { state, actions } = useStore();
   const niches = useNiches();
   const [tab, setTab] = useState<Tab>('all');
+  const tabsY = useRef(0);
+  const tabsRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const { height: windowH } = useWindowDimensions();
+  const rootRef = useRef<ComponentRef<typeof View>>(null);
+  // Set when you tap a tab after scrolling down the profile at all.
+  const picked = useRef(false);
+  const pickTab = (t: Tab) => {
+    if (!onTabChange) return setTab(t);
+    rootRef.current?.measureInWindow((_x, rootY) => {
+      picked.current = rootY < pageTop - 1;
+      setTab(t);
+    });
+  };
+  // After the new tab has drawn (the Top 4 rows above the tabs come and go with
+  // some tabs), find where the tab row ended up and let the screen scroll it
+  // to the top if it's out of view (founder, Nov 19 2026).
+  useEffect(() => {
+    if (!picked.current || !onTabChange) return;
+    picked.current = false;
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        tabsRef.current?.measureInWindow((_x, rowY) => rootRef.current?.measureInWindow((_rx, rootY) => onTabChange(rowY - rootY)));
+      }),
+    );
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   const [diaryView, setDiaryView] = useState<'list' | 'calendar'>('list');
   const [editing, setEditing] = useState(false);
   // Where the small picture is, so the enlarged one can glide out of it.
@@ -86,7 +114,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
   const openList = (tab: 'followers' | 'following') => router.push({ pathname: '/connections/[id]', params: { id: user.id, tab } });
 
   return (
-    <View>
+    <View ref={rootRef} collapsable={false}>
       {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
       <View style={styles.head}>
         <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>
@@ -211,17 +239,19 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
       ) : null}
 
       {/* Tabs keep their natural width (no wrapped labels) and scroll sideways if they don't all fit. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" style={styles.tabs} contentContainerStyle={styles.tabsRow}>
+      <ScrollView ref={tabsRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" onLayout={(e) => (tabsY.current = e.nativeEvent.layout.y)} style={styles.tabs} contentContainerStyle={styles.tabsRow}>
         {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[]).map((t) => {
           const selected = t === tab;
           return (
-            <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
+            <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => pickTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
               <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label}</Text>
             </Pressable>
           );
         })}
       </ScrollView>
 
+      {/* Every tab's content fades in the same way, and is at least a screen tall so the tab row can sit at the top. */}
+      <Animated.View key={tab} entering={FadeIn.duration(180).reduceMotion(ReduceMotion.System)} style={{ minHeight: windowH }}>
       {tab === 'goals' ? (
         <View style={styles.diary}>
           {isMe && weekly.length ? (
@@ -323,7 +353,8 @@ export function ProfileView({ user, isMe, footer, topInset = 0 }: { user: User; 
         <PostSquares posts={shown} nicheBorders={tab === 'all' && nicheTabs.length > 1} />
       )}
 
-      {footer}
+        {footer}
+      </Animated.View>
     </View>
   );
 }

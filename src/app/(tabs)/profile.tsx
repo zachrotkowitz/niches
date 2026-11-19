@@ -51,6 +51,8 @@ function ProfileScreenInner() {
         user={me}
         isMe
         topInset={insets.top}
+        // Picking a tab while scrolled past the tab row brings the row back to the top.
+        onTabChange={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - insets.top), animated: true })}
         footer={
           <View style={styles.settings}>
             <Text style={styles.settingsTitle}>Archive</Text>

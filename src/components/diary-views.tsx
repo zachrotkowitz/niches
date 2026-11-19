@@ -28,7 +28,7 @@ function Thumb({ log, size, radius }: { log: LogEntry; size: number; radius: num
   const photo = logPhoto(log);
   return (
     <View style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', backgroundColor: log.mediaColor ?? niche.field }}>
-      {photo ? <Image source={photo} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+      {photo ? <Image source={photo} contentFit="cover" transition={150} style={StyleSheet.absoluteFill} /> : null}
     </View>
   );
 }
@@ -150,7 +150,7 @@ export function DiaryCalendar({ logs }: { logs: LogEntry[] }) {
               accessibilityLabel={`${MONTHS[m - 1]} ${d}: ${entries.map((e) => e.title).join(', ')}`}
               onPress={() => router.push({ pathname: '/log/[id]', params: { id: top.id } })}
               style={({ pressed }) => [styles.cell, { overflow: 'hidden', backgroundColor: top.mediaColor ?? niches[top.niche].field, transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
-              {logPhoto(top) ? <Image source={logPhoto(top)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+              {logPhoto(top) ? <Image source={logPhoto(top)} contentFit="cover" transition={150} style={StyleSheet.absoluteFill} /> : null}
               <Text style={styles.photoNum}>{d}</Text>
               {entries.length > 1 ? <Text style={styles.more}>+{entries.length - 1}</Text> : null}
             </Pressable>

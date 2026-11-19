@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,11 +28,14 @@ function UserScreenInner() {
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => setRefreshing(false), 900);
   };
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [listTop, setListTop] = useState(0);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/discover'));
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
+      {/* The page scrolls below this bar, so its bottom edge is the top of the visible page. */}
+      <View onLayout={(e) => setListTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)} style={[styles.nav, { paddingTop: insets.top + 4 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.back}>
           <ChevronLeftIcon color={surface.text} />
           <Text style={styles.backText}>Back</Text>
@@ -41,8 +44,13 @@ function UserScreenInner() {
         <View style={{ width: 80 }} />
       </View>
       {user ? (
-        <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-          <ProfileView user={user} isMe={user.id === state.me?.id} />
+        <ScrollView ref={scrollRef} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+          <ProfileView
+            user={user}
+            isMe={user.id === state.me?.id}
+            pageTop={listTop}
+            onTabChange={(y) => scrollRef.current?.scrollTo({ y, animated: true })}
+          />
         </ScrollView>
       ) : (
         <View style={{ padding: 20, gap: 14 }}>
