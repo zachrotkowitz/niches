@@ -3,11 +3,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/text';
+import Animated, { FadeInDown, FadeOut, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StarInput } from '@/components/diary';
 import { Eyebrow } from '@/components/discover-parts';
-import { CameraIcon, CheckIcon, CloseIcon } from '@/components/icons';
+import { CalendarIcon, CameraIcon, CheckIcon, CloseIcon } from '@/components/icons';
+import { MonthCalendar } from '@/components/month-calendar';
 import { SurfaceProvider } from '@/components/surface';
 import { DisplayText } from '@/components/primitives';
 import { useToast } from '@/components/toast';
@@ -62,9 +64,9 @@ export default function NewLogScreen() {
   const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt && g.kind !== 'best');
   const toggleGoal = (id: string) => setGoalIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const ready = !!state.me && title.trim().length > 0 && rating > 0;
-  const recent = Array.from({ length: 14 }, (_, i) => isoDay(-i));
-  // An older entry keeps its own date in the list.
-  const days = editing && !recent.includes(editing.date) ? [...recent, editing.date] : recent;
+  // Today and Yesterday as quick words; any other day comes from the calendar.
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const otherDay = date !== isoDay(0) && date !== isoDay(-1);
 
   const save = () => {
     if (!ready || !state.me) return;
@@ -105,7 +107,8 @@ export default function NewLogScreen() {
 
   const ground = groundSurface(appGround);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/profile'));
-  const dayName = (d: string, i: number) => (i === 0 ? 'Today' : i === 1 ? 'Yesterday' : parseDay(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }));
+  // "Sat, Nov 7", with the year only when it isn't this year.
+  const dayName = (d: string) => parseDay(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(d.slice(0, 4) === isoDay(0).slice(0, 4) ? {} : { year: 'numeric' }) });
   const quiet = (on: boolean, accent: string) => [styles.word, { color: on ? ground.text : ground.muted, fontWeight: on ? ('700' as const) : ('500' as const), borderBottomColor: on ? accent : 'transparent' }];
 
   return (
@@ -179,13 +182,35 @@ export default function NewLogScreen() {
 
           <View style={[styles.block, { borderBottomColor: ground.line }]}>
             <Eyebrow>When</Eyebrow>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.words}>
-              {days.map((d, i) => (
-                <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === date }} onPress={() => setDate(d)} style={styles.wordHit}>
-                  <Text style={quiet(d === date, ground.text)}>{dayName(d, i)}</Text>
+            <View accessibilityRole="radiogroup" style={styles.words}>
+              {[isoDay(0), isoDay(-1)].map((d, i) => (
+                <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === date }} onPress={() => (setDate(d), setCalendarOpen(false))} style={styles.wordHit}>
+                  <Text style={quiet(d === date, ground.text)}>{i === 0 ? 'Today' : 'Yesterday'}</Text>
                 </Pressable>
               ))}
-            </ScrollView>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={otherDay ? `${dayName(date)}. Pick another day` : 'Pick a day on the calendar'}
+                accessibilityState={{ expanded: calendarOpen }}
+                onPress={() => setCalendarOpen((o) => !o)}
+                style={[styles.wordHit, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                <CalendarIcon size={16} color={otherDay || calendarOpen ? ground.text : ground.muted} />
+                <Text style={quiet(otherDay, ground.text)}>{otherDay ? dayName(date) : 'Another day'}</Text>
+              </Pressable>
+            </View>
+            {calendarOpen ? (
+              <Animated.View entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(120)}>
+                <MonthCalendar
+                  value={date}
+                  max={isoDay(0)}
+                  accent={niche.accent}
+                  onChange={(d) => {
+                    setDate(d);
+                    setCalendarOpen(false);
+                  }}
+                />
+              </Animated.View>
+            ) : null}
           </View>
 
           <View style={[styles.block, { borderBottomColor: ground.line }]}>
