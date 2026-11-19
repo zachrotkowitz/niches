@@ -11,7 +11,7 @@ import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
-import { canSee, chosenDish, kindLabel, parseDay, participants, type Rsvp } from '@/lib/plans';
+import { canSee, chosenDish, parseDay, participants, type Rsvp } from '@/lib/plans';
 import { cancelReminder, REMINDER_CHOICES, reminderDate, reminderLabel, planStart, scheduleReminder } from '@/lib/reminders';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, TOUCH } from '@/lib/theme';
@@ -169,7 +169,7 @@ export default function PlanScreen() {
               <View style={styles.kindRow}>
                 <View style={[styles.dot, { backgroundColor: niche.accent }]} />
                 <Text style={[styles.kind, { color: ground.muted }]}>
-                  {niche.label} · {kindLabel(plan.kind, plan.niche)}
+                  {niche.label}
                 </Text>
                 {plan.visibility === 'private' ? <LockIcon size={12} color={ground.muted} /> : null}
                 <Text style={[styles.kind, { color: ground.muted }]}>{plan.visibility === 'private' ? 'Private' : 'Public'}</Text>

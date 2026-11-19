@@ -5,7 +5,7 @@ import { Text } from '@/components/text';
 import { NICHE_BORDER } from '@/components/feed-grid';
 import { LockIcon } from '@/components/icons';
 import { Avatar } from '@/components/primitives';
-import { chosenDish, dayOfMonth, kindLabel, monthShort, participants, weekdayShort, type Plan } from '@/lib/plans';
+import { chosenDish, dayOfMonth, monthShort, participants, weekdayShort, type Plan } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, fonts } from '@/lib/theme';
 
@@ -49,7 +49,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${kindLabel(plan.kind, plan.niche)} in ${niche.label}: ${plan.title}, ${weekdayShort(plan.date)} ${monthShort(plan.date)} ${dayOfMonth(plan.date)}${plan.time ? `, ${plan.time}` : ''}${status ? `. ${status}` : ''}`}
+      accessibilityLabel={`${niche.label} plan: ${plan.title}, ${weekdayShort(plan.date)} ${monthShort(plan.date)} ${dayOfMonth(plan.date)}${plan.time ? `, ${plan.time}` : ''}${status ? `. ${status}` : ''}`}
       onPress={() => router.push({ pathname: '/plans/[id]', params: { id: plan.id } })}
       style={({ pressed }) => [styles.card, { borderColor: niche.accent, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
       {/* The day as a big serif number, like the Diary list (founder picked A's list, Nov 19 2026). */}
@@ -60,10 +60,8 @@ export function PlanCard({ plan }: { plan: Plan }) {
       </View>
       <View style={styles.body}>
         <View style={styles.topRow}>
-          <Text style={styles.kind}>
-            {kindLabel(plan.kind, plan.niche)}
-            {plan.time ? ` · ${plan.time}` : ''}
-          </Text>
+          {/* No "Meal" / "Shoot" label: the title already says what it is (founder, Nov 19 2026). */}
+          <Text style={styles.kind}>{plan.time ? `${niche.label} · ${plan.time}` : niche.label}</Text>
           {plan.visibility === 'private' ? <LockIcon size={13} color={colors.textMuted} /> : null}
         </View>
         <Text style={styles.title} numberOfLines={2}>{plan.title}</Text>
