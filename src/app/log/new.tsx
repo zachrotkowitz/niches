@@ -28,7 +28,7 @@ import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/th
  * editing that post never changes the entry.
  */
 export default function NewLogScreen() {
-  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string; edit?: string }>();
+  const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string; edit?: string; v?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -106,6 +106,23 @@ export default function NewLogScreen() {
   };
 
   const ground = groundSurface(appGround);
+  const variant = (params.v ?? 'a') as 'a' | 'b' | 'c';
+  const pick = async () => {
+    const p = await pickPhoto();
+    if (p) setPhoto(p);
+  };
+  const photoLinks = (
+    <View style={{ flexDirection: 'row', gap: 14 }}>
+      <Pressable accessibilityRole="button" onPress={pick} style={styles.smallLink}>
+        <Text style={[styles.smallLinkText, { color: ground.text }]}>{photo ? 'Change photo' : 'Add a photo'}</Text>
+      </Pressable>
+      {photo ? (
+        <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.smallLink}>
+          <Text style={[styles.smallLinkText, { color: ground.muted }]}>Remove</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
   const close = () => (router.canGoBack() ? router.back() : router.replace('/profile'));
   // "Sat, Nov 7", with the year only when it isn't this year.
   const dayName = (d: string) => parseDay(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(d.slice(0, 4) === isoDay(0).slice(0, 4) ? {} : { year: 'numeric' }) });
@@ -131,42 +148,88 @@ export default function NewLogScreen() {
         </View>
 
         {/* Photo, and where it came from */}
-        <View style={styles.photoRow}>
-          <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={[styles.thumb, { backgroundColor: photo ? '#E3E5E1' : ground.line }]}>
-            {photo ? <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={22} color={ground.text} />}
-          </Pressable>
-          <View style={{ flex: 1, gap: 3 }}>
-            {source ? <Eyebrow>{editing ? 'Changes stay in your diary' : `From ${sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}`}</Eyebrow> : null}
-            <View style={{ flexDirection: 'row', gap: 14 }}>
-              <Pressable accessibilityRole="button" onPress={async () => { const p = await pickPhoto(); if (p) setPhoto(p); }} style={styles.smallLink}>
-                <Text style={[styles.smallLinkText, { color: ground.text }]}>{photo ? 'Change photo' : 'Add a photo'}</Text>
-              </Pressable>
-              {photo ? (
-                <Pressable accessibilityRole="button" onPress={() => setPhoto(null)} style={styles.smallLink}>
-                  <Text style={[styles.smallLinkText, { color: ground.muted }]}>Remove</Text>
-                </Pressable>
-              ) : null}
+        {source ? <Eyebrow style={{ marginTop: 16 }}>{editing ? 'Changes stay in your diary' : `From ${sourceAuthor?.id === state.me?.id ? 'your post' : `${sourceAuthor?.username}’s post`}`}</Eyebrow> : null}
+        {variant === 'c' ? (
+          // C: a recipe card: the photo across the top, the name under it.
+          <View style={[styles.writeCard, { padding: 0, overflow: 'hidden' }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={pick} style={[styles.wide, { backgroundColor: photo ? '#E3E5E1' : ground.line }]}>
+              {photo ? <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : (
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  <CameraIcon size={24} color={ground.text} />
+                  <Text style={[styles.smallLinkText, { color: ground.text }]}>Add a photo</Text>
+                </View>
+              )}
+            </Pressable>
+            <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+              <TextInput
+                accessibilityLabel="Title"
+                value={title}
+                onChangeText={setTitle}
+                // One line to start, growing with the text, so the stars sit right under it.
+                // (Phones grow on their own; the web needs rows=1 and field-sizing.)
+                {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+                maxLength={60}
+                multiline
+                placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
+                placeholderTextColor={ground.muted}
+                selectionColor={ground.text}
+                style={[styles.titleInput, (variant as string) === 'b' ? { fontSize: 34, lineHeight: 38 } : null, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
+              />
             </View>
           </View>
-        </View>
-
-        {/* White means "write here" (founder, Nov 19 2026): the name and the notes sit on white cards. */}
-        <View style={styles.writeCard}>
-          <TextInput
-            accessibilityLabel="Title"
-            value={title}
-            onChangeText={setTitle}
-            // One line to start, growing with the text, so the stars sit right under it.
-            // (Phones grow on their own; the web needs rows=1 and field-sizing.)
-            {...(Platform.OS === 'web' ? { rows: 1 } : null)}
-            maxLength={60}
-            multiline
-            placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
-            placeholderTextColor={ground.muted}
-            selectionColor={ground.text}
-            style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
-          />
-        </View>
+        ) : variant === 'b' ? (
+          // B: the name written on a line, like a notebook; the photo stays its own row.
+          <>
+            <View style={styles.photoRow}>
+              <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={pick} style={[styles.thumb, { backgroundColor: photo ? '#E3E5E1' : '#FFFFFF' }]}>
+                {photo ? <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={22} color={ground.text} />}
+              </Pressable>
+              {photoLinks}
+            </View>
+            <View style={{ marginTop: 14, borderBottomWidth: 1.5, borderBottomColor: ground.text, paddingBottom: 6 }}>
+              <TextInput
+                accessibilityLabel="Title"
+                value={title}
+                onChangeText={setTitle}
+                // One line to start, growing with the text, so the stars sit right under it.
+                // (Phones grow on their own; the web needs rows=1 and field-sizing.)
+                {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+                maxLength={60}
+                multiline
+                placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
+                placeholderTextColor={ground.muted}
+                selectionColor={ground.text}
+                style={[styles.titleInput, (variant as string) === 'b' ? { fontSize: 34, lineHeight: 38 } : null, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
+              />
+            </View>
+          </>
+        ) : (
+          // A: like Add to diary: the photo and the name share one white card.
+          <>
+            <View style={[styles.writeCard, { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={pick} style={[styles.thumb, { backgroundColor: photo ? '#E3E5E1' : ground.line }]}>
+                {photo ? <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={22} color={ground.text} />}
+              </Pressable>
+              <View style={{ flex: 1 }}>
+              <TextInput
+                accessibilityLabel="Title"
+                value={title}
+                onChangeText={setTitle}
+                // One line to start, growing with the text, so the stars sit right under it.
+                // (Phones grow on their own; the web needs rows=1 and field-sizing.)
+                {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+                maxLength={60}
+                multiline
+                placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
+                placeholderTextColor={ground.muted}
+                selectionColor={ground.text}
+                style={[styles.titleInput, (variant as string) === 'b' ? { fontSize: 34, lineHeight: 38 } : null, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
+              />
+              </View>
+            </View>
+            <View style={{ marginTop: -2, marginBottom: 2 }}>{photoLinks}</View>
+          </>
+        )}
 
         <View style={{ marginLeft: -4, paddingBottom: 10 }}>
           <StarInput value={rating} onChange={setRating} color={niche.accent} size={42} />
@@ -280,7 +343,8 @@ const styles = StyleSheet.create({
   thumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   smallLink: { minHeight: 32, justifyContent: 'center' },
   smallLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
-  titleInput: { fontSize: 34, lineHeight: 38, paddingVertical: 0, minHeight: 38 },
+  titleInput: { fontSize: 24, lineHeight: 29, paddingVertical: 0, minHeight: 29 },
+  wide: { height: 150, alignItems: 'center', justifyContent: 'center' },
   writeCard: { marginTop: 14, marginBottom: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, backgroundColor: '#FFFFFF' },
   rows: { borderTopWidth: StyleSheet.hairlineWidth * 2, marginTop: 6 },
   block: { paddingVertical: 14, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
