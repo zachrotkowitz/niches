@@ -4,18 +4,16 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CheckIcon } from '@/components/icons';
-import { Button } from '@/components/primitives';
+import { Eyebrow } from '@/components/discover-parts';
+import { CheckIcon, CloseIcon, PlusIcon } from '@/components/icons';
+import { DisplayText } from '@/components/primitives';
+import { SurfaceProvider } from '@/components/surface';
+import { UnderlineTabs } from '@/components/underline-tabs';
 import { useToast } from '@/components/toast';
 import { BEST_UNITS, GOAL_TEMPLATES, type GoalKind, type GoalTemplate, type GoalVisibility } from '@/lib/goals';
-import { useNiches, useStore } from '@/lib/store';
-import { colors, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
+import { useAppGround, useNiches, useStore } from '@/lib/store';
+import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
-const KINDS: { id: GoalKind; label: string; sub: string }[] = [
-  { id: 'habit', label: 'Weekly habit', sub: 'Do it a few times a week' },
-  { id: 'total', label: 'Reach a number', sub: 'Like 20 loaves' },
-  { id: 'best', label: 'Personal best', sub: 'Like a lift or a time' },
-];
 
 const num = (s: string) => {
   const n = parseFloat(s.replace(',', '.'));
@@ -30,6 +28,7 @@ export default function NewGoalScreen() {
   const toast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
+  const appGround = useAppGround();
 
   const [nicheId, setNicheId] = useState<NicheId>(params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche);
   const [kind, setKind] = useState<GoalKind>('habit');
@@ -80,202 +79,217 @@ export default function NewGoalScreen() {
     router.replace({ pathname: '/goals/[id]', params: { id } });
   };
 
-  return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: 'transparent' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.nav, { paddingTop: insets.top + 6 }]}>
-        <Pressable accessibilityRole="button" onPress={() => (router.canGoBack() ? router.back() : router.replace('/goals'))} style={styles.navButton}>
-          <Text style={[styles.navText, { color: niche.accent }]}>Cancel</Text>
+  const ground = groundSurface(appGround);
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/goals'));
+  const ideas = GOAL_TEMPLATES[nicheId].slice(0, 4);
+  const stepper = (value: string, set: (v: string) => void, min = 1) => {
+    const n = num(value) ?? 0;
+    return (
+      <View style={styles.steps}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Less" onPress={() => set(String(Math.max(min, n - 1)))} style={[styles.step, { borderColor: ground.text }]}>
+          <Text style={[styles.stepText, { color: ground.text }]}>−</Text>
         </Pressable>
-        <Text style={styles.navTitle}>New goal</Text>
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={save} style={[styles.navButton, { alignItems: 'flex-end' }]}>
-          <Text style={[styles.navText, { color: niche.accent, fontWeight: '700', opacity: ready ? 1 : 0.4 }]}>Save</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="More" onPress={() => set(String(n + 1))} style={[styles.step, { borderColor: ground.text }]}>
+          <Text style={[styles.stepText, { color: ground.text }]}>+</Text>
         </Pressable>
       </View>
+    );
+  };
+  const switchLink = (lead: string, action: string, to: GoalKind) => (
+    <Pressable accessibilityRole="button" onPress={() => setKind(to)} style={styles.switchRow}>
+      <Text style={[styles.switchText, { color: ground.muted }]}>
+        {lead} <Text style={{ color: ground.text, fontWeight: '700', textDecorationLine: 'underline' }}>{action}</Text>
+      </Text>
+    </Pressable>
+  );
+  const input = (value: string, set: (v: string) => void, label: string, width = 90, numeric = true) => (
+    <TextInput
+      accessibilityLabel={label}
+      value={value}
+      onChangeText={set}
+      keyboardType={numeric ? 'decimal-pad' : 'default'}
+      maxLength={numeric ? 7 : 20}
+      selectionColor={ground.text}
+      style={[styles.inlineInput, { color: ground.text, borderBottomColor: ground.muted, width }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+    />
+  );
 
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 22, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-        <Field label="Niche">
-          <View style={styles.wrap}>
-            {NICHE_ORDER.map((id) => {
-              const on = id === nicheId;
-              return (
-                <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setNicheId(id)} style={[styles.chip, { borderColor: niches[id].accent }, on ? { backgroundColor: niches[id].accent } : null]}>
-                  <Text style={[styles.chipText, { color: on ? '#FFFFFF' : colors.textBody }]}>{niches[id].label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Field>
+  return (
+    <SurfaceProvider value={ground}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={close} style={styles.close}>
+          <CloseIcon color={ground.text} />
+        </Pressable>
+        <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
+          <DisplayText size={38} color={ground.text}>New goal</DisplayText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !ready }}
+            disabled={!ready}
+            onPress={save}
+            style={({ pressed }) => [styles.savePill, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.85 : 1) : 0.3 }]}>
+            <Text style={[styles.saveText, { color: ground.ground }]}>Set goal</Text>
+          </Pressable>
+        </View>
 
-        <Field label="Start from an idea">
-          <View style={styles.wrap}>
-            {GOAL_TEMPLATES[nicheId].map((tpl) => {
-              const on = title === tpl.title;
-              return (
-                <Pressable key={tpl.title} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => applyTemplate(tpl)} style={[styles.idea, { backgroundColor: on ? niche.accent : niche.field }]}>
-                  <Text style={[styles.ideaText, { color: on ? '#FFFFFF' : niche.ink }]}>{tpl.title}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {nicheId === 'gym' ? (
-            <Text style={styles.note}>Gym goals track what you can do, not what you weigh. There’s no weight-loss goal, on purpose.</Text>
-          ) : null}
-        </Field>
+        <View style={{ marginTop: 12, marginHorizontal: -10 }}>
+          <UnderlineTabs
+            label="Niche"
+            inset={0}
+            value={nicheId}
+            onChange={(k) => setNicheId(k as NicheId)}
+            items={NICHE_ORDER.map((id) => ({ key: id, label: niches[id].label, color: niches[id].accent }))}
+          />
+        </View>
 
-        <Field label="Kind of goal">
-          <View accessibilityRole="radiogroup" style={{ gap: 8 }}>
-            {KINDS.map((k) => {
-              const on = k.id === kind;
-              return (
-                <Pressable key={k.id} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setKind(k.id)} style={[styles.option, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                  <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.optionTitle}>{k.label}</Text>
-                    <Text style={styles.optionSub}>{k.sub}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Field>
+        {/* The goal itself, on white: the main thing on the page (founder, Nov 19 2026). Type it however you like. */}
+        <View style={styles.goalCard}>
+          <Eyebrow>Your goal</Eyebrow>
+          <TextInput
+            accessibilityLabel="Goal title"
+            value={title}
+            onChangeText={setTitle}
+            multiline
+            maxLength={60}
+            autoFocus={Platform.OS !== 'web'}
+            selectionColor={ground.text}
+            style={[styles.goalInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+          />
+        </View>
 
-        <Field label="Your goal">
-          <TextInput accessibilityLabel="Goal title" value={title} onChangeText={setTitle} maxLength={60} placeholder={GOAL_TEMPLATES[nicheId][0].title} placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-        </Field>
-
-        {kind === 'habit' ? (
-          <Field label="Times a week">
-            <View style={styles.row}>
-              {[1, 2, 3, 4, 5, 6, 7].map((n) => {
-                const on = n === perWeek;
-                return (
-                  <Pressable key={n} accessibilityRole="radio" accessibilityLabel={`${n} ${n === 1 ? 'time' : 'times'} a week`} accessibilityState={{ checked: on }} onPress={() => setPerWeek(n)} style={[styles.num, on ? { backgroundColor: niche.accent } : null]}>
-                    <Text style={[styles.numText, on ? { color: '#FFFFFF' } : null]}>{n}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.note}>Your streak counts weeks, not days. Busy week? Mark it as a rest week and the streak keeps going.</Text>
-          </Field>
-        ) : kind === 'total' ? (
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Field label="Target">
-                <TextInput accessibilityLabel="Target" value={target} onChangeText={setTarget} keyboardType="decimal-pad" placeholder="20" placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-              </Field>
-            </View>
-            <View style={{ flex: 1.4 }}>
-              <Field label="Of what">
-                <TextInput accessibilityLabel="Unit" value={unit} onChangeText={setUnit} maxLength={20} placeholder="loaves" placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-              </Field>
-            </View>
-          </View>
-        ) : (
-          <>
-            <Field label="Measured in">
-              <View style={styles.wrap}>
-                {BEST_UNITS.map((u) => {
-                  const on = u === unit;
-                  return (
-                    <Pressable key={u} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setUnit(u)} style={[styles.unit, on ? { backgroundColor: niche.accent } : null]}>
-                      <Text style={[styles.numText, on ? { color: '#FFFFFF' } : null]}>{u}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </Field>
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Field label="Where you are now">
-                  <TextInput accessibilityLabel="Starting point" value={start} onChangeText={setStart} keyboardType="decimal-pad" placeholder="60" placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-                </Field>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Field label="Goal">
-                  <TextInput accessibilityLabel="Target" value={target} onChangeText={setTarget} keyboardType="decimal-pad" placeholder="100" placeholderTextColor="#6B7178" style={styles.input} selectionColor={niche.accent} />
-                </Field>
-              </View>
-            </View>
-            <View style={styles.segment} accessibilityRole="radiogroup">
-              {(['up', 'down'] as const).map((d) => {
-                const on = d === direction;
-                return (
-                  <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setDirection(d)} style={[styles.segmentOption, on ? styles.segmentOn : null]}>
-                    <Text style={[styles.segmentText, { color: on ? colors.text : colors.textMuted }]}>{d === 'up' ? 'Higher is better' : 'Lower is better (times)'}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
-
-        <Field label="Who can see this goal">
-          <View style={{ gap: 8 }}>
-            {(['private', 'profile'] as GoalVisibility[]).map((v) => {
-              const on = v === visibility;
-              return (
-                <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setVisibility(v)} style={[styles.option, on ? { borderColor: niche.accent, backgroundColor: niche.field } : null]}>
-                  <View style={[styles.radio, on ? { borderColor: niche.accent } : null]}>{on ? <View style={[styles.radioDot, { backgroundColor: niche.accent }]} /> : null}</View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={styles.optionTitle}>{v === 'private' ? 'Just me' : 'On my profile'}</Text>
-                    <Text style={styles.optionSub}>{v === 'private' ? 'Nobody else sees it.' : 'People who visit your profile see the goal and your progress posts.'}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-            {visibility === 'profile' ? (
-              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: hideNumbers }} onPress={() => setHideNumbers(!hideNumbers)} style={styles.check}>
-                <View style={[styles.box, hideNumbers ? { backgroundColor: niche.accent, borderColor: niche.accent } : null]}>{hideNumbers ? <CheckIcon size={15} strokeWidth={3} /> : null}</View>
+        <View style={[styles.rows, { borderTopColor: ground.line }]}>
+          {kind === 'habit' ? (
+            <>
+              <View style={[styles.trackRow, { borderBottomColor: ground.line }]}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.optionTitle}>Hide my numbers</Text>
-                  <Text style={styles.optionSub}>Others see the goal and a progress bar, but no counts, weights or times.</Text>
+                  <Eyebrow>Check in</Eyebrow>
+                  <Text style={[styles.trackValue, { color: ground.text }]}>{perWeek === 1 ? 'Once a week' : `${perWeek} times a week`}</Text>
                 </View>
-              </Pressable>
-            ) : null}
-          </View>
-        </Field>
+                <View style={styles.steps}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Fewer times a week" onPress={() => setPerWeek(Math.max(1, perWeek - 1))} style={[styles.step, { borderColor: ground.text, opacity: perWeek <= 1 ? 0.35 : 1 }]}>
+                    <Text style={[styles.stepText, { color: ground.text }]}>−</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="More times a week" onPress={() => setPerWeek(Math.min(7, perWeek + 1))} style={[styles.step, { borderColor: ground.text, opacity: perWeek >= 7 ? 0.35 : 1 }]}>
+                    <Text style={[styles.stepText, { color: ground.text }]}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {switchLink('Counting toward a total instead?', 'Set a number to reach', 'total')}
+            </>
+          ) : kind === 'total' ? (
+            <>
+              <View style={[styles.trackRow, { borderBottomColor: ground.line }]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Eyebrow>Reach</Eyebrow>
+                  <View style={styles.inlineRow}>
+                    {input(target, setTarget, 'Number to reach', 70)}
+                    {input(unit, setUnit, 'Of what, like loaves', 120, false)}
+                  </View>
+                </View>
+                {stepper(target, setTarget)}
+              </View>
+              {switchLink('Doing it every week instead?', 'Check in weekly', 'habit')}
+              {nicheId === 'gym' ? switchLink('Chasing a time or a lift?', 'Track a personal best', 'best') : null}
+            </>
+          ) : (
+            <>
+              <View style={[styles.trackRow, { borderBottomColor: ground.line, flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+                <Eyebrow>Personal best</Eyebrow>
+                <View style={styles.inlineRow}>
+                  <Text style={[styles.inlineLabel, { color: ground.muted }]}>From</Text>
+                  {input(start, setStart, 'Where you are now', 60)}
+                  <Text style={[styles.inlineLabel, { color: ground.muted }]}>to</Text>
+                  {input(target, setTarget, 'Your goal', 60)}
+                  {input(unit, setUnit, 'Unit, like kg or min', 60, false)}
+                </View>
+                <View style={styles.inlineRow}>
+                  {(['up', 'down'] as const).map((d) => (
+                    <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === direction }} onPress={() => setDirection(d)} style={styles.wordHit}>
+                      <Text style={[styles.word, { color: d === direction ? ground.text : ground.muted, fontWeight: d === direction ? '700' : '500', borderBottomColor: d === direction ? ground.text : 'transparent' }]}>
+                        {d === 'up' ? 'Higher is better' : 'Lower is better'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              {switchLink('Doing it every week instead?', 'Check in weekly', 'habit')}
+            </>
+          )}
+        </View>
 
-        <Button label="Set goal" color={niche.accent} disabled={!ready} onPress={save} />
+        {/* A few ideas to get going (founder, Nov 19 2026: from mock 1, under the tracking). */}
+        <View style={{ marginTop: 18 }}>
+          <Eyebrow>Need an idea?</Eyebrow>
+          <View style={{ marginTop: 4 }}>
+            {ideas.map((tpl) => (
+              <Pressable key={tpl.title} accessibilityRole="button" accessibilityLabel={`Use idea: ${tpl.title}`} onPress={() => applyTemplate(tpl)} style={({ pressed }) => [styles.idea, { borderBottomColor: ground.line, opacity: pressed ? 0.6 : 1 }]}>
+                <PlusIcon size={15} color={ground.muted} strokeWidth={2.2} />
+                <Text style={[styles.ideaText, { color: ground.text }]}>{tpl.title}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.foot, { borderTopColor: ground.line }]}>
+          <View style={styles.footRow}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.footTitle, { color: ground.text }]}>Who can see it</Text>
+              <Text style={[styles.footSub, { color: ground.muted }]}>{visibility === 'private' ? 'Only you see it. You can change this later.' : 'Shows on your profile’s Goals tab.'}</Text>
+            </View>
+            <View accessibilityRole="radiogroup" accessibilityLabel="Who can see it" style={styles.toggle}>
+              {(['private', 'profile'] as GoalVisibility[]).map((v) => {
+                const on = visibility === v;
+                return (
+                  <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setVisibility(v)} style={[styles.toggleItem, on && { backgroundColor: '#FFFFFF' }]}>
+                    <Text style={[styles.toggleText, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]}>{v === 'private' ? 'Private' : 'Public'}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          {visibility === 'profile' ? (
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: hideNumbers }} onPress={() => setHideNumbers(!hideNumbers)} style={styles.hideRow}>
+              <View style={[styles.box, hideNumbers ? { backgroundColor: ground.text, borderColor: ground.text } : { borderColor: ground.muted }]}>{hideNumbers ? <CheckIcon size={14} strokeWidth={2.8} /> : null}</View>
+              <Text style={[styles.footSub, { color: ground.text }]}>Hide my numbers from others</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ gap: 8 }}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </View>
+    </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  navButton: { minWidth: 80, minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 12 },
-  navText: { fontSize: 17 },
-  navTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  row: { flexDirection: 'row', gap: 8 },
-  chip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 19, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  chipText: { fontSize: 14, fontWeight: '600' },
-  idea: { minHeight: 38, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  ideaText: { fontSize: 14, fontWeight: '600' },
-  note: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center' },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  optionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  optionSub: { fontSize: 13, lineHeight: 18, color: colors.textMuted },
-  input: { minHeight: TOUCH + 4, borderRadius: 14, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 14, fontSize: 16, color: colors.text, backgroundColor: '#FFFFFF', width: '100%', minWidth: 0 },
-  num: { flex: 1, height: TOUCH, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  unit: { minWidth: 52, height: 40, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  numText: { fontSize: 15, fontWeight: '700', color: colors.textBody },
-  segment: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: '#F0F1EE' },
-  segmentOption: { flex: 1, minHeight: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  segmentOn: { backgroundColor: '#FFFFFF', shadowColor: '#14161A', shadowOpacity: 0.14, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  segmentText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  check: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', paddingVertical: 6 },
-  box: { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: '#9AA19B', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  close: { width: TOUCH, height: TOUCH, marginLeft: -10, alignItems: 'center', justifyContent: 'center' },
+  masthead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1 },
+  savePill: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  saveText: { fontSize: 15, fontWeight: '700' },
+  goalCard: { marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: '#FFFFFF', gap: 6, shadowColor: '#1F1A14', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
+  goalInput: { fontFamily: fonts.display, fontSize: 32, lineHeight: 37, minHeight: 80, paddingVertical: 2, textAlignVertical: 'top' },
+  rows: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  trackRow: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  trackValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34 },
+  steps: { flexDirection: 'row', gap: 8 },
+  step: { width: TOUCH, height: TOUCH, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  stepText: { fontSize: 22, lineHeight: 24 },
+  switchRow: { minHeight: TOUCH, justifyContent: 'center' },
+  switchText: { fontSize: 14 },
+  inlineRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10 },
+  inlineInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, borderBottomWidth: 1, paddingVertical: 2 },
+  inlineLabel: { fontSize: 14, paddingBottom: 6 },
+  wordHit: { minHeight: 36, justifyContent: 'center' },
+  word: { fontSize: 14, paddingBottom: 4, borderBottomWidth: 2 },
+  idea: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  ideaText: { fontSize: 15, flexShrink: 1 },
+  foot: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 14, gap: 10 },
+  footRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  footTitle: { fontSize: 15, fontWeight: '700' },
+  footSub: { fontSize: 12, lineHeight: 17 },
+  toggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.07)' },
+  toggleItem: { minHeight: 36, paddingHorizontal: 16, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  toggleText: { fontSize: 14 },
+  hideRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH },
+  box: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
