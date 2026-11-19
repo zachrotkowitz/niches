@@ -141,10 +141,11 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
                 accessibilityLabel="Name"
                 value={title}
                 onChangeText={setTitle}
+                {...(Platform.OS === 'web' ? { rows: 1 } : null)}
                 maxLength={60}
                 multiline
                 selectionColor={ground.text}
-                style={[styles.title, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+                style={[styles.title, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
               />
             </View>
 
@@ -161,6 +162,7 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
               ) : (
                 <View style={[styles.row, { borderBottomColor: ground.line, paddingVertical: 10, flexDirection: 'column', alignItems: 'stretch', gap: 2 }]}>
                   <Eyebrow>Notes</Eyebrow>
+                  <View style={styles.writeCard}>
                   <TextInput
                     accessibilityLabel="Notes"
                     value={notes}
@@ -171,6 +173,7 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
                     selectionColor={ground.text}
                     style={[styles.notes, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
                   />
+                  </View>
                 </View>
               )}
               <Pressable
@@ -240,8 +243,10 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 14 },
   heading: { fontFamily: fonts.displayItalic, fontSize: 30, lineHeight: 34 },
   small: { fontSize: 13 },
-  dish: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dish: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 18, backgroundColor: '#FFFFFF' },
   thumb: { width: 52, height: 52, borderRadius: 12, overflow: 'hidden' },
+  // White means "write here" (founder, Nov 19 2026).
+  writeCard: { marginTop: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, backgroundColor: '#FFFFFF' },
   title: { flex: 1, fontFamily: fonts.display, fontSize: 22, lineHeight: 26, paddingVertical: 2 },
   rows: { borderTopWidth: StyleSheet.hairlineWidth * 2 },
   row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth * 2 },

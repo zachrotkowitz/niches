@@ -150,20 +150,23 @@ export default function NewLogScreen() {
           </View>
         </View>
 
-        <TextInput
-          accessibilityLabel="Title"
-          value={title}
-          onChangeText={setTitle}
-          // One line to start, growing with the text, so the stars sit right under it.
-          // (Phones grow on their own; the web needs rows=1 and field-sizing.)
-          {...(Platform.OS === 'web' ? { rows: 1 } : null)}
-          maxLength={60}
-          multiline
-          placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
-          placeholderTextColor={ground.muted}
-          selectionColor={ground.text}
-          style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
-        />
+        {/* White means "write here" (founder, Nov 19 2026): the name and the notes sit on white cards. */}
+        <View style={styles.writeCard}>
+          <TextInput
+            accessibilityLabel="Title"
+            value={title}
+            onChangeText={setTitle}
+            // One line to start, growing with the text, so the stars sit right under it.
+            // (Phones grow on their own; the web needs rows=1 and field-sizing.)
+            {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+            maxLength={60}
+            multiline
+            placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
+            placeholderTextColor={ground.muted}
+            selectionColor={ground.text}
+            style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
+          />
+        </View>
 
         <View style={{ marginLeft: -4, paddingBottom: 10 }}>
           <StarInput value={rating} onChange={setRating} color={niche.accent} size={42} />
@@ -218,6 +221,7 @@ export default function NewLogScreen() {
 
           <View style={[styles.block, { borderBottomColor: ground.line }]}>
             <Eyebrow>Notes for next time</Eyebrow>
+            <View style={[styles.writeCard, { marginTop: 0 }]}>
             <TextInput
               accessibilityLabel="Notes"
               value={notes}
@@ -227,6 +231,7 @@ export default function NewLogScreen() {
               selectionColor={ground.text}
               style={[styles.notesInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
             />
+            </View>
           </View>
 
           {/* Check-ins were counted when it was logged, so editing doesn't count them again. */}
@@ -275,13 +280,14 @@ const styles = StyleSheet.create({
   thumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   smallLink: { minHeight: 32, justifyContent: 'center' },
   smallLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
-  titleInput: { fontSize: 36, lineHeight: 40, paddingTop: 14, paddingBottom: 0, minHeight: 40 },
+  titleInput: { fontSize: 34, lineHeight: 38, paddingVertical: 0, minHeight: 38 },
+  writeCard: { marginTop: 14, marginBottom: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, backgroundColor: '#FFFFFF' },
   rows: { borderTopWidth: StyleSheet.hairlineWidth * 2, marginTop: 6 },
   block: { paddingVertical: 14, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
   words: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 20 },
   wordHit: { minHeight: 40, justifyContent: 'center' },
   word: { fontSize: 15, paddingBottom: 5, borderBottomWidth: 2.5 },
-  notesInput: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 27, minHeight: 60, paddingVertical: 2, textAlignVertical: 'top' },
+  notesInput: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 27, minHeight: 80, paddingVertical: 2, textAlignVertical: 'top' },
   // The calendar sits on white so it stands out from the cream (founder, Nov 19 2026).
   calCard: { marginTop: 4, paddingHorizontal: 10, paddingBottom: 8, borderRadius: 20, backgroundColor: '#FFFFFF', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
   goal: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH },
