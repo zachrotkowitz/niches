@@ -326,7 +326,7 @@ export default function NewPlanSheet() {
                         </View>
                         {matches.length ? (
                           <View>
-                            {!query.trim() ? <Text style={[styles.hint, { color: ground.muted, marginBottom: 2 }]}>People you follow</Text> : null}
+                            {!query.trim() ? <Text style={[styles.hint, { color: ground.muted, marginBottom: 2 }]}>Suggested</Text> : null}
                             {matches.map((u) => {
                               const on = invitees.includes(u.id);
                               return (
