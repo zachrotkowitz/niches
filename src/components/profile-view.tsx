@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type RefreshControlProps } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { Easing, interpolate, ReduceMotion, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useDerivedValue, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, interpolate, ReduceMotion, useAnimatedScrollHandler, useAnimatedStyle, useDerivedValue, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Text } from '@/components/text';
 
@@ -125,18 +125,11 @@ export function ProfileView({
   const pos = useSharedValue(0);
   const start = useSharedValue(0);
   const [heights, setHeights] = useState<Partial<Record<Tab, number>>>({});
-  const [stuck, setStuck] = useState(false);
   const onScroll = useAnimatedScrollHandler((e) => {
     y.set(e.contentOffset.y);
   });
   // How far into the tabs you've scrolled: 0 until the row pins.
   const depth = useDerivedValue(() => Math.max(0, y.get() - (tabsTop.get() - topInset)));
-  useAnimatedReaction(
-    () => y.get() >= tabsTop.get() - topInset && tabsTop.get() > 0,
-    (now, before) => {
-      if (now !== before) scheduleOnRN(setStuck, now);
-    },
-  );
   const scrollAfter = useRef(false);
   const settle = (i: number) => {
     scrollAfter.current = depth.get() > 0;
@@ -194,7 +187,6 @@ export function ProfileView({
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pos.get() }] }));
   // Where the scroll is when the row reaches the top.
   const pinAt = useDerivedValue(() => tabsTop.get() - topInset);
-  const pinnedStyle = useAnimatedStyle(() => ({ opacity: tabsTop.get() > 0 && y.get() >= pinAt.get() ? 1 : 0 }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: interpolate(y.get(), [pinAt.get() - 48, pinAt.get()], [0, 1], 'clamp') }));
   // A soft shadow under the pinned row, fading in as posts start to slide beneath it.
   const lineStyle = useAnimatedStyle(() => {
@@ -316,7 +308,8 @@ export function ProfileView({
 
   return (
     <View style={{ flex: 1 }}>
-      <Animated.ScrollView ref={scroller} onScroll={onScroll} scrollEventThrottle={16} refreshControl={refreshControl} contentContainerStyle={{ paddingBottom: contentBottom }}>
+      {/* The tab row (child 1) sticks natively: the phone itself keeps it at the top while scrolling, in step at any speed (founder's screen recording, Nov 19 2026). */}
+      <Animated.ScrollView ref={scroller} onScroll={onScroll} scrollEventThrottle={16} refreshControl={refreshControl} stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: contentBottom }}>
       {/* Everything above the tab row. Its height is where the row sits (also right on the web, which only reports size changes). */}
       <View onLayout={(e) => tabsTop.set(e.nativeEvent.layout.height)}>
       {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
@@ -443,7 +436,12 @@ export function ProfileView({
       ) : null}
 
       </View>
-      <View>{tabRow}</View>
+      {/* Pulled up by the status bar's height with the same padding, so when it sticks the row sits just under the clock.
+          That top strip is see-through until it fades to the background as the row arrives. */}
+      <View pointerEvents="box-none" style={{ marginTop: -topInset, paddingTop: topInset, zIndex: 2 }}>
+        {topInset ? <Animated.View pointerEvents="none" style={[styles.strip, { height: topInset, backgroundColor: surface.ground }, backdropStyle]} /> : null}
+        <Animated.View style={[{ backgroundColor: surface.ground, shadowColor: '#1F1A14', shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }, lineStyle]}>{tabRow}</Animated.View>
+      </View>
 
       {/* The pages, side by side. The box is as tall as the tab you're on. */}
       <GestureDetector gesture={pan}>
@@ -459,16 +457,6 @@ export function ProfileView({
       </GestureDetector>
       </Animated.ScrollView>
 
-      {/* The tab row pinned at the top once you scroll past it. It's always there,
-          and shows on the exact frame the real row reaches the top, so the swap
-          can't be seen; the strip behind the status bar fades in just before,
-          and a hairline fades in once posts start sliding under it. */}
-      <View pointerEvents={stuck ? 'box-none' : 'none'} style={styles.pinned}>
-        {topInset ? <Animated.View style={[{ height: topInset, backgroundColor: surface.ground }, backdropStyle]} /> : null}
-        <Animated.View style={[{ backgroundColor: surface.ground, shadowColor: '#1F1A14', shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }, pinnedStyle, lineStyle]}>
-          {tabRow}
-        </Animated.View>
-      </View>
     </View>
   );
 }
@@ -607,7 +595,7 @@ const makeStyles = (sf: Surface) =>
   favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
   goalsLine: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 26, marginBottom: 4 },
-  pinned: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5 },
+  strip: { position: 'absolute', top: 0, left: 0, right: 0 },
   diaryHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 4 },
   diaryStatsRow: { flexDirection: 'row', gap: 22 },
   viewToggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.06)' },
