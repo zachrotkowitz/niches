@@ -60,9 +60,6 @@ export default function GoalsScreen() {
                 ]}
               />
             </View>
-            {tab === 'all' && active.some((g) => g.kind === 'habit' && (g.period ?? 'week') === 'week') ? (
-              <Text style={[styles.line, { color: ground.text }]}>{left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`}</Text>
-            ) : null}
             <View style={styles.list}>
               {shown.map((g) => (
                 <GoalCard key={g.id} goal={g} />

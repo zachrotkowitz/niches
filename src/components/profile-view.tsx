@@ -203,14 +203,6 @@ export function ProfileView({
     <>
       {t === 'goals' ? (
         <View style={styles.diary}>
-          {isMe && weekly.length ? (
-            <Text style={[styles.goalsLine, { color: surface.text }]}>
-              {(() => {
-                const left = weekly.filter((g) => progress(g).fraction < 1).length;
-                return left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`;
-              })()}
-            </Text>
-          ) : null}
           <View style={{ gap: 10 }}>
             {goals.map((g) => (
               <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
