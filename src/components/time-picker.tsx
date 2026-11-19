@@ -4,6 +4,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View, type NativeScrollEve
 
 import { useSurface } from '@/components/surface';
 import { Text } from '@/components/text';
+import { fonts } from '@/lib/theme';
 
 const ITEM = 40;
 const VISIBLE = 5; // rows showing; the middle one is the pick
@@ -82,7 +83,7 @@ function Wheel({ items, value, onChange, accent, label, width }: { items: string
               accessibilityState={{ selected: i === live }}
               onPress={() => jump(i)}
               style={[styles.item, Platform.OS === 'web' ? ({ scrollSnapAlign: 'center' } as object) : null]}>
-              <Text style={[styles.itemText, d === 0 ? { color: accent, fontSize: 26, fontWeight: '600' } : { color: surface.muted, opacity: d === 1 ? 0.9 : 0.45 }]}>{it}</Text>
+              <Text style={[styles.itemText, d === 0 ? { color: accent, fontSize: 30, lineHeight: 34 } : { color: surface.muted, opacity: d === 1 ? 0.9 : 0.45 }]}>{it}</Text>
             </Pressable>
           );
         })}
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 4 },
   band: { position: 'absolute', left: 12, right: 12, top: 6 + ITEM * 2, height: ITEM, borderRadius: 12 },
   item: { height: ITEM, alignItems: 'center', justifyContent: 'center' },
-  itemText: { fontSize: 19, fontVariant: ['tabular-nums'] },
-  colon: { fontSize: 24, fontWeight: '600', marginTop: -3 },
+  // The serif, like the day numbers on the calendar and Plans (founder, Nov 19 2026).
+  itemText: { fontFamily: fonts.display, fontSize: 22, lineHeight: 26 },
+  colon: { fontFamily: fonts.display, fontSize: 28, marginTop: -3 },
 });
