@@ -154,15 +154,18 @@ export default function NewLogScreen() {
           accessibilityLabel="Title"
           value={title}
           onChangeText={setTitle}
+          // One line to start, growing with the text, so the stars sit right under it.
+          // (Phones grow on their own; the web needs rows=1 and field-sizing.)
+          {...(Platform.OS === 'web' ? { rows: 1 } : null)}
           maxLength={60}
           multiline
           placeholder={`What did you ${nicheId === 'photography' ? 'shoot' : nicheId === 'gym' ? 'do' : 'make'}?`}
           placeholderTextColor={ground.muted}
           selectionColor={ground.text}
-          style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+          style={[styles.titleInput, { color: ground.text, fontFamily: title ? fonts.display : fonts.displayItalic }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
         />
 
-        <View style={{ paddingVertical: 8 }}>
+        <View style={{ marginLeft: -4, paddingBottom: 10 }}>
           <StarInput value={rating} onChange={setRating} color={niche.accent} size={42} />
         </View>
 
@@ -199,7 +202,7 @@ export default function NewLogScreen() {
               </Pressable>
             </View>
             {calendarOpen ? (
-              <Animated.View entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(120)}>
+              <Animated.View entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(120)} style={[styles.calCard, { shadowColor: ground.text }]}>
                 <MonthCalendar
                   value={date}
                   max={isoDay(0)}
@@ -272,13 +275,15 @@ const styles = StyleSheet.create({
   thumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   smallLink: { minHeight: 32, justifyContent: 'center' },
   smallLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
-  titleInput: { fontSize: 36, lineHeight: 40, paddingTop: 14, paddingBottom: 4, minHeight: 56 },
+  titleInput: { fontSize: 36, lineHeight: 40, paddingTop: 14, paddingBottom: 0, minHeight: 40 },
   rows: { borderTopWidth: StyleSheet.hairlineWidth * 2, marginTop: 6 },
   block: { paddingVertical: 14, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
   words: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 20 },
   wordHit: { minHeight: 40, justifyContent: 'center' },
   word: { fontSize: 15, paddingBottom: 5, borderBottomWidth: 2.5 },
   notesInput: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 27, minHeight: 60, paddingVertical: 2, textAlignVertical: 'top' },
+  // The calendar sits on white so it stands out from the cream (founder, Nov 19 2026).
+  calCard: { marginTop: 4, paddingHorizontal: 10, paddingBottom: 8, borderRadius: 20, backgroundColor: '#FFFFFF', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
   goal: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH },
   goalTitle: { fontSize: 15, fontWeight: '700' },
   goalSub: { fontSize: 13, lineHeight: 18 },

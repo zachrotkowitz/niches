@@ -86,14 +86,15 @@ export function StarInput({ value, onChange, color, size = 32 }: { value: number
           </Pressable>
         ))}
       </View>
+      {/* No hint while empty (founder: people figure out half stars); the row keeps its height so nothing jumps. */}
       <View style={styles.ratingRow}>
-        <Text style={[styles.ratingText, { color: surface.muted }]}>
-          {value ? `${formatRating(value)} ${value <= 1 ? 'star' : 'stars'}` : 'Tap a star twice for a half star'}
-        </Text>
         {value ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear rating" onPress={() => onChange(0)} hitSlop={10}>
-            <Text style={[styles.ratingText, { color: surface.text, fontWeight: '700' }]}>Clear</Text>
-          </Pressable>
+          <>
+            <Text style={[styles.ratingText, { color: surface.muted }]}>{`${formatRating(value)} ${value <= 1 ? 'star' : 'stars'}`}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear rating" onPress={() => onChange(0)} hitSlop={10}>
+              <Text style={[styles.ratingText, { color: surface.text, fontWeight: '700' }]}>Clear</Text>
+            </Pressable>
+          </>
         ) : null}
       </View>
     </View>
@@ -261,7 +262,7 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
 const makeStyles = (sf: Surface) =>
   StyleSheet.create({
   stars: { flexDirection: 'row', gap: 1 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 6 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 6, minHeight: 18 },
   ratingText: { fontSize: 13, fontWeight: '600' },
   starInput: { flexDirection: 'row', gap: 2 },
   starButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
