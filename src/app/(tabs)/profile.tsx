@@ -47,10 +47,11 @@ function ProfileScreenInner() {
 
   return (
     <View style={[{ flex: 1 }, styles.screen]}>
+      {/* A solid bar behind the clock and battery; the profile scrolls below it, so nothing shows through above the pinned tab row (founder, Nov 19 2026). */}
+      <View style={{ height: insets.top, backgroundColor: surface.ground, zIndex: 3 }} />
       <ProfileView
         user={me}
         isMe
-        topInset={insets.top}
         // Picking a tab while scrolled past the tab row brings the row back to the top.
         scrollRef={scrollRef}
         scrollY={scrollY}
