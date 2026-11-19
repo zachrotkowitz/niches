@@ -7,7 +7,7 @@ import { LockIcon } from '@/components/icons';
 import { Avatar } from '@/components/primitives';
 import { chosenDish, dayOfMonth, kindLabel, monthShort, participants, weekdayShort, type Plan } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
-import { colors } from '@/lib/theme';
+import { colors, fonts } from '@/lib/theme';
 
 /**
  * A plan in a list. Plans from different niches sit together, so each card
@@ -52,14 +52,15 @@ export function PlanCard({ plan }: { plan: Plan }) {
       accessibilityLabel={`${kindLabel(plan.kind, plan.niche)} in ${niche.label}: ${plan.title}, ${weekdayShort(plan.date)} ${monthShort(plan.date)} ${dayOfMonth(plan.date)}${plan.time ? `, ${plan.time}` : ''}${status ? `. ${status}` : ''}`}
       onPress={() => router.push({ pathname: '/plans/[id]', params: { id: plan.id } })}
       style={({ pressed }) => [styles.card, { borderColor: niche.accent, transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-      <View style={[styles.date, { backgroundColor: niche.field }]}>
-        <Text style={[styles.dow, { color: niche.inkSoft }]}>{weekdayShort(plan.date).toUpperCase()}</Text>
-        <Text style={[styles.dom, { color: niche.ink }]}>{dayOfMonth(plan.date)}</Text>
-        <Text style={[styles.mon, { color: niche.inkSoft }]}>{monthShort(plan.date)}</Text>
+      {/* The day as a big serif number, like the Diary list (founder picked A's list, Nov 19 2026). */}
+      <View style={styles.date}>
+        <Text style={styles.dow}>{weekdayShort(plan.date).toUpperCase()}</Text>
+        <Text style={styles.dom}>{dayOfMonth(plan.date)}</Text>
+        <Text style={styles.mon}>{monthShort(plan.date)}</Text>
       </View>
       <View style={styles.body}>
         <View style={styles.topRow}>
-          <Text style={[styles.kind, { color: niche.ink }]}>
+          <Text style={styles.kind}>
             {kindLabel(plan.kind, plan.niche)}
             {plan.time ? ` · ${plan.time}` : ''}
           </Text>
@@ -77,7 +78,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
             {people.length > 4 ? <Text style={styles.more}>+{people.length - 4}</Text> : null}
           </View>
           {status ? (
-            <Text style={[styles.status, invitedNoAnswer ? { color: niche.accent } : null]}>{status}</Text>
+            <Text style={[styles.status, invitedNoAnswer ? styles.statusAsk : null]}>{invitedNoAnswer ? 'Reply' : status}</Text>
           ) : null}
         </View>
       </View>
@@ -86,19 +87,20 @@ export function PlanCard({ plan }: { plan: Plan }) {
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', borderRadius: 18, borderWidth: NICHE_BORDER, backgroundColor: '#FFFFFF', overflow: 'hidden' },
-  date: { width: 66, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-  dow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
-  dom: { fontSize: 26, fontWeight: '800', lineHeight: 30, fontVariant: ['tabular-nums'] },
-  mon: { fontSize: 12, fontWeight: '600' },
-  body: { flex: 1, minWidth: 0, padding: 12, gap: 3 },
+  card: { flexDirection: 'row', gap: 4, borderRadius: 20, borderWidth: NICHE_BORDER, backgroundColor: '#FFFFFF', overflow: 'hidden', padding: 12 },
+  date: { width: 50, alignItems: 'center', paddingTop: 2 },
+  dow: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: colors.textMuted },
+  dom: { fontFamily: fonts.display, fontSize: 36, lineHeight: 38, color: colors.text },
+  mon: { fontSize: 12, color: colors.textMuted },
+  body: { flex: 1, minWidth: 0, paddingLeft: 6, gap: 2 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  kind: { fontSize: 12, fontWeight: '700' },
-  title: { fontSize: 16, fontWeight: '700', color: colors.text, lineHeight: 21 },
+  kind: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  title: { fontFamily: fonts.display, fontSize: 23, color: colors.text, lineHeight: 26 },
   detail: { fontSize: 13, color: colors.textMuted },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
   faces: { flexDirection: 'row', alignItems: 'center' },
   face: { borderRadius: 13, borderWidth: 2, borderColor: '#FFFFFF' },
   more: { fontSize: 12, color: colors.textMuted, marginLeft: 6 },
-  status: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  status: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  statusAsk: { color: colors.text, fontWeight: '700', textDecorationLine: 'underline' },
 });
