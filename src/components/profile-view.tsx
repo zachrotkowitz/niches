@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type RefreshControlProps } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { Easing, ReduceMotion, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useDerivedValue, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, interpolate, ReduceMotion, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useDerivedValue, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Text } from '@/components/text';
 
@@ -192,6 +192,15 @@ export function ProfileView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [W, tabs.length]);
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pos.get() }] }));
+  // Where the scroll is when the row reaches the top.
+  const pinAt = useDerivedValue(() => tabsTop.get() - topInset);
+  const pinnedStyle = useAnimatedStyle(() => ({ opacity: tabsTop.get() > 0 && y.get() >= pinAt.get() ? 1 : 0 }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: interpolate(y.get(), [pinAt.get() - 48, pinAt.get()], [0, 1], 'clamp') }));
+  // A soft shadow under the pinned row, fading in as posts start to slide beneath it.
+  const lineStyle = useAnimatedStyle(() => {
+    const t = interpolate(y.get(), [pinAt.get(), pinAt.get() + 40], [0, 1], 'clamp');
+    return { shadowOpacity: 0.08 * t, elevation: 3 * t };
+  });
   const tabRow = (
     <UnderlineTabs label="Profile sections" inset={10} value={tabs[Math.min(target, last)]} onChange={(k) => goTo(tabs.indexOf(k as Tab))} items={tabs.map((t) => ({ key: t, label: tabLabel(t) }))} />
   );
@@ -450,12 +459,16 @@ export function ProfileView({
       </GestureDetector>
       </Animated.ScrollView>
 
-      {/* The tab row pinned at the top once you scroll past it. */}
-      {stuck ? (
-        <View style={[styles.pinned, { paddingTop: topInset, backgroundColor: surface.ground }]}>
+      {/* The tab row pinned at the top once you scroll past it. It's always there,
+          and shows on the exact frame the real row reaches the top, so the swap
+          can't be seen; the strip behind the status bar fades in just before,
+          and a hairline fades in once posts start sliding under it. */}
+      <View pointerEvents={stuck ? 'box-none' : 'none'} style={styles.pinned}>
+        {topInset ? <Animated.View style={[{ height: topInset, backgroundColor: surface.ground }, backdropStyle]} /> : null}
+        <Animated.View style={[{ backgroundColor: surface.ground, shadowColor: '#1F1A14', shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }, pinnedStyle, lineStyle]}>
           {tabRow}
-        </View>
-      ) : null}
+        </Animated.View>
+      </View>
     </View>
   );
 }
