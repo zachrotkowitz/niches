@@ -218,7 +218,6 @@ export function TopFour({ userId, niche, isMe }: { userId: string; niche: NicheI
           }}
           renderEmpty={emptySlot}
         />
-        <Text style={[styles.dragHint, { color: surface.muted }]}>Hold and drag to change the order</Text>
       </View>
     );
   }
@@ -277,7 +276,6 @@ const makeStyles = (sf: Surface) =>
   editButton: { minHeight: 32, justifyContent: 'center', paddingLeft: 12 },
   editText: { fontSize: 14, fontWeight: '700' },
   tiles: { flexDirection: 'row', gap: 8 },
-  dragHint: { fontSize: 12, fontWeight: '500' },
   tile: { aspectRatio: 0.8, borderRadius: 10, overflow: 'hidden' },
   emptyTile: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   tileTitle: { fontSize: 11, fontWeight: '600', color: sf.body, lineHeight: 14 },
