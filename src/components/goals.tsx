@@ -10,7 +10,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { CheckIcon, LockIcon, PlusIcon } from '@/components/icons';
 import { useToast } from '@/components/toast';
-import { goalRule, progress, streak, weekDone, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
+import { goalRule, periodOf, progress, streak, weekDone, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
 import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, fonts } from '@/lib/theme';
@@ -106,8 +106,9 @@ export function goalSubline(goal: Goal) {
   if (goal.kind === 'habit') {
     const s = streak(goal);
     const w = weekDone(goal);
-    if (w.done) return `Done this week${w.extra ? ` · ${w.extra} extra` : ''}${s > 1 ? ` · ${s}-week streak` : ''}`;
-    return `${p.headline === 'Rest week' ? 'Rest week' : `${p.headline} this week`}${s > 1 ? ` · ${s}-week streak` : ''}`;
+    const per = periodOf(goal);
+    if (w.done) return `Done this ${per}${w.extra ? ` · ${w.extra} extra` : ''}${s > 1 ? ` · ${s}-${per} streak` : ''}`;
+    return `${p.headline === 'Rest week' ? 'Rest week' : `${p.headline} this ${per}`}${s > 1 ? ` · ${s}-${per} streak` : ''}`;
   }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
   return p.caption.replace('best so far · ', 'Best so far · ');
@@ -134,7 +135,7 @@ export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsO
     if (goal.kind === 'best') return open({ checkin: '1' });
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const id = actions.checkIn(goal.id, { date: isoDay() });
-    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : 'Checked in for this week', { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, id) });
+    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : `Checked in for this ${periodOf(goal)}`, { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, id) });
   };
 
   return (

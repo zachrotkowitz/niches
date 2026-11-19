@@ -89,7 +89,7 @@ function RootStack() {
         <Stack.Screen name="log/[id]" />
         <Stack.Screen name="favorites/[niche]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="goals/index" />
-        <Stack.Screen name="goals/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="goals/new" options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
         <Stack.Screen name="goals/[id]" />
         <Stack.Screen name="recap/[niche]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="settings/colors" />

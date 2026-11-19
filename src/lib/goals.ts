@@ -14,6 +14,8 @@ import type { NicheId } from './theme';
  * best:  a personal best, like "Squat 100 kg" or "5K in 25 min".
  */
 export type GoalKind = 'habit' | 'total' | 'best';
+export type Period = 'week' | 'month' | 'year';
+export const PERIODS: Period[] = ['week', 'month', 'year'];
 export type GoalVisibility = 'private' | 'profile';
 
 export type CheckIn = {
@@ -36,8 +38,10 @@ export type Goal = {
   niche: NicheId;
   kind: GoalKind;
   title: string;
-  /** habit: times per week, 1–7. */
+  /** habit: times per period (the field keeps its old name). */
   perWeek?: number;
+  /** habit: the time frame, week by default (founder, Nov 19 2026: week, month or year). */
+  period?: Period;
   /** total and best: the number to reach. */
   target?: number;
   /** total: "loaves"; best: "kg", "reps", "min". */
@@ -106,29 +110,56 @@ export function weeksBetween(a: string, b: string): number {
   return Math.round((parseDay(b).getTime() - parseDay(a).getTime()) / (7 * 86400000));
 }
 
-const startWeek = (g: Goal) => weekKey(isoDay(0, new Date(g.createdAt)));
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** A habit goal's time frame (week unless it says otherwise). */
+export const periodOf = (g: Pick<Goal, 'kind' | 'period'>): Period => (g.kind === 'habit' ? g.period ?? 'week' : 'week');
+
+/** The first day of the week, month or year a date falls in, as YYYY-MM-DD (so keys sort as text). */
+export function periodKey(iso: string, p: Period): string {
+  if (p === 'week') return weekKey(iso);
+  return p === 'month' ? `${iso.slice(0, 7)}-01` : `${iso.slice(0, 4)}-01-01`;
+}
+
+export function addPeriods(key: string, n: number, p: Period): string {
+  if (p === 'week') return addWeeks(key, n);
+  const d = parseDay(key);
+  if (p === 'month') {
+    const m = new Date(d.getFullYear(), d.getMonth() + n, 1);
+    return `${m.getFullYear()}-${pad2(m.getMonth() + 1)}-01`;
+  }
+  return `${d.getFullYear() + n}-01-01`;
+}
+
+const startWeek = (g: Goal) => weekKey(isoDay(0, new Date(g.createdAt)));
+const startPeriod = (g: Goal) => periodKey(isoDay(0, new Date(g.createdAt)), periodOf(g));
+
+/** Check-ins counted per period (weeks for most goals; months or years for those habits). */
 export function checkInsByWeek(g: Goal): Record<string, number> {
+  const p = periodOf(g);
   const out: Record<string, number> = {};
   for (const c of g.checkIns) {
-    const k = weekKey(c.date);
+    const k = periodKey(c.date, p);
     out[k] = (out[k] ?? 0) + 1;
   }
   return out;
 }
+/** Rest only applies to weekly goals. */
+const isRest = (g: Goal, key: string) => periodOf(g) === 'week' && g.restWeeks.includes(key);
 
 export type WeekCell = { key: string; count: number; met: boolean; rest: boolean; current: boolean; beforeStart: boolean };
 
 /** The last `n` weeks, oldest first, for the week strip. */
 export function weekStrip(g: Goal, n = 12, today = isoDay()): WeekCell[] {
+  const p = periodOf(g);
   const byWeek = checkInsByWeek(g);
-  const now = weekKey(today);
-  const first = startWeek(g);
+  const now = periodKey(today, p);
+  const first = startPeriod(g);
   const per = g.kind === 'habit' ? g.perWeek ?? 1 : 1;
   return Array.from({ length: n }, (_, i) => {
-    const key = addWeeks(now, i - (n - 1));
+    const key = addPeriods(now, i - (n - 1), p);
     const count = byWeek[key] ?? 0;
-    return { key, count, met: count >= per, rest: g.restWeeks.includes(key), current: key === now, beforeStart: key < first && count === 0 };
+    return { key, count, met: count >= per, rest: isRest(g, key), current: key === now, beforeStart: key < first && count === 0 };
   });
 }
 
@@ -138,20 +169,21 @@ export function weekStrip(g: Goal, n = 12, today = isoDay()): WeekCell[] {
  * so an unfinished week never "breaks" anything.
  */
 export function streak(g: Goal, today = isoDay()): number {
+  const p = periodOf(g);
   const byWeek = checkInsByWeek(g);
   const per = g.kind === 'habit' ? g.perWeek ?? 1 : 1;
-  const first = startWeek(g);
+  const first = startPeriod(g);
   // Check-ins can be backdated to before the goal was made.
   const floor = Object.keys(byWeek).reduce((a, b) => (b < a ? b : a), first);
-  let key = weekKey(today);
+  let key = periodKey(today, p);
   let n = 0;
   if ((byWeek[key] ?? 0) >= per) n++;
-  key = addWeeks(key, -1);
-  // Walk back through finished weeks. Stop at the first missed, non-rest week.
+  key = addPeriods(key, -1, p);
+  // Walk back through finished periods. Stop at the first missed, non-rest one.
   for (let guard = 0; guard < 520 && key >= floor; guard++) {
     if ((byWeek[key] ?? 0) >= per) n++;
-    else if (!g.restWeeks.includes(key)) break;
-    key = addWeeks(key, -1);
+    else if (!isRest(g, key)) break;
+    key = addPeriods(key, -1, p);
   }
   return n;
 }
@@ -164,9 +196,10 @@ export function longestStreak(g: Goal): number {
   if (!keys.length) return 0;
   let best = 0;
   let run = 0;
-  for (let key = keys[0]; key <= keys[keys.length - 1]; key = addWeeks(key, 1)) {
+  const p = periodOf(g);
+  for (let key = keys[0]; key <= keys[keys.length - 1]; key = addPeriods(key, 1, p)) {
     if ((byWeek[key] ?? 0) >= per) best = Math.max(best, ++run);
-    else if (!g.restWeeks.includes(key)) run = 0;
+    else if (!isRest(g, key)) run = 0;
   }
   return best;
 }
@@ -184,12 +217,13 @@ export type Progress = {
 export function progress(g: Goal, today = isoDay()): Progress {
   if (g.kind === 'habit') {
     const per = g.perWeek ?? 1;
-    const count = checkInsByWeek(g)[weekKey(today)] ?? 0;
-    const rest = g.restWeeks.includes(weekKey(today));
+    const p = periodOf(g);
+    const count = checkInsByWeek(g)[periodKey(today, p)] ?? 0;
+    const rest = isRest(g, weekKey(today));
     return {
       fraction: rest ? 1 : Math.min(1, count / per),
       headline: rest ? 'Rest week' : `${Math.min(count, per)} of ${per}`,
-      caption: rest ? 'your streak is safe' : 'this week',
+      caption: rest ? 'your streak is safe' : `this ${p}`,
       reached: false,
     };
   }
@@ -220,7 +254,7 @@ export function progress(g: Goal, today = isoDay()): Progress {
 export function weekDone(g: Goal, today = isoDay()): { done: boolean; extra: number } {
   if (g.kind !== 'habit') return { done: false, extra: 0 };
   const per = g.perWeek ?? 1;
-  const count = checkInsByWeek(g)[weekKey(today)] ?? 0;
+  const count = checkInsByWeek(g)[periodKey(today, periodOf(g))] ?? 0;
   return { done: count >= per, extra: Math.max(0, count - per) };
 }
 
@@ -234,8 +268,8 @@ export function currentBest(g: Goal): number | undefined {
 export const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /** One line describing the goal's rule, e.g. "3× a week" or "Personal best · higher is better". */
-export function goalRule(g: Pick<Goal, 'kind' | 'perWeek' | 'target' | 'unit' | 'direction'>): string {
-  if (g.kind === 'habit') return g.perWeek === 1 ? 'Once a week' : `${g.perWeek ?? 1}× a week`;
+export function goalRule(g: Pick<Goal, 'kind' | 'perWeek' | 'target' | 'unit' | 'direction' | 'period'>): string {
+  if (g.kind === 'habit') return g.perWeek === 1 ? `Once a ${periodOf(g)}` : `${g.perWeek ?? 1}× a ${periodOf(g)}`;
   if (g.kind === 'total') return `Reach ${g.target ?? 0} ${g.unit ?? ''}`.trim();
   return `Personal best · ${g.direction === 'down' ? 'lower' : 'higher'} is better`;
 }

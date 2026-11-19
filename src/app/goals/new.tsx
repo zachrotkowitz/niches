@@ -1,64 +1,83 @@
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from '@/components/text';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, { Easing, ReduceMotion, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
-import { Eyebrow } from '@/components/discover-parts';
-import { CheckIcon, CloseIcon, PlusIcon } from '@/components/icons';
-import { DisplayText } from '@/components/primitives';
+import { ChevronLeftIcon, CloseIcon } from '@/components/icons';
 import { SurfaceProvider } from '@/components/surface';
-import { UnderlineTabs } from '@/components/underline-tabs';
+import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
-import { BEST_UNITS, GOAL_TEMPLATES, type GoalKind, type GoalTemplate, type GoalVisibility } from '@/lib/goals';
+import { PERIODS, type GoalKind, type GoalVisibility, type Period } from '@/lib/goals';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
 
+const MAX_PER: Record<Period, number> = { week: 7, month: 31, year: 365 };
 
 const num = (s: string) => {
   const n = parseFloat(s.replace(',', '.'));
   return Number.isFinite(n) ? n : undefined;
 };
 
-/** Set a goal. Private by default; templates per niche, none of them about weight. */
-export default function NewGoalScreen() {
+/**
+ * New goal, as a quick sheet (founder picked round 3's option C, Nov 19 2026,
+ * "very similar to the diary entry"): type the goal however you like, how many
+ * times a week / month / year with − / +, Private or Public, Set goal. A total
+ * to reach is one link away (and a personal best, in Gym). Swipe down, tap
+ * above or the X to close. Everything else can be changed on the goal later.
+ */
+export default function NewGoalSheet() {
   const params = useLocalSearchParams<{ niche?: NicheId }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
-  const appGround = useAppGround();
+  const ground = groundSurface(useAppGround());
+  const { height } = useWindowDimensions();
 
   const [nicheId, setNicheId] = useState<NicheId>(params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche);
+  const [pickingNiche, setPickingNiche] = useState(false);
   const [kind, setKind] = useState<GoalKind>('habit');
   const [title, setTitle] = useState('');
   const [perWeek, setPerWeek] = useState(3);
-  const [target, setTarget] = useState('');
+  const [period, setPeriod] = useState<Period>('week');
+  const [target, setTarget] = useState('10');
   const [unit, setUnit] = useState('');
   const [start, setStart] = useState('');
   const [direction, setDirection] = useState<'up' | 'down'>('up');
   const [visibility, setVisibility] = useState<GoalVisibility>('private');
-  const [hideNumbers, setHideNumbers] = useState(false);
 
   const niche = niches[nicheId];
   const t = num(target);
   const s0 = num(start);
-  const ready =
-    !!state.me &&
-    title.trim().length > 0 &&
-    (kind === 'habit' || (t !== undefined && t > 0)) &&
-    (kind !== 'best' || (s0 !== undefined && unit.length > 0 && s0 !== t));
+  const ready = !!state.me && title.trim().length > 0 && (kind === 'habit' || (t !== undefined && t > 0)) && (kind !== 'best' || (s0 !== undefined && unit.trim().length > 0 && s0 !== t));
 
-  const applyTemplate = (tpl: GoalTemplate) => {
-    setKind(tpl.kind);
-    setTitle(tpl.title);
-    if (tpl.perWeek) setPerWeek(tpl.perWeek);
-    setTarget(tpl.target !== undefined ? String(tpl.target) : '');
-    setUnit(tpl.unit ?? '');
-    setStart(tpl.start !== undefined ? String(tpl.start) : '');
-    setDirection(tpl.direction ?? 'up');
-  };
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/goals'));
+
+  // Swipe down to close, like Add to diary.
+  const drag = useSharedValue(0);
+  const sheetH = useSharedValue(500);
+  const pan = usePanGesture({
+    activeOffsetY: [-1000, 8],
+    failOffsetX: [-20, 20],
+    onUpdate: (e) => {
+      'worklet';
+      drag.set(Math.max(0, e.translationY));
+    },
+    onDeactivate: (e) => {
+      'worklet';
+      if (drag.get() > sheetH.get() * 0.3 || e.velocityY > 900) {
+        drag.set(withTiming(height, { duration: 200, easing: Easing.in(Easing.cubic), reduceMotion: ReduceMotion.System }, () => scheduleOnRN(close)));
+      } else {
+        drag.set(withSpring(0, { duration: 300, dampingRatio: 1, reduceMotion: ReduceMotion.System }));
+      }
+    },
+  });
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: drag.get() }] }));
 
   const save = () => {
     if (!ready || !state.me) return;
@@ -68,41 +87,36 @@ export default function NewGoalScreen() {
       kind,
       title: title.trim(),
       perWeek: kind === 'habit' ? perWeek : undefined,
+      period: kind === 'habit' && period !== 'week' ? period : undefined,
       target: kind === 'habit' ? undefined : t,
       unit: kind === 'habit' ? undefined : unit.trim() || undefined,
       start: kind === 'best' ? s0 : undefined,
       direction: kind === 'best' ? direction : undefined,
       visibility,
-      hideNumbers: visibility === 'profile' ? hideNumbers : undefined,
     });
-    toast(visibility === 'private' ? 'Goal set. Only you can see it.' : 'Goal set and on your profile');
-    router.replace({ pathname: '/goals/[id]', params: { id } });
+    if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+    close();
+    toast(visibility === 'private' ? 'Goal set. Only you can see it.' : 'Goal set and on your profile', { label: 'Open', onPress: () => router.push({ pathname: '/goals/[id]', params: { id } }) });
   };
 
-  const ground = groundSurface(appGround);
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/goals'));
-  const ideas = GOAL_TEMPLATES[nicheId].slice(0, 4);
-  const stepper = (value: string, set: (v: string) => void, min = 1) => {
-    const n = num(value) ?? 0;
-    return (
-      <View style={styles.steps}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Less" onPress={() => set(String(Math.max(min, n - 1)))} style={[styles.step, { borderColor: ground.text }]}>
-          <Text style={[styles.stepText, { color: ground.text }]}>−</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="More" onPress={() => set(String(n + 1))} style={[styles.step, { borderColor: ground.text }]}>
-          <Text style={[styles.stepText, { color: ground.text }]}>+</Text>
-        </Pressable>
-      </View>
-    );
-  };
-  const switchLink = (lead: string, action: string, to: GoalKind) => (
-    <Pressable accessibilityRole="button" onPress={() => setKind(to)} style={styles.switchRow}>
-      <Text style={[styles.switchText, { color: ground.muted }]}>
+  const stepButtons = (onLess: () => void, onMore: () => void, lessOff = false, moreOff = false) => (
+    <View style={styles.steps}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Less" disabled={lessOff} onPress={onLess} style={[styles.step, { borderColor: ground.text, opacity: lessOff ? 0.3 : 1 }]}>
+        <Text style={[styles.stepText, { color: ground.text }]}>−</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="More" disabled={moreOff} onPress={onMore} style={[styles.step, { borderColor: ground.text, opacity: moreOff ? 0.3 : 1 }]}>
+        <Text style={[styles.stepText, { color: ground.text }]}>+</Text>
+      </Pressable>
+    </View>
+  );
+  const link = (lead: string, action: string, onPress: () => void) => (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.linkRow}>
+      <Text style={[styles.linkText, { color: ground.muted }]}>
         {lead} <Text style={{ color: ground.text, fontWeight: '700', textDecorationLine: 'underline' }}>{action}</Text>
       </Text>
     </Pressable>
   );
-  const input = (value: string, set: (v: string) => void, label: string, width = 90, numeric = true) => (
+  const field = (value: string, set: (v: string) => void, label: string, width: number, numeric = true) => (
     <TextInput
       accessibilityLabel={label}
       value={value}
@@ -110,186 +124,175 @@ export default function NewGoalScreen() {
       keyboardType={numeric ? 'decimal-pad' : 'default'}
       maxLength={numeric ? 7 : 20}
       selectionColor={ground.text}
-      style={[styles.inlineInput, { color: ground.text, borderBottomColor: ground.muted, width }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+      style={[styles.inline, { color: ground.text, borderBottomColor: ground.muted, width }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
     />
   );
 
   return (
     <SurfaceProvider value={ground}>
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-        <Pressable accessibilityRole="button" accessibilityLabel="Cancel" onPress={close} style={styles.close}>
-          <CloseIcon color={ground.text} />
-        </Pressable>
-        <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
-          <DisplayText size={38} color={ground.text}>New goal</DisplayText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !ready }}
-            disabled={!ready}
-            onPress={save}
-            style={({ pressed }) => [styles.savePill, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.85 : 1) : 0.3 }]}>
-            <Text style={[styles.saveText, { color: ground.ground }]}>Set goal</Text>
-          </Pressable>
-        </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* Nothing behind is dimmed (founder); tap above the sheet to close. */}
+        <Pressable accessibilityRole="button" accessibilityLabel="Close" style={{ flex: 1 }} onPress={close} />
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            entering={SlideInDown.duration(320).easing(Easing.out(Easing.cubic)).reduceMotion(ReduceMotion.System)}
+            onLayout={(e) => sheetH.set(e.nativeEvent.layout.height)}
+            accessibilityViewIsModal
+            style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8, shadowColor: niche.ink }, sheetStyle]}>
+            <View style={styles.grabber} />
+            <View style={styles.head}>
+              <Text accessibilityRole="header" style={[styles.heading, { color: ground.text }]}>New goal</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close without saving" onPress={close} hitSlop={6} style={styles.close}>
+                <CloseIcon size={20} color={ground.text} />
+              </Pressable>
+            </View>
 
-        <View style={{ marginTop: 12, marginHorizontal: -10 }}>
-          <UnderlineTabs
-            label="Niche"
-            inset={0}
-            value={nicheId}
-            onChange={(k) => setNicheId(k as NicheId)}
-            items={NICHE_ORDER.map((id) => ({ key: id, label: niches[id].label, color: niches[id].accent }))}
-          />
-        </View>
-
-        {/* The goal itself, on white: the main thing on the page (founder, Nov 19 2026). Type it however you like. */}
-        <View style={styles.goalCard}>
-          <Eyebrow>Your goal</Eyebrow>
-          <TextInput
-            accessibilityLabel="Goal title"
-            value={title}
-            onChangeText={setTitle}
-            multiline
-            maxLength={60}
-            autoFocus={Platform.OS !== 'web'}
-            selectionColor={ground.text}
-            style={[styles.goalInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
-          />
-        </View>
-
-        <View style={[styles.rows, { borderTopColor: ground.line }]}>
-          {kind === 'habit' ? (
-            <>
-              <View style={[styles.trackRow, { borderBottomColor: ground.line }]}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Eyebrow>Check in</Eyebrow>
-                  <Text style={[styles.trackValue, { color: ground.text }]}>{perWeek === 1 ? 'Once a week' : `${perWeek} times a week`}</Text>
-                </View>
-                <View style={styles.steps}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Fewer times a week" onPress={() => setPerWeek(Math.max(1, perWeek - 1))} style={[styles.step, { borderColor: ground.text, opacity: perWeek <= 1 ? 0.35 : 1 }]}>
-                    <Text style={[styles.stepText, { color: ground.text }]}>−</Text>
+            {/* The niche as one small word; tap it to pick another. */}
+            {pickingNiche ? (
+              <View accessibilityRole="radiogroup" style={styles.niches}>
+                {NICHE_ORDER.map((id) => (
+                  <Pressable key={id} accessibilityRole="radio" accessibilityState={{ checked: id === nicheId }} onPress={() => (setNicheId(id), setPickingNiche(false))} style={styles.nicheHit}>
+                    <View style={[styles.dot, { backgroundColor: niches[id].accent }]} />
+                    <Text style={[styles.nicheText, { color: id === nicheId ? ground.text : ground.muted, fontWeight: id === nicheId ? '700' : '500' }]}>{niches[id].label}</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel="More times a week" onPress={() => setPerWeek(Math.min(7, perWeek + 1))} style={[styles.step, { borderColor: ground.text, opacity: perWeek >= 7 ? 0.35 : 1 }]}>
-                    <Text style={[styles.stepText, { color: ground.text }]}>+</Text>
-                  </Pressable>
-                </View>
+                ))}
               </View>
-              {switchLink('Counting toward a total instead?', 'Set a number to reach', 'total')}
-            </>
-          ) : kind === 'total' ? (
-            <>
-              <View style={[styles.trackRow, { borderBottomColor: ground.line }]}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Eyebrow>Reach</Eyebrow>
+            ) : (
+              <Pressable accessibilityRole="button" accessibilityLabel={`${niche.label}. Change niche`} onPress={() => setPickingNiche(true)} style={styles.nicheHit}>
+                <View style={[styles.dot, { backgroundColor: niche.accent }]} />
+                <Text style={[styles.nicheText, { color: ground.text, fontWeight: '700' }]}>{niche.label}</Text>
+                <View style={{ transform: [{ rotate: '-90deg' }] }}>
+                  <ChevronLeftIcon size={14} color={ground.text} />
+                </View>
+              </Pressable>
+            )}
+
+            <View style={styles.card}>
+              <TextInput
+                accessibilityLabel="Goal title"
+                value={title}
+                onChangeText={setTitle}
+                multiline
+                maxLength={60}
+                autoFocus={Platform.OS !== 'web'}
+                selectionColor={ground.text}
+                style={[styles.goalInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+              />
+            </View>
+
+            {kind === 'habit' ? (
+              <>
+                <View style={styles.row}>
+                  <Text style={[styles.rowValue, { color: ground.text }]}>
+                    {perWeek === 1 ? 'Once a ' : `${perWeek} times a `}
+                    {/* Tap the time frame to switch between week, month and year. */}
+                    <Text
+                      accessibilityRole="button"
+                      accessibilityLabel={`A ${period}. Change to a ${PERIODS[(PERIODS.indexOf(period) + 1) % PERIODS.length]}`}
+                      onPress={() => {
+                        const next = PERIODS[(PERIODS.indexOf(period) + 1) % PERIODS.length];
+                        setPeriod(next);
+                        setPerWeek((n) => Math.min(n, MAX_PER[next]));
+                      }}
+                      style={{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: niche.accent }}>
+                      {period}
+                    </Text>
+                  </Text>
+                  {stepButtons(() => setPerWeek(Math.max(1, perWeek - 1)), () => setPerWeek(Math.min(MAX_PER[period], perWeek + 1)), perWeek <= 1, perWeek >= MAX_PER[period])}
+                </View>
+                {link('Counting to a total instead?', 'Set a number', () => setKind('total'))}
+              </>
+            ) : kind === 'total' ? (
+              <>
+                <View style={styles.row}>
                   <View style={styles.inlineRow}>
-                    {input(target, setTarget, 'Number to reach', 70)}
-                    {input(unit, setUnit, 'Of what, like loaves', 120, false)}
+                    <Text style={[styles.rowValue, { color: ground.text }]}>Reach</Text>
+                    {field(target, setTarget, 'Number to reach', 64)}
+                    {field(unit, setUnit, 'Of what, like loaves', 110, false)}
+                  </View>
+                  {stepButtons(() => setTarget(String(Math.max(1, (t ?? 1) - 1))), () => setTarget(String((t ?? 0) + 1)), (t ?? 1) <= 1)}
+                </View>
+                {link('Doing it regularly instead?', 'Times a week', () => setKind('habit'))}
+                {nicheId === 'gym' ? link('Chasing a time or a lift?', 'Beat a personal best', () => setKind('best')) : null}
+              </>
+            ) : (
+              <>
+                <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+                  <View style={styles.inlineRow}>
+                    <Text style={[styles.rowValue, { color: ground.text }]}>From</Text>
+                    {field(start, setStart, 'Where you are now', 56)}
+                    <Text style={[styles.rowValue, { color: ground.text }]}>to</Text>
+                    {field(target, setTarget, 'Your goal', 56)}
+                    {field(unit, setUnit, 'Unit, like kg or min', 56, false)}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 18 }}>
+                    {(['up', 'down'] as const).map((d) => (
+                      <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === direction }} onPress={() => setDirection(d)} style={styles.linkRow}>
+                        <Text style={[styles.linkText, { color: d === direction ? ground.text : ground.muted, fontWeight: d === direction ? '700' : '500', textDecorationLine: d === direction ? 'underline' : 'none' }]}>
+                          {d === 'up' ? 'Higher is better' : 'Lower is better'}
+                        </Text>
+                      </Pressable>
+                    ))}
                   </View>
                 </View>
-                {stepper(target, setTarget)}
-              </View>
-              {switchLink('Doing it every week instead?', 'Check in weekly', 'habit')}
-              {nicheId === 'gym' ? switchLink('Chasing a time or a lift?', 'Track a personal best', 'best') : null}
-            </>
-          ) : (
-            <>
-              <View style={[styles.trackRow, { borderBottomColor: ground.line, flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
-                <Eyebrow>Personal best</Eyebrow>
-                <View style={styles.inlineRow}>
-                  <Text style={[styles.inlineLabel, { color: ground.muted }]}>From</Text>
-                  {input(start, setStart, 'Where you are now', 60)}
-                  <Text style={[styles.inlineLabel, { color: ground.muted }]}>to</Text>
-                  {input(target, setTarget, 'Your goal', 60)}
-                  {input(unit, setUnit, 'Unit, like kg or min', 60, false)}
-                </View>
-                <View style={styles.inlineRow}>
-                  {(['up', 'down'] as const).map((d) => (
-                    <Pressable key={d} accessibilityRole="radio" accessibilityState={{ checked: d === direction }} onPress={() => setDirection(d)} style={styles.wordHit}>
-                      <Text style={[styles.word, { color: d === direction ? ground.text : ground.muted, fontWeight: d === direction ? '700' : '500', borderBottomColor: d === direction ? ground.text : 'transparent' }]}>
-                        {d === 'up' ? 'Higher is better' : 'Lower is better'}
-                      </Text>
+                {link('Doing it regularly instead?', 'Times a week', () => setKind('habit'))}
+              </>
+            )}
+
+            <View style={[styles.foot, { borderTopColor: ground.line }]}>
+              {/* Private or public, right here (founder, Nov 19 2026). */}
+              <View accessibilityRole="radiogroup" accessibilityLabel="Who can see this goal" style={styles.toggle}>
+                {(['private', 'profile'] as GoalVisibility[]).map((v) => {
+                  const on = visibility === v;
+                  return (
+                    <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setVisibility(v)} style={[styles.toggleItem, on && { backgroundColor: '#FFFFFF' }]}>
+                      <Text style={[styles.toggleText, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]}>{v === 'private' ? 'Private' : 'Public'}</Text>
                     </Pressable>
-                  ))}
-                </View>
+                  );
+                })}
               </View>
-              {switchLink('Doing it every week instead?', 'Check in weekly', 'habit')}
-            </>
-          )}
-        </View>
-
-        {/* A few ideas to get going (founder, Nov 19 2026: from mock 1, under the tracking). */}
-        <View style={{ marginTop: 18 }}>
-          <Eyebrow>Need an idea?</Eyebrow>
-          <View style={{ marginTop: 4 }}>
-            {ideas.map((tpl) => (
-              <Pressable key={tpl.title} accessibilityRole="button" accessibilityLabel={`Use idea: ${tpl.title}`} onPress={() => applyTemplate(tpl)} style={({ pressed }) => [styles.idea, { borderBottomColor: ground.line, opacity: pressed ? 0.6 : 1 }]}>
-                <PlusIcon size={15} color={ground.muted} strokeWidth={2.2} />
-                <Text style={[styles.ideaText, { color: ground.text }]}>{tpl.title}</Text>
+              <View style={{ flex: 1 }} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !ready }}
+                disabled={!ready}
+                onPress={save}
+                style={({ pressed }) => [styles.save, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.85 : 1) : 0.3 }]}>
+                <Text style={[styles.saveText, { color: ground.ground }]}>Set goal</Text>
               </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={[styles.foot, { borderTopColor: ground.line }]}>
-          <View style={styles.footRow}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[styles.footTitle, { color: ground.text }]}>Who can see it</Text>
-              <Text style={[styles.footSub, { color: ground.muted }]}>{visibility === 'private' ? 'Only you see it. You can change this later.' : 'Shows on your profile’s Goals tab.'}</Text>
             </View>
-            <View accessibilityRole="radiogroup" accessibilityLabel="Who can see it" style={styles.toggle}>
-              {(['private', 'profile'] as GoalVisibility[]).map((v) => {
-                const on = visibility === v;
-                return (
-                  <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setVisibility(v)} style={[styles.toggleItem, on && { backgroundColor: '#FFFFFF' }]}>
-                    <Text style={[styles.toggleText, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]}>{v === 'private' ? 'Private' : 'Public'}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          {visibility === 'profile' ? (
-            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: hideNumbers }} onPress={() => setHideNumbers(!hideNumbers)} style={styles.hideRow}>
-              <View style={[styles.box, hideNumbers ? { backgroundColor: ground.text, borderColor: ground.text } : { borderColor: ground.muted }]}>{hideNumbers ? <CheckIcon size={14} strokeWidth={2.8} /> : null}</View>
-              <Text style={[styles.footSub, { color: ground.text }]}>Hide my numbers from others</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </Animated.View>
+        </GestureDetector>
+      </KeyboardAvoidingView>
     </SurfaceProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  close: { width: TOUCH, height: TOUCH, marginLeft: -10, alignItems: 'center', justifyContent: 'center' },
-  masthead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottomWidth: 1 },
-  savePill: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  saveText: { fontSize: 15, fontWeight: '700' },
-  goalCard: { marginTop: 16, padding: 16, borderRadius: 22, backgroundColor: '#FFFFFF', gap: 6, shadowColor: '#1F1A14', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
-  goalInput: { fontFamily: fonts.display, fontSize: 32, lineHeight: 37, minHeight: 80, paddingVertical: 2, textAlignVertical: 'top' },
-  rows: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth * 2 },
-  trackRow: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
-  trackValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34 },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
+  grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(31,26,20,0.18)' },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heading: { fontFamily: fonts.displayItalic, fontSize: 30, lineHeight: 34 },
+  close: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(31,26,20,0.07)', alignItems: 'center', justifyContent: 'center' },
+  niches: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18 },
+  nicheHit: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, alignSelf: 'flex-start' },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  nicheText: { fontSize: 14 },
+  card: { padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
+  goalInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 33, minHeight: 66, paddingVertical: 2, textAlignVertical: 'top' },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 52 },
+  rowValue: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, flexShrink: 1 },
   steps: { flexDirection: 'row', gap: 8 },
   step: { width: TOUCH, height: TOUCH, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 22, lineHeight: 24 },
-  switchRow: { minHeight: TOUCH, justifyContent: 'center' },
-  switchText: { fontSize: 14 },
-  inlineRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10 },
-  inlineInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 32, borderBottomWidth: 1, paddingVertical: 2 },
-  inlineLabel: { fontSize: 14, paddingBottom: 6 },
-  wordHit: { minHeight: 36, justifyContent: 'center' },
-  word: { fontSize: 14, paddingBottom: 4, borderBottomWidth: 2 },
-  idea: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
-  ideaText: { fontSize: 15, flexShrink: 1 },
-  foot: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 14, gap: 10 },
-  footRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  footTitle: { fontSize: 15, fontWeight: '700' },
-  footSub: { fontSize: 12, lineHeight: 17 },
+  inlineRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8, flexShrink: 1 },
+  inline: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, borderBottomWidth: 1, paddingVertical: 0 },
+  linkRow: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
+  linkText: { fontSize: 14 },
+  foot: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 12 },
   toggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.07)' },
-  toggleItem: { minHeight: 36, paddingHorizontal: 16, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  toggleItem: { minHeight: 36, paddingHorizontal: 14, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   toggleText: { fontSize: 14 },
-  hideRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH },
-  box: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  save: { minHeight: 48, paddingHorizontal: 26, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  saveText: { fontSize: 15, fontWeight: '700' },
 });

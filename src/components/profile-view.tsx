@@ -78,7 +78,7 @@ export function ProfileView({
   const cardW = useCardWidth();
   const logs = visibleLogs(state, user.id);
   const goals = visibleGoals(state.goals, user.id, state.me?.id).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt) || b.createdAt - a.createdAt);
-  const weekly = goals.filter((g) => g.kind === 'habit' && !g.doneAt);
+  const weekly = goals.filter((g) => g.kind === 'habit' && (g.period ?? 'week') === 'week' && !g.doneAt);
   const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals' && t !== 'boards';
   // The niche this person is most active in (posts and diary), so the profile
   // looks the same whichever niche was last open on Home.

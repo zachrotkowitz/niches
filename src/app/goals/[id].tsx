@@ -15,7 +15,7 @@ import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { useToast } from '@/components/toast';
 import { diaryWords } from '@/lib/diary';
-import { currentBest, fmt, goalRule, progress, streak, weekDone, weekKey, weekNumber, type Goal } from '@/lib/goals';
+import { currentBest, fmt, goalRule, periodOf, progress, streak, weekDone, weekKey, weekNumber, type Goal } from '@/lib/goals';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import { shortTitle } from '@/lib/format';
 import { dayLabel, isoDay } from '@/lib/plans';
@@ -82,7 +82,7 @@ export default function GoalScreen() {
     let milestone: string | undefined = i === 0 ? 'Started' : undefined;
     if (goal.kind === 'habit') {
       const st = streak(goal, c.date);
-      for (const m of [4, 8, 12, 26, 52]) if (st === m && !marked.has(`s${m}`)) (marked.add(`s${m}`), (milestone = `${m}-week streak`));
+      for (const m of [4, 8, 12, 26, 52]) if (st === m && !marked.has(`s${m}`)) (marked.add(`s${m}`), (milestone = `${m}-${periodOf(goal)} streak`));
     } else if (goal.kind === 'total') {
       const before = running;
       running += c.value ?? 1;
@@ -114,7 +114,7 @@ export default function GoalScreen() {
     if (goal.kind === 'best') return setCheckingIn(true);
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const cid = actions.checkIn(goal.id, { date: isoDay() });
-    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : 'Checked in for this week', { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, cid) });
+    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : `Checked in for this ${periodOf(goal)}`, { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, cid) });
   };
 
   const confirmDelete = () => {
@@ -169,7 +169,7 @@ export default function GoalScreen() {
               // Says something the ring doesn't: your streak, how many to go, or the target.
               <>
                 <Text style={[ds.headline, { color: ground.text }]}>{summaryTitle(goal, s)}</Text>
-                <Text style={[ds.caption, { color: ground.muted }]}>{summaryLine(goal)}</Text>
+                <Text style={[ds.caption, { color: ground.muted }]}>{summaryLine(goal, s)}</Text>
               </>
             )}
           </View>
@@ -194,9 +194,10 @@ export default function GoalScreen() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Pressable accessibilityRole="button" onPress={quick} style={({ pressed }) => [ds.primary, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
                 <CheckIcon size={16} color={ground.ground} strokeWidth={2.6} />
-                <Text style={[ds.primaryText, { color: ground.ground }]}>{goal.kind === 'habit' ? 'Check in this week' : goal.kind === 'total' ? `Add one${goal.unit ? ` (${goal.unit})` : ''}` : 'Log a new result'}</Text>
+                <Text style={[ds.primaryText, { color: ground.ground }]}>{goal.kind === 'habit' ? `Check in this ${periodOf(goal)}` : goal.kind === 'total' ? `Add one${goal.unit ? ` (${goal.unit})` : ''}` : 'Log a new result'}</Text>
               </Pressable>
-              {goal.kind === 'habit' ? (
+              {/* Rest is a weekly thing; a month or year already has room for a break. */}
+              {goal.kind === 'habit' && periodOf(goal) === 'week' ? (
                 <Pressable
                   accessibilityRole="switch"
                   accessibilityState={{ checked: resting }}
@@ -316,7 +317,7 @@ export default function GoalScreen() {
 /** The big line next to the ring: what the ring doesn't already say. */
 function summaryTitle(goal: Goal, s: number) {
   const p = progress(goal);
-  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Rest week' : s > 0 ? `${s}-week streak` : 'This week';
+  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Rest week' : s > 0 ? `${s}-${periodOf(goal)} streak` : `This ${periodOf(goal)}`;
   if (goal.kind === 'total') {
     const total = goal.checkIns.reduce((n, c) => n + (c.value ?? 1), 0);
     const left = Math.max(0, (goal.target ?? 0) - total);
@@ -324,12 +325,12 @@ function summaryTitle(goal: Goal, s: number) {
   }
   return `Goal ${fmt(goal.target ?? 0)} ${goal.unit ?? ''}`.trim();
 }
-function summaryLine(goal: Goal) {
+function summaryLine(goal: Goal, streakNow = 0) {
   const p = progress(goal);
   if (goal.kind === 'habit') {
     const w = weekDone(goal);
-    if (w.done) return `Done this week${w.extra ? ` · ${w.extra} extra` : ''}`;
-    return p.headline === 'Rest week' ? 'Your streak is safe' : `${p.headline} this week`;
+    if (w.done) return `Done this ${periodOf(goal)}${w.extra ? ` · ${w.extra} extra` : ''}`;
+    return p.headline === 'Rest week' ? 'Your streak is safe' : streakNow > 0 ? `${p.headline} this ${periodOf(goal)}` : `${p.headline} so far`;
   }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
   return currentBest(goal) === undefined ? 'No result logged yet' : `Best so far ${p.headline}`;

@@ -29,7 +29,7 @@ export default function GoalsScreen() {
   const done = mine.filter((g) => g.doneAt).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
   const nicheTabs = NICHE_ORDER.filter((id) => active.some((g) => g.niche === id));
   const shown = tab === 'done' ? done : tab === 'all' ? active : active.filter((g) => g.niche === tab);
-  const left = active.filter((g) => g.kind === 'habit' && progress(g).fraction < 1).length;
+  const left = active.filter((g) => g.kind === 'habit' && (g.period ?? 'week') === 'week' && progress(g).fraction < 1).length;
 
   return (
     <SurfaceProvider value={ground}>
@@ -60,7 +60,7 @@ export default function GoalsScreen() {
                 ]}
               />
             </View>
-            {tab === 'all' && active.some((g) => g.kind === 'habit') ? (
+            {tab === 'all' && active.some((g) => g.kind === 'habit' && (g.period ?? 'week') === 'week') ? (
               <Text style={[styles.line, { color: ground.text }]}>{left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`}</Text>
             ) : null}
             <View style={styles.list}>
