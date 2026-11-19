@@ -5,13 +5,14 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CheckIcon, ChevronLeftIcon, HeartIcon, LockIcon, MoreIcon } from '@/components/icons';
+import { BellIcon, CheckIcon, ChevronLeftIcon, HeartIcon, LockIcon, MoreIcon } from '@/components/icons';
 import { Avatar, DisplayText } from '@/components/primitives';
 import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
 import { canSee, chosenDish, kindLabel, parseDay, participants, type Rsvp } from '@/lib/plans';
+import { cancelReminder, REMINDER_CHOICES, reminderDate, reminderLabel, planStart, scheduleReminder } from '@/lib/reminders';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, TOUCH } from '@/lib/theme';
 
@@ -36,6 +37,9 @@ export default function PlanScreen() {
   const [menu, setMenu] = useState(false);
   const [newItem, setNewItem] = useState('');
   const [newDish, setNewDish] = useState('');
+  const [remindMenu, setRemindMenu] = useState(false);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [itemDraft, setItemDraft] = useState('');
 
   const plan = state.plans.find((p) => p.id === id);
   const me = state.me;
@@ -62,7 +66,33 @@ export default function PlanScreen() {
   const isIn = isHost || invited || myAnswer === 'going' || myAnswer === 'maybe';
   const dish = chosenDish(plan);
   const claimed = plan.items.filter((i) => i.claimedBy).length;
-  const itemsTitle = plan.kind === 'together' ? 'Who brings what' : plan.kind === 'meal' ? 'Shopping list' : niche.id === 'photography' ? 'Shot list' : 'What to bring';
+  // Every Cooking plan gets dish votes and who brings what, however it was made (founder, Nov 19 2026).
+  const cooking = plan.niche === 'cooking';
+  const itemsTitle = cooking ? 'Who brings what' : niche.id === 'photography' ? 'Shot list' : 'What to bring';
+  const reminder = state.planReminders[plan.id];
+  const upcoming = planStart(plan).getTime() > Date.now();
+  const setReminder = async (minutes: number | null) => {
+    setRemindMenu(false);
+    await cancelReminder(reminder?.notificationId);
+    if (minutes === null) {
+      actions.setPlanReminder(plan.id, null);
+      toast('Reminder off');
+      return;
+    }
+    const r = await scheduleReminder(plan, minutes);
+    if (!r.ok) {
+      actions.setPlanReminder(plan.id, null);
+      toast(r.reason === 'past' ? 'That time has already passed' : 'Turn on notifications for Niches in Settings');
+      return;
+    }
+    actions.setPlanReminder(plan.id, { minutes, notificationId: r.notificationId });
+    toast(`We’ll remind you ${reminderLabel(minutes).toLowerCase()}`);
+  };
+  const saveItem = (itemId: string) => {
+    const v = itemDraft.trim();
+    if (v) actions.renameItem(plan.id, itemId, v);
+    setEditingItem(null);
+  };
   const going = people.filter((u) => u === plan.ownerId || plan.rsvps[u] === 'going').length;
   const longDay = parseDay(plan.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const statusOf = (uid: string) => (uid === plan.ownerId ? 'Host' : plan.rsvps[uid] ? RSVP_LABEL[plan.rsvps[uid]] : 'Invited');
@@ -177,6 +207,20 @@ export default function PlanScreen() {
             </View>
           </View>
 
+          {/* Who leads the plan, and your own reminder. */}
+          <Text style={[styles.hostNote, { color: ground.muted }]}>
+            {isHost
+              ? `You’re the host: you can change the plan, invite people${cooking ? ' and pick the dish' : ''}.`
+              : `${hostFirst} is the host and can change the plan, invite people${cooking ? ' and pick the dish' : ''}.`}
+          </Text>
+          {isIn && upcoming ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={reminder ? `Reminder ${reminderLabel(reminder.minutes)}. Change it` : 'Set a reminder'} onPress={() => setRemindMenu(true)} style={[styles.remind, { borderColor: ground.line }]}>
+              <BellIcon size={18} color={ground.text} />
+              <Text style={[styles.remindText, { color: ground.text }]}>{reminder ? 'Reminder' : 'Remind me'}</Text>
+              <Text style={[styles.remindValue, { color: reminder ? ground.text : ground.muted }]}>{reminder ? reminderLabel(reminder.minutes) : 'Choose when'}</Text>
+            </Pressable>
+          ) : null}
+
           {plan.notes ? (
             <View style={[styles.quote, { borderLeftColor: niche.accent }]}>
               <Text style={[styles.quoteText, { color: ground.text }]}>“{plan.notes}”</Text>
@@ -184,11 +228,11 @@ export default function PlanScreen() {
             </View>
           ) : null}
 
-          {plan.kind === 'together' ? (
+          {cooking ? (
             <View style={styles.block}>
               <View style={styles.titleRow}>
-                <Text style={[styles.blockTitle, { color: ground.text }]}>What we’re making</Text>
-                {!dish && plan.dishIdeas.length ? <Text style={[styles.count, { color: ground.muted }]}>{plan.dishIdeas.length} {plan.dishIdeas.length === 1 ? 'idea' : 'ideas'} · vote</Text> : null}
+                <Text style={[styles.blockTitle, { color: ground.text }]}>{dish ? 'What we’re making' : 'Vote: what are we making?'}</Text>
+                {!dish && plan.dishIdeas.length ? <Text style={[styles.count, { color: ground.muted }]}>{plan.dishIdeas.length} {plan.dishIdeas.length === 1 ? 'idea' : 'ideas'}</Text> : null}
               </View>
               {dish ? (
                 <View style={[styles.row, { borderBottomColor: ground.line }]}>
@@ -202,9 +246,7 @@ export default function PlanScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-              ) : (
-                <Text style={[styles.hint, { color: ground.muted }]}>{isHost ? 'Everyone votes; you pick the winner.' : 'Vote for the dishes you want. The host picks the winner.'}</Text>
-              )}
+              ) : null}
               {!dish
                 ? plan.dishIdeas
                     .slice()
@@ -244,20 +286,50 @@ export default function PlanScreen() {
             <View style={styles.block}>
               <View style={styles.titleRow}>
                 <Text style={[styles.blockTitle, { color: ground.text }]}>{itemsTitle}</Text>
-                {plan.items.length && plan.kind !== 'meal' ? <Text style={[styles.count, { color: ground.muted }]}>{claimed} of {plan.items.length} claimed</Text> : null}
+                {plan.items.length ? <Text style={[styles.count, { color: ground.muted }]}>{claimed} of {plan.items.length} claimed</Text> : null}
               </View>
               {plan.items.map((it) => {
                 const mine = it.claimedBy === me.id;
                 const who = it.claimedBy ? usersById[it.claimedBy] : undefined;
+                if (editingItem === it.id)
+                  return (
+                    <View key={it.id} style={[styles.row, { borderBottomColor: ground.line }]}>
+                      <View style={[styles.writeBox, { flex: 1, marginTop: 0 }]}>
+                        <TextInput
+                          accessibilityLabel={`Rename ${it.name}`}
+                          value={itemDraft}
+                          onChangeText={setItemDraft}
+                          onSubmitEditing={() => saveItem(it.id)}
+                          autoFocus
+                          maxLength={60}
+                          selectionColor={ground.text}
+                          style={[styles.writeInput, { color: ground.text }, webInput]}
+                        />
+                        <Pressable accessibilityRole="button" onPress={() => saveItem(it.id)} hitSlop={8}>
+                          <Text style={[styles.link, { color: ground.text }]}>Save</Text>
+                        </Pressable>
+                      </View>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${it.name}`} onPress={() => (actions.removeItem(plan.id, it.id), setEditingItem(null), toast(`${it.name} removed`))} style={styles.linkHit}>
+                        <Text style={[styles.link, { color: ground.muted }]}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  );
                 return (
                   <View key={it.id} style={[styles.row, { borderBottomColor: ground.line }]}>
                     <View style={[styles.check, { borderColor: it.claimedBy ? niche.accent : ground.muted, backgroundColor: it.claimedBy ? niche.accent : 'transparent' }]}>
                       {it.claimedBy ? <CheckIcon size={13} strokeWidth={3} /> : null}
                     </View>
-                    <View style={{ flex: 1, gap: 1 }}>
+                    {/* Anyone in the plan can tap an item to fix or remove it. */}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${it.name}${who ? `, ${who.displayName} is bringing this` : ''}`}
+                      accessibilityHint={isIn ? 'Change or remove it' : undefined}
+                      disabled={!isIn}
+                      onPress={() => (setEditingItem(it.id), setItemDraft(it.name))}
+                      style={{ flex: 1, gap: 1 }}>
                       <Text style={[styles.itemName, { color: it.claimedBy && !mine ? ground.muted : ground.text }]}>{it.name}</Text>
                       {who ? <Text style={[styles.sub, { color: ground.muted }]}>{mine ? 'You’re bringing this' : `${who.displayName.split(' ')[0]} is bringing this`}</Text> : null}
-                    </View>
+                    </Pressable>
                     {isIn && (!it.claimedBy || mine) ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={mine ? `Stop bringing ${it.name}` : `I’ll bring ${it.name}`} onPress={() => actions.toggleClaim(plan.id, it.id, me.id)} style={styles.linkHit}>
                         <Text style={[styles.link, { color: mine ? ground.muted : ground.text }]}>{mine ? 'Undo' : plan.kind === 'outing' && niche.id === 'photography' ? 'I’ll shoot it' : 'I’ll bring it'}</Text>
@@ -299,6 +371,14 @@ export default function PlanScreen() {
           onClose={() => setMenu(false)}
           items={[
             {
+              label: 'Edit plan',
+              detail: 'Name, niche, day and time, place, notes and who’s invited.',
+              onPress: () => {
+                setMenu(false);
+                router.push({ pathname: '/plans/new', params: { edit: plan.id } });
+              },
+            },
+            {
               label: plan.visibility === 'private' ? 'Make public' : 'Make private',
               detail: plan.visibility === 'private' ? 'Show it on your profile so anyone can join.' : 'Only you and the people you invited will see it.',
               onPress: () => {
@@ -318,6 +398,17 @@ export default function PlanScreen() {
                 goBack();
               },
             },
+          ]}
+        />
+        <Sheet
+          visible={remindMenu}
+          onClose={() => setRemindMenu(false)}
+          items={[
+            ...REMINDER_CHOICES.filter((c) => (!c.needsTime || plan.time) && reminderDate(plan, c.minutes).getTime() > Date.now()).map((c) => ({
+              label: c.label + (reminder?.minutes === c.minutes ? '  ✓' : ''),
+              onPress: () => void setReminder(c.minutes),
+            })),
+            ...(reminder ? [{ label: 'No reminder', destructive: true, onPress: () => void setReminder(null) }] : []),
           ]}
         />
       </KeyboardAvoidingView>
@@ -345,6 +436,10 @@ const styles = StyleSheet.create({
   rsvpRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   rsvp: { minHeight: 40, paddingHorizontal: 18, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   rsvpText: { fontSize: 14, fontWeight: '700' },
+  hostNote: { marginHorizontal: 24, marginTop: 12, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  remind: { marginHorizontal: 20, marginTop: 14, minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: StyleSheet.hairlineWidth * 2, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  remindText: { fontSize: 15, fontWeight: '600' },
+  remindValue: { marginLeft: 'auto', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
   quote: { marginHorizontal: 20, marginTop: 22, paddingLeft: 14, borderLeftWidth: 2, gap: 4 },
   quoteText: { fontFamily: fonts.displayItalic, fontSize: 20, lineHeight: 26 },
   quoteBy: { fontSize: 12, fontWeight: '600' },

@@ -48,6 +48,8 @@ type State = {
   discoverNiches: NicheId[];
   /** Discover searches, newest first. */
   recentSearches: string[];
+  /** Your own reminders for plans: minutes before the plan (see reminders.ts), and the phone's notification id. */
+  planReminders: Record<string, { minutes: number; notificationId?: string }>;
   /** Saved boards: yours, plus public ones on demo profiles. */
   boards: Board[];
   plans: Plan[];
@@ -121,6 +123,7 @@ type Action =
   | { type: 'removeSample' }
   | { type: 'setAppGround'; id: string }
   | { type: 'setRecentSearches'; list: string[] }
+  | { type: 'setPlanReminder'; planId: string; reminder: { minutes: number; notificationId?: string } | null }
   | { type: 'addBoard'; board: Board }
   | { type: 'mapBoard'; id: string; fn: (b: Board) => Board }
   | { type: 'deleteBoard'; id: string }
@@ -148,6 +151,7 @@ function freshState(): Persisted {
     palettes: {},
     discoverNiches: [],
     recentSearches: [],
+    planReminders: {},
     boards: seedBoards(now),
     plans: seedPlans(now),
     homeMode: 'feed',
@@ -303,6 +307,12 @@ function reducer(state: State, action: Action): State {
     }
     case 'setAppGround':
       return { ...state, appGround: action.id };
+    case 'setPlanReminder': {
+      const next = { ...state.planReminders };
+      if (action.reminder) next[action.planId] = action.reminder;
+      else delete next[action.planId];
+      return { ...state, planReminders: next };
+    }
     case 'setRecentSearches':
       return { ...state, recentSearches: action.list };
     case 'addBoard':
@@ -462,7 +472,7 @@ function useStoreValue() {
         return id;
       },
       deletePlan: (id: string) => dispatch({ type: 'deletePlan', id }),
-      updatePlan: (id: string, patch: Partial<Pick<Plan, 'title' | 'date' | 'time' | 'location' | 'notes' | 'visibility' | 'invitees'>>) =>
+      updatePlan: (id: string, patch: Partial<Pick<Plan, 'title' | 'date' | 'time' | 'location' | 'notes' | 'visibility' | 'invitees' | 'niche' | 'kind'>>) =>
         dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, ...patch }) }),
       rsvp: (id: string, userId: string, answer: Rsvp | null) =>
         dispatch({
@@ -489,6 +499,9 @@ function useStoreValue() {
         }),
       addItem: (id: string, name: string, claimedBy?: string) =>
         dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, items: [...p.items, { id: makeId('i'), name, claimedBy }] }) }),
+      /** Anyone in the plan can fix an item's name (founder, Nov 19 2026). */
+      renameItem: (id: string, itemId: string, name: string) =>
+        dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, items: p.items.map((i) => (i.id === itemId ? { ...i, name } : i)) }) }),
       removeItem: (id: string, itemId: string) => dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, items: p.items.filter((i) => i.id !== itemId) }) }),
       addDishIdea: (id: string, name: string, by: string) =>
         dispatch({ type: 'mapPlan', id, fn: (p) => ({ ...p, dishIdeas: [...p.dishIdeas, { id: makeId('d'), name, by, votes: [by] }] }) }),
@@ -653,6 +666,7 @@ function useStoreValue() {
       },
       removeSampleYear: () => dispatch({ type: 'removeSample' }),
       setAppGround: (id: string) => dispatch({ type: 'setAppGround', id }),
+      setPlanReminder: (planId: string, reminder: { minutes: number; notificationId?: string } | null) => dispatch({ type: 'setPlanReminder', planId, reminder }),
       setRecentSearches: (list: string[]) => dispatch({ type: 'setRecentSearches', list: list.slice(0, 8) }),
       /** Makes a board and returns its id. */
       createBoard: (ownerId: string, name: string, visibility: Board['visibility'] = 'private', firstPostId?: string) => {

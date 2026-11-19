@@ -7,7 +7,7 @@ import {
   SchibstedGrotesk_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/schibsted-grotesk';
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastProvider } from '@/components/toast';
 
+import { listenForReminderTaps } from '@/lib/reminders';
 import { StoreProvider, useAppGround, useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
@@ -57,6 +58,8 @@ function RootStack() {
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
+  // Tapping a plan reminder opens the plan.
+  useEffect(() => listenForReminderTaps((url) => router.push(url as never)), []);
 
   if (!ready) return null;
 

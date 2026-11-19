@@ -42,7 +42,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
                 : '';
 
   const detail =
-    plan.kind === 'together'
+    plan.niche === 'cooking' && (plan.dishIdeas.length || plan.items.length)
       ? `${dish ? dish.name : `${plan.dishIdeas.length} dish ${plan.dishIdeas.length === 1 ? 'idea' : 'ideas'}`} · ${claimed} of ${plan.items.length} ingredients claimed`
       : plan.location ?? plan.notes ?? '';
 

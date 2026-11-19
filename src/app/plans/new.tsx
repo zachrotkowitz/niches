@@ -36,7 +36,7 @@ const tap = () => {
  * Dish votes are added on the plan's page.
  */
 export default function NewPlanSheet() {
-  const params = useLocalSearchParams<{ niche?: NicheId }>();
+  const params = useLocalSearchParams<{ niche?: NicheId; edit?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -45,19 +45,21 @@ export default function NewPlanSheet() {
   const ground = groundSurface(useAppGround());
   const { height } = useWindowDimensions();
 
-  const [nicheId, setNicheId] = useState<NicheId>(params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche);
+  // With `edit=<plan id>` the same sheet edits a plan you host (founder, Nov 19 2026).
+  const editing = params.edit ? state.plans.find((p) => p.id === params.edit && p.ownerId === state.me?.id) : undefined;
+  const [nicheId, setNicheId] = useState<NicheId>(editing?.niche ?? (params.niche && NICHE_ORDER.includes(params.niche) ? params.niche : state.niche));
   const [pickingNiche, setPickingNiche] = useState(false);
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState(isoDay(1));
+  const [title, setTitle] = useState(editing?.title ?? '');
+  const [date, setDate] = useState(editing?.date ?? isoDay(1));
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [time, setTime] = useState<string | undefined>(undefined);
-  const [open, setOpen] = useState<Extra[]>([]);
-  const [invitees, setInvitees] = useState<string[]>([]);
-  const [location, setLocation] = useState('');
+  const [time, setTime] = useState<string | undefined>(editing?.time);
+  const [open, setOpen] = useState<Extra[]>(editing ? [...(editing.invitees.length ? (['invite'] as Extra[]) : []), ...(editing.location ? (['place'] as Extra[]) : []), ...(editing.notes ? (['notes'] as Extra[]) : [])] : []);
+  const [invitees, setInvitees] = useState<string[]>(editing?.invitees ?? []);
+  const [location, setLocation] = useState(editing?.location ?? '');
   const [items, setItems] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
-  const [notes, setNotes] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>('private');
+  const [notes, setNotes] = useState(editing?.notes ?? '');
+  const [visibility, setVisibility] = useState<Visibility>(editing?.visibility ?? 'private');
   const [timeOpen, setTimeOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -131,6 +133,24 @@ export default function NewPlanSheet() {
 
   const create = () => {
     if (!ready || !state.me) return;
+    if (editing) {
+      const cookingKind = invitees.length || editing.items.length ? 'together' : 'meal';
+      actions.updatePlan(editing.id, {
+        title: title.trim(),
+        niche: nicheId,
+        kind: (cooking ? cookingKind : 'outing') as PlanKind,
+        date,
+        time,
+        location: location.trim() || undefined,
+        notes: notes.trim() || undefined,
+        visibility,
+        invitees,
+      });
+      const added = invitees.filter((u) => !editing.invitees.includes(u)).length;
+      close();
+      toast(added ? `Plan updated. ${added} ${added === 1 ? 'person' : 'people'} invited.` : 'Plan updated');
+      return;
+    }
     const pending = draft.trim();
     const allItems = pending ? [...items, pending] : items;
     const id = actions.createPlan({
@@ -138,7 +158,7 @@ export default function NewPlanSheet() {
       niche: nicheId,
       // The kind follows what you add: a cooking plan with things to bring is a
       // "Cook together", otherwise a meal; other niches make outings.
-      kind: (cooking ? (allItems.length ? 'together' : 'meal') : 'outing') as PlanKind,
+      kind: (cooking ? (allItems.length || invitees.length ? 'together' : 'meal') : 'outing') as PlanKind,
       title: title.trim(),
       date,
       time,
@@ -186,7 +206,7 @@ export default function NewPlanSheet() {
             style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8, shadowColor: niche.ink, maxHeight: height - insets.top - 24, flexShrink: 1 }, sheetStyle]}>
             <View style={styles.grabber} />
             <View style={styles.head}>
-              <Text accessibilityRole="header" style={[styles.heading, { color: ground.text }]}>New plan</Text>
+              <Text accessibilityRole="header" style={[styles.heading, { color: ground.text }]}>{editing ? 'Edit plan' : 'New plan'}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel="Close without saving" onPress={close} hitSlop={6} style={styles.close}>
                 <CloseIcon size={20} color={ground.text} />
               </Pressable>
@@ -221,7 +241,7 @@ export default function NewPlanSheet() {
                   multiline
                   {...(Platform.OS === 'web' ? { rows: 1 } : null)}
                   maxLength={60}
-                  autoFocus={Platform.OS !== 'web'}
+                  autoFocus={Platform.OS !== 'web' && !editing}
                   selectionColor={ground.text}
                   style={[styles.titleInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
                 />
@@ -309,7 +329,7 @@ export default function NewPlanSheet() {
                             value={query}
                             onChangeText={setQuery}
                             onFocus={() => reveal('invite')}
-                            autoFocus
+                            autoFocus={!editing}
                             autoCapitalize="none"
                             autoCorrect={false}
                             placeholder="Search people"
@@ -358,7 +378,7 @@ export default function NewPlanSheet() {
                       'place',
                       'Where',
                       <View onLayout={spot('place', 'box')} style={styles.smallCard}>
-                        <TextInput accessibilityLabel="Where" value={location} onChangeText={setLocation} onFocus={() => reveal('place')} autoFocus maxLength={80} selectionColor={ground.text} style={[styles.smallInput, { color: ground.text }, webInput]} />
+                        <TextInput accessibilityLabel="Where" value={location} onChangeText={setLocation} onFocus={() => reveal('place')} autoFocus={!editing} maxLength={80} selectionColor={ground.text} style={[styles.smallInput, { color: ground.text }, webInput]} />
                       </View>,
                     )
                   : null}
@@ -384,7 +404,7 @@ export default function NewPlanSheet() {
                             onFocus={() => reveal('bring')}
                             submitBehavior="submit"
                             returnKeyType="done"
-                            autoFocus
+                            autoFocus={!editing}
                             maxLength={60}
                             selectionColor={ground.text}
                             style={[styles.smallInput, { flex: 1, color: ground.text }, webInput]}
@@ -404,13 +424,14 @@ export default function NewPlanSheet() {
                       'notes',
                       'Notes',
                       <View onLayout={spot('notes', 'box')} style={styles.smallCard}>
-                        <TextInput accessibilityLabel="Notes" value={notes} onChangeText={(t) => (setNotes(t), reveal('notes'))} onFocus={() => reveal('notes')} autoFocus multiline maxLength={500} selectionColor={ground.text} style={[styles.notesInput, { color: ground.text }, webInput]} />
+                        <TextInput accessibilityLabel="Notes" value={notes} onChangeText={(t) => (setNotes(t), reveal('notes'))} onFocus={() => reveal('notes')} autoFocus={!editing} multiline maxLength={500} selectionColor={ground.text} style={[styles.notesInput, { color: ground.text }, webInput]} />
                       </View>,
                     )
                   : null}
                 {plusRow('invite', 'Invite friends')}
                 {plusRow('place', 'Add a place')}
-                {plusRow('bring', cooking ? 'Who brings what' : 'What to bring', cooking ? 'for cooking together' : undefined)}
+                {/* Things to bring are changed on the plan's page once it exists. */}
+                {editing ? null : plusRow('bring', cooking ? 'Who brings what' : 'What to bring', cooking ? 'for cooking together' : undefined)}
                 {plusRow('notes', 'Add notes')}
               </View>
             </ScrollView>
@@ -433,7 +454,7 @@ export default function NewPlanSheet() {
                 disabled={!ready}
                 onPress={create}
                 style={({ pressed }) => [styles.save, { backgroundColor: ground.text, opacity: ready ? (pressed ? 0.85 : 1) : 0.3 }]}>
-                <Text style={[styles.saveText, { color: ground.ground }]}>Make plan</Text>
+                <Text style={[styles.saveText, { color: ground.ground }]}>{editing ? 'Save' : 'Make plan'}</Text>
               </Pressable>
             </View>
           </Animated.View>
