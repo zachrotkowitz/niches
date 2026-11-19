@@ -1,20 +1,21 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { Easing, FadeIn, FadeInDown, ReduceMotion, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, ReduceMotion, SlideInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CalendarIcon, CheckIcon, ChevronLeftIcon, CloseIcon, PlusIcon } from '@/components/icons';
+import { CalendarIcon, CheckIcon, ChevronLeftIcon, ClockIcon, CloseIcon, PlusIcon, SearchIcon } from '@/components/icons';
+import { TimePicker } from '@/components/time-picker';
 import { MonthCalendar } from '@/components/month-calendar';
 import { Avatar } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
-import { CLOCK_TIMES, dayLabel, isoDay, MEAL_TIMES, type PlanKind, type Visibility } from '@/lib/plans';
+import { dayLabel, isoDay, type PlanKind, type Visibility } from '@/lib/plans';
 import { SEED_USERS } from '@/lib/seed';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, NICHE_ORDER, type NicheId } from '@/lib/theme';
@@ -57,22 +58,50 @@ export default function NewPlanSheet() {
   const [draft, setDraft] = useState('');
   const [notes, setNotes] = useState('');
   const [visibility, setVisibility] = useState<Visibility>('private');
+  const [timeOpen, setTimeOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  // Keep what you're typing above the keyboard (founder, Nov 19 2026): the
+  // sheet shrinks to the space left, and focusing a box scrolls it into view.
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const viewH = useRef(0);
+  const rowsY = useRef(0);
+  const spots = useRef<Record<string, { y: number; boxY: number; boxH: number }>>({});
+  const reveal = (key: string) =>
+    setTimeout(() => {
+      const s = spots.current[key];
+      if (!s) return;
+      const bottom = rowsY.current + s.y + s.boxY + s.boxH + 16;
+      const top = rowsY.current + s.y;
+      scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(top, bottom - viewH.current)), animated: true });
+    }, 320);
+  const spot = (key: string, part: 'y' | 'box') => (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
+    const cur = spots.current[key] ?? { y: 0, boxY: 0, boxH: 0 };
+    spots.current[key] = part === 'y' ? { ...cur, y: e.nativeEvent.layout.y } : { ...cur, boxY: e.nativeEvent.layout.y, boxH: e.nativeEvent.layout.height };
+  };
 
   const niche = niches[nicheId];
   const cooking = nicheId === 'cooking';
-  const times = cooking ? MEAL_TIMES : CLOCK_TIMES;
   const ready = title.trim().length > 0 && !!state.me;
   const people = SEED_USERS.filter((u) => u.id !== state.me?.id).sort((a, b) => Number(!!state.following[b.id]) - Number(!!state.following[a.id]));
   const otherDay = date !== isoDay(0) && date !== isoDay(1);
+  const toggleInvite = (uid: string) => setInvitees((xs) => (xs.includes(uid) ? xs.filter((x) => x !== uid) : [...xs, uid]));
+  const q = query.trim().toLowerCase();
+  // Typing: anyone whose name or username matches. Empty: a few people you follow you haven't asked yet.
+  const matches = q
+    ? people.filter((u) => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)).slice(0, 5)
+    : people.filter((u) => state.following[u.id] && !invitees.includes(u.id)).slice(0, 3);
   const add = (e: Extra) => {
     tap();
     setOpen((o) => (o.includes(e) ? o : [...o, e]));
+    reveal(e);
   };
   const addItem = () => {
     const v = draft.trim();
     if (!v) return;
     setItems((xs) => [...xs, v]);
     setDraft('');
+    reveal('bring');
   };
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/plans'));
@@ -136,7 +165,7 @@ export default function NewPlanSheet() {
       </Pressable>
     );
   const section = (key: string, label: string, children: ReactNode) => (
-    <Animated.View key={key} entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} style={[styles.section, { borderBottomColor: ground.line }]}>
+    <Animated.View key={key} onLayout={spot(key, 'y')} entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} style={[styles.section, { borderBottomColor: ground.line }]}>
       <Eyebrow>{label}</Eyebrow>
       {children}
     </Animated.View>
@@ -152,7 +181,7 @@ export default function NewPlanSheet() {
             entering={SlideInDown.duration(320).easing(Easing.out(Easing.cubic)).reduceMotion(ReduceMotion.System)}
             onLayout={(e) => sheetH.set(e.nativeEvent.layout.height)}
             accessibilityViewIsModal
-            style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8, shadowColor: niche.ink, maxHeight: height - insets.top - 24 }, sheetStyle]}>
+            style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8, shadowColor: niche.ink, maxHeight: height - insets.top - 24, flexShrink: 1 }, sheetStyle]}>
             <View style={styles.grabber} />
             <View style={styles.head}>
               <Text accessibilityRole="header" style={[styles.heading, { color: ground.text }]}>New plan</Text>
@@ -161,7 +190,7 @@ export default function NewPlanSheet() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 12, paddingBottom: 4 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView ref={scrollRef} onLayout={(e) => (viewH.current = e.nativeEvent.layout.height)} style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 12, paddingBottom: 4 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {/* The niche as one small word; tap it to pick another. */}
               {pickingNiche ? (
                 <View accessibilityRole="radiogroup" style={styles.niches}>
@@ -208,7 +237,7 @@ export default function NewPlanSheet() {
                     accessibilityRole="button"
                     accessibilityLabel={otherDay ? `${dayLabel(date)}. Pick another day` : 'Pick a day on the calendar'}
                     accessibilityState={{ expanded: calendarOpen }}
-                    onPress={() => setCalendarOpen((o) => !o)}
+                    onPress={() => (setCalendarOpen((o) => !o), setTimeOpen(false))}
                     style={[styles.wordHit, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                     <CalendarIcon size={16} color={otherDay || calendarOpen ? ground.text : ground.muted} />
                     <Text style={quiet(otherDay)}>{otherDay ? dayLabel(date) : 'Another day'}</Text>
@@ -219,55 +248,115 @@ export default function NewPlanSheet() {
                     <MonthCalendar value={date} min={isoDay(0)} accent={niche.accent} onChange={(d) => (setDate(d), setCalendarOpen(false))} />
                   </Animated.View>
                 ) : null}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.words}>
-                  {times.map((t) => (
-                    <Pressable key={t} accessibilityRole="radio" accessibilityState={{ checked: t === time }} onPress={() => setTime(t === time ? undefined : t)} style={styles.wordHit}>
-                      <Text style={[quiet(t === time, niche.accent), { fontSize: 14 }]}>{t}</Text>
+                {/* Any time, picked on a small clock card like the calendar (founder, Nov 19 2026). */}
+                <View style={[styles.words, { alignItems: 'center' }]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={time ? `${time}. Change the time` : 'Add a time'}
+                    accessibilityState={{ expanded: timeOpen }}
+                    onPress={() => (setTimeOpen((o) => !o), setCalendarOpen(false), !time && setTime('7:00 PM'))}
+                    style={[styles.wordHit, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                    <ClockIcon size={16} color={time || timeOpen ? ground.text : ground.muted} />
+                    <Text style={quiet(!!time)}>{time ?? 'Add a time'}</Text>
+                  </Pressable>
+                  {time ? (
+                    <Pressable accessibilityRole="button" accessibilityLabel="Remove the time" onPress={() => (setTime(undefined), setTimeOpen(false))} style={styles.wordHit}>
+                      <Text style={[styles.smallLink, { color: ground.muted }]}>No time</Text>
                     </Pressable>
-                  ))}
-                </ScrollView>
+                  ) : null}
+                  {timeOpen ? (
+                    <Pressable accessibilityRole="button" onPress={() => setTimeOpen(false)} style={[styles.wordHit, { marginLeft: 'auto' }]}>
+                      <Text style={[styles.smallLink, { color: ground.text }]}>Done</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                {timeOpen ? (
+                  <Animated.View entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)} style={[styles.calCard, { paddingHorizontal: 12 }]}>
+                    <TimePicker value={time} onChange={setTime} accent={niche.accent} />
+                  </Animated.View>
+                ) : null}
               </View>
 
               {/* What you've added, then + rows for the rest. */}
-              <View style={[styles.rows, { borderTopColor: ground.line }]}>
+              <View onLayout={(e) => (rowsY.current = e.nativeEvent.layout.y)} style={[styles.rows, { borderTopColor: ground.line }]}>
                 {open.includes('invite')
                   ? section(
                       'invite',
                       cooking ? 'Who’s coming' : 'Who’s coming along',
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 14, paddingVertical: 4 }}>
-                        {people.map((u) => {
-                          const on = invitees.includes(u.id);
-                          return (
-                            <Pressable
-                              key={u.id}
-                              accessibilityRole="checkbox"
-                              accessibilityState={{ checked: on }}
-                              accessibilityLabel={`Invite ${u.displayName}`}
-                              onPress={() => (tap(), setInvitees(on ? invitees.filter((x) => x !== u.id) : [...invitees, u.id]))}
-                              style={styles.person}>
-                              <View style={{ opacity: on ? 1 : 0.55 }}>
-                                <Avatar user={u} size={44} />
-                              </View>
-                              {on ? (
-                                <Animated.View entering={FadeIn.duration(150)} style={[styles.tick, { backgroundColor: niche.accent, borderColor: ground.ground }]}>
-                                  <CheckIcon size={11} strokeWidth={3.2} />
-                                </Animated.View>
-                              ) : null}
-                              <Text style={[styles.personName, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]} numberOfLines={1}>
-                                {u.displayName.split(' ')[0]}
-                              </Text>
+                      <View style={{ gap: 8 }}>
+                        {/* Who you've asked, as small name tags; × takes someone off. */}
+                        {invitees.length ? (
+                          <View style={styles.chips}>
+                            {invitees.map((uid) => {
+                              const u = people.find((x) => x.id === uid);
+                              return (
+                                <Pressable key={uid} accessibilityRole="button" accessibilityLabel={`Remove ${u?.displayName ?? 'person'}`} onPress={() => (tap(), toggleInvite(uid))} style={styles.chip}>
+                                  <Avatar user={u} size={24} />
+                                  <Text style={[styles.chipText, { color: ground.text }]}>{u?.displayName.split(' ')[0]}</Text>
+                                  <CloseIcon size={12} color={ground.muted} />
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        ) : null}
+                        {/* Search like Discover, instead of scrolling through everyone (founder, Nov 19 2026). */}
+                        <View onLayout={spot('invite', 'box')} style={[styles.smallCard, styles.search]}>
+                          <SearchIcon size={17} color={ground.muted} />
+                          <TextInput
+                            accessibilityLabel="Search people to invite"
+                            value={query}
+                            onChangeText={setQuery}
+                            onFocus={() => reveal('invite')}
+                            autoFocus
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            placeholder="Search people"
+                            placeholderTextColor={ground.muted}
+                            returnKeyType="search"
+                            selectionColor={ground.text}
+                            style={[styles.smallInput, { flex: 1, color: ground.text }, webInput]}
+                          />
+                          {query ? (
+                            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setQuery('')} hitSlop={8}>
+                              <CloseIcon size={14} color={ground.muted} />
                             </Pressable>
-                          );
-                        })}
-                      </ScrollView>,
+                          ) : null}
+                        </View>
+                        {matches.length ? (
+                          <View>
+                            {!query.trim() ? <Text style={[styles.hint, { color: ground.muted, marginBottom: 2 }]}>People you follow</Text> : null}
+                            {matches.map((u) => {
+                              const on = invitees.includes(u.id);
+                              return (
+                                <Pressable
+                                  key={u.id}
+                                  accessibilityRole="checkbox"
+                                  accessibilityState={{ checked: on }}
+                                  accessibilityLabel={`Invite ${u.displayName}`}
+                                  onPress={() => (tap(), toggleInvite(u.id), setQuery(''))}
+                                  style={[styles.personRow, { borderBottomColor: ground.line }]}>
+                                  <Avatar user={u} size={34} />
+                                  <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={[styles.personName, { color: ground.text }]} numberOfLines={1}>{u.displayName}</Text>
+                                    <Text style={[styles.personSub, { color: ground.muted }]} numberOfLines={1}>{u.username}{state.following[u.id] ? ' · you follow' : ''}</Text>
+                                  </View>
+                                  <View style={[styles.box, { borderColor: on ? niche.accent : ground.muted, backgroundColor: on ? niche.accent : 'transparent' }]}>{on ? <CheckIcon size={12} strokeWidth={3.2} /> : null}</View>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        ) : query.trim() ? (
+                          <Text style={[styles.hint, { color: ground.muted }]}>No one called “{query.trim()}”.</Text>
+                        ) : null}
+                      </View>,
                     )
                   : null}
                 {open.includes('place')
                   ? section(
                       'place',
                       'Where',
-                      <View style={styles.smallCard}>
-                        <TextInput accessibilityLabel="Where" value={location} onChangeText={setLocation} autoFocus maxLength={80} selectionColor={ground.text} style={[styles.smallInput, { color: ground.text }, webInput]} />
+                      <View onLayout={spot('place', 'box')} style={styles.smallCard}>
+                        <TextInput accessibilityLabel="Where" value={location} onChangeText={setLocation} onFocus={() => reveal('place')} autoFocus maxLength={80} selectionColor={ground.text} style={[styles.smallInput, { color: ground.text }, webInput]} />
                       </View>,
                     )
                   : null}
@@ -284,12 +373,13 @@ export default function NewPlanSheet() {
                             </Pressable>
                           </View>
                         ))}
-                        <View style={[styles.smallCard, { flexDirection: 'row', alignItems: 'center' }]}>
+                        <View onLayout={spot('bring', 'box')} style={[styles.smallCard, { flexDirection: 'row', alignItems: 'center' }]}>
                           <TextInput
                             accessibilityLabel={cooking ? 'Add an ingredient' : 'Add something to bring'}
                             value={draft}
                             onChangeText={setDraft}
                             onSubmitEditing={addItem}
+                            onFocus={() => reveal('bring')}
                             submitBehavior="submit"
                             returnKeyType="done"
                             autoFocus
@@ -311,8 +401,8 @@ export default function NewPlanSheet() {
                   ? section(
                       'notes',
                       'Notes',
-                      <View style={styles.smallCard}>
-                        <TextInput accessibilityLabel="Notes" value={notes} onChangeText={setNotes} autoFocus multiline maxLength={500} selectionColor={ground.text} style={[styles.notesInput, { color: ground.text }, webInput]} />
+                      <View onLayout={spot('notes', 'box')} style={styles.smallCard}>
+                        <TextInput accessibilityLabel="Notes" value={notes} onChangeText={(t) => (setNotes(t), reveal('notes'))} onFocus={() => reveal('notes')} autoFocus multiline maxLength={500} selectionColor={ground.text} style={[styles.notesInput, { color: ground.text }, webInput]} />
                       </View>,
                     )
                   : null}
@@ -372,9 +462,15 @@ const styles = StyleSheet.create({
   rowText: { fontSize: 15, fontWeight: '600' },
   rowSub: { marginLeft: 'auto', fontSize: 13 },
   section: { paddingVertical: 10, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
-  person: { width: 58, alignItems: 'center', gap: 4 },
-  tick: { position: 'absolute', top: 28, right: 4, width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  personName: { fontSize: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 3, paddingRight: 10, minHeight: 32, borderRadius: 16, backgroundColor: '#FFFFFF' },
+  chipText: { fontSize: 14, fontWeight: '600' },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  personName: { fontSize: 15, fontWeight: '600' },
+  personSub: { fontSize: 12 },
+  box: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  smallLink: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
   smallCard: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: '#FFFFFF' },
   smallInput: { fontSize: 15, minHeight: 24, paddingVertical: 0 },
   notesInput: { fontFamily: fonts.displayItalic, fontSize: 19, lineHeight: 24, minHeight: 50, paddingVertical: 0, textAlignVertical: 'top' },

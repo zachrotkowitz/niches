@@ -135,6 +135,15 @@ export function DownloadIcon({ size = 14, color = '#14161A' }: IconProps) {
   );
 }
 
+export function ClockIcon({ size = 22, color = '#14161A' }: IconProps) {
+  return (
+    <Svg {...base(size)}>
+      <Circle cx={12} cy={12} r={8.5} fill="none" stroke={color} strokeWidth={1.8} />
+      <Path d="M12 7.5V12l3 2" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function CalendarIcon({ size = 22, color = '#14161A' }: IconProps) {
   return (
     <Svg {...base(size)}>
