@@ -15,7 +15,7 @@ import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { useToast } from '@/components/toast';
 import { diaryWords } from '@/lib/diary';
-import { currentBest, fmt, goalRule, progress, streak, weekKey, weekNumber, type Goal } from '@/lib/goals';
+import { currentBest, fmt, goalRule, progress, streak, weekDone, weekKey, weekNumber, type Goal } from '@/lib/goals';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
 import { shortTitle } from '@/lib/format';
 import { dayLabel, isoDay } from '@/lib/plans';
@@ -158,7 +158,7 @@ export default function GoalScreen() {
 
         <View style={ds.summary}>
           <GoalRing fraction={done ? 1 : hidden ? 0 : p.fraction} color={niche.accent} size={84} stroke={9}>
-            {done ? <CheckIcon size={28} color={niche.accent} strokeWidth={2.6} /> : hidden ? null : <Text style={[ds.ringText, { color: ground.text, fontSize: label.length > 3 ? 19 : 24 }]}>{label}</Text>}
+            {done || weekDone(goal).done ? <CheckIcon size={28} color={niche.accent} strokeWidth={2.6} /> : hidden ? null : <Text style={[ds.ringText, { color: ground.text, fontSize: label.length > 3 ? 19 : 24 }]}>{label}</Text>}
           </GoalRing>
           <View style={{ flex: 1, gap: 2 }}>
             {done ? (
@@ -326,7 +326,11 @@ function summaryTitle(goal: Goal, s: number) {
 }
 function summaryLine(goal: Goal) {
   const p = progress(goal);
-  if (goal.kind === 'habit') return p.headline === 'Rest week' ? 'Your streak is safe' : `${p.headline} this week`;
+  if (goal.kind === 'habit') {
+    const w = weekDone(goal);
+    if (w.done) return `Done this week${w.extra ? ` · ${w.extra} extra` : ''}`;
+    return p.headline === 'Rest week' ? 'Your streak is safe' : `${p.headline} this week`;
+  }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
   return currentBest(goal) === undefined ? 'No result logged yet' : `Best so far ${p.headline}`;
 }

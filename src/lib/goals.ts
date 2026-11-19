@@ -188,7 +188,7 @@ export function progress(g: Goal, today = isoDay()): Progress {
     const rest = g.restWeeks.includes(weekKey(today));
     return {
       fraction: rest ? 1 : Math.min(1, count / per),
-      headline: rest ? 'Rest week' : `${Math.min(count, 99)} of ${per}`,
+      headline: rest ? 'Rest week' : `${Math.min(count, per)} of ${per}`,
       caption: rest ? 'your streak is safe' : 'this week',
       reached: false,
     };
@@ -210,6 +210,18 @@ export function progress(g: Goal, today = isoDay()): Progress {
     caption: current === undefined ? `starting point · goal ${fmt(target)}` : `best so far · goal ${fmt(target)}`,
     reached,
   };
+}
+
+/**
+ * A weekly goal you've hit this week, and how many extra times you did it
+ * (founder picked option A, Nov 19 2026: a check in the ring, "2 extra" below,
+ * never "4/2").
+ */
+export function weekDone(g: Goal, today = isoDay()): { done: boolean; extra: number } {
+  if (g.kind !== 'habit') return { done: false, extra: 0 };
+  const per = g.perWeek ?? 1;
+  const count = checkInsByWeek(g)[weekKey(today)] ?? 0;
+  return { done: count >= per, extra: Math.max(0, count - per) };
 }
 
 /** Your best value so far on a personal-best goal. */

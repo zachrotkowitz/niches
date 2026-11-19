@@ -10,7 +10,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { CheckIcon, LockIcon, PlusIcon } from '@/components/icons';
 import { useToast } from '@/components/toast';
-import { goalRule, progress, streak, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
+import { goalRule, progress, streak, weekDone, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
 import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, fonts } from '@/lib/theme';
@@ -105,6 +105,8 @@ export function goalSubline(goal: Goal) {
   const p = progress(goal);
   if (goal.kind === 'habit') {
     const s = streak(goal);
+    const w = weekDone(goal);
+    if (w.done) return `Done this week${w.extra ? ` · ${w.extra} extra` : ''}${s > 1 ? ` · ${s}-week streak` : ''}`;
     return `${p.headline === 'Rest week' ? 'Rest week' : `${p.headline} this week`}${s > 1 ? ` · ${s}-week streak` : ''}`;
   }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
@@ -142,7 +144,7 @@ export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsO
       onPress={() => open()}
       style={({ pressed }) => [styles.card, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
       <GoalRing fraction={done ? 1 : hidden ? 0 : p.fraction} color={niche.accent}>
-        {done ? (
+        {done || weekDone(goal).done ? (
           <CheckIcon size={22} color={niche.accent} strokeWidth={2.6} />
         ) : hidden ? null : (
           <Text style={[styles.ringText, { color: colors.text, fontSize: label.length > 3 ? 15 : 19 }]} numberOfLines={1}>{label}</Text>
