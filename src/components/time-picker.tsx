@@ -1,87 +1,123 @@
 import * as Haptics from 'expo-haptics';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { useSurface } from '@/components/surface';
 import { Text } from '@/components/text';
-import { fonts } from '@/lib/theme';
 
-const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES = ['00', '15', '30', '45'];
-const tick = () => {
-  if (Platform.OS !== 'web') void Haptics.selectionAsync();
-};
+const ITEM = 40;
+const VISIBLE = 5; // rows showing; the middle one is the pick
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const HALVES = ['AM', 'PM'];
 
 /** "7:30 PM" → its parts, or a 7:00 PM default. */
 function parse(t?: string) {
   const m = t?.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!m) return { h: 7, min: '00', pm: true };
-  return { h: Number(m[1]), min: MINUTES.includes(m[2]) ? m[2] : '00', pm: m[3].toUpperCase() === 'PM' };
+  if (!m) return { h: '7', min: '00', half: 'PM' };
+  return { h: String(Number(m[1])), min: m[2], half: m[3].toUpperCase() };
 }
 
 /**
- * Pick any time with a few taps, nothing to scroll (founder, Nov 19 2026:
- * "like the calendar, an option to pick the time themselves"): the time in
- * big serif, then the hours, the minutes and AM / PM. Sits on a white card
- * like the calendar. Gives back times like "7:30 PM".
+ * One spinning column: scroll it and it snaps to a row; the row in the
+ * middle band is the pick, in the niche's color. Tap a row to jump to it.
+ * A soft click as each row passes the middle (phones).
  */
-export function TimePicker({ value, onChange, accent }: { value?: string; onChange: (t: string) => void; accent: string }) {
+function Wheel({ items, value, onChange, accent, label, width }: { items: string[]; value: string; onChange: (v: string) => void; accent: string; label: string; width: number }) {
   const surface = useSurface();
-  const { h, min, pm } = parse(value);
-  const set = (next: Partial<{ h: number; min: string; pm: boolean }>) => {
-    tick();
-    const v = { h, min, pm, ...next };
-    onChange(`${v.h}:${v.min} ${v.pm ? 'PM' : 'AM'}`);
+  const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const start = Math.max(0, items.indexOf(value));
+  const [live, setLive] = useState(start);
+  const liveRef = useRef(start);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Start on the current value.
+  useEffect(() => {
+    const t = setTimeout(() => ref.current?.scrollTo({ y: start * ITEM, animated: false }), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const commit = (i: number) => {
+    const v = items[Math.min(items.length - 1, Math.max(0, i))];
+    if (v !== value) onChange(v);
   };
-  const cell = (on: boolean) => [styles.cell, on ? { backgroundColor: accent } : null];
-  const label = (on: boolean) => [styles.cellText, { color: on ? '#FFFFFF' : surface.text, fontWeight: on ? ('700' as const) : ('500' as const) }];
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.min(items.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.y / ITEM)));
+    if (i !== liveRef.current) {
+      liveRef.current = i;
+      setLive(i);
+      if (Platform.OS !== 'web') void Haptics.selectionAsync();
+    }
+    // The web has no "scroll ended" event, so settle a moment after the last scroll.
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      if (Platform.OS === 'web') ref.current?.scrollTo({ y: liveRef.current * ITEM, animated: true });
+      commit(liveRef.current);
+    }, 140);
+  };
+  const jump = (i: number) => ref.current?.scrollTo({ y: i * ITEM, animated: true });
 
   return (
+    <View style={{ width, height: ITEM * VISIBLE }}>
+      <ScrollView
+        ref={ref}
+        accessibilityLabel={label}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        nestedScrollEnabled
+        onScroll={onScroll}
+        onMomentumScrollEnd={(e) => commit(Math.round(e.nativeEvent.contentOffset.y / ITEM))}
+        contentContainerStyle={{ paddingVertical: ITEM * Math.floor(VISIBLE / 2) }}
+        style={Platform.OS === 'web' ? ({ scrollSnapType: 'y mandatory' } as object) : undefined}>
+        {items.map((it, i) => {
+          const d = Math.abs(i - live);
+          return (
+            <Pressable
+              key={it}
+              accessibilityRole="button"
+              accessibilityLabel={`${label} ${it}`}
+              accessibilityState={{ selected: i === live }}
+              onPress={() => jump(i)}
+              style={[styles.item, Platform.OS === 'web' ? ({ scrollSnapAlign: 'center' } as object) : null]}>
+              <Text style={[styles.itemText, d === 0 ? { color: accent, fontSize: 26, fontWeight: '600' } : { color: surface.muted, opacity: d === 1 ? 0.9 : 0.45 }]}>{it}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Pick a time on spinning wheels, like the phone's own picker (founder, Nov
+ * 19 2026, from a screenshot they liked): hours, minutes and AM / PM, no
+ * seconds. Sits on a white card like the calendar; gives back "7:30 PM".
+ */
+export function TimePicker({ value, onChange, accent }: { value?: string; onChange: (t: string) => void; accent: string }) {
+  const cur = parse(value);
+  const set = (next: Partial<typeof cur>) => {
+    const v = { ...cur, ...next };
+    onChange(`${v.h}:${v.min} ${v.half}`);
+  };
+  return (
     <View style={styles.wrap}>
-      <Text accessibilityLiveRegion="polite" style={[styles.big, { color: surface.text }]}>
-        {h}:{min} {pm ? 'PM' : 'AM'}
-      </Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Hour" style={styles.grid}>
-        {HOURS.map((x) => (
-          <Pressable key={x} accessibilityRole="radio" accessibilityState={{ checked: x === h }} accessibilityLabel={`${x} o’clock`} onPress={() => set({ h: x })} style={styles.slot}>
-            <View style={cell(x === h)}>
-              <Text style={label(x === h)}>{x}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-      <View style={[styles.row, { borderTopColor: surface.line }]}>
-        <View accessibilityRole="radiogroup" accessibilityLabel="Minutes" style={styles.pair}>
-          {MINUTES.map((x) => (
-            <Pressable key={x} accessibilityRole="radio" accessibilityState={{ checked: x === min }} accessibilityLabel={`${x} minutes`} onPress={() => set({ min: x })}>
-              <View style={[cell(x === min), styles.wide]}>
-                <Text style={label(x === min)}>:{x}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-        <View accessibilityRole="radiogroup" accessibilityLabel="AM or PM" style={styles.toggle}>
-          {[false, true].map((p) => (
-            <Pressable key={String(p)} accessibilityRole="radio" accessibilityState={{ checked: p === pm }} onPress={() => set({ pm: p })} style={[styles.toggleItem, p === pm && { backgroundColor: surface.text }]}>
-              <Text style={[styles.toggleText, { color: p === pm ? '#FFFFFF' : surface.muted }]}>{p ? 'PM' : 'AM'}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+      {/* The band behind the middle row. */}
+      <View pointerEvents="none" style={[styles.band, { backgroundColor: 'rgba(31,26,20,0.05)' }]} />
+      <Wheel items={HOURS} value={cur.h} onChange={(h) => set({ h })} accent={accent} label="Hour" width={64} />
+      <Text style={[styles.colon, { color: accent }]}>:</Text>
+      <Wheel items={MINUTES} value={cur.min} onChange={(min) => set({ min })} accent={accent} label="Minutes" width={64} />
+      <Wheel items={HALVES} value={cur.half} onChange={(half) => set({ half })} accent={accent} label="AM or PM" width={70} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: 8, gap: 6 },
-  big: { fontFamily: fonts.displayItalic, fontSize: 30, lineHeight: 34, paddingHorizontal: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  slot: { width: `${100 / 6}%`, height: 46, alignItems: 'center', justifyContent: 'center' },
-  cell: { minWidth: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  wide: { minWidth: 46, paddingHorizontal: 6 },
-  cellText: { fontSize: 15 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 8 },
-  pair: { flexDirection: 'row', gap: 2 },
-  toggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.07)' },
-  toggleItem: { minHeight: 34, paddingHorizontal: 11, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  toggleText: { fontSize: 13, fontWeight: '700' },
+  wrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 4 },
+  band: { position: 'absolute', left: 12, right: 12, top: 6 + ITEM * 2, height: ITEM, borderRadius: 12 },
+  item: { height: ITEM, alignItems: 'center', justifyContent: 'center' },
+  itemText: { fontSize: 19, fontVariant: ['tabular-nums'] },
+  colon: { fontSize: 24, fontWeight: '600', marginTop: -3 },
 });

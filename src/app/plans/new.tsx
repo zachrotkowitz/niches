@@ -110,6 +110,8 @@ export default function NewPlanSheet() {
   const drag = useSharedValue(0);
   const sheetH = useSharedValue(500);
   const pan = usePanGesture({
+    // Spinning the time wheels shouldn't pull the sheet down.
+    enabled: !timeOpen,
     activeOffsetY: [-1000, 8],
     failOffsetX: [-20, 20],
     onUpdate: (e) => {
