@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactElement, type ReactNode, type RefObject } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View, type RefreshControlProps } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, { Easing, ReduceMotion, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useDerivedValue, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER, tileTitle } from '@/components/feed-grid';
@@ -18,6 +20,7 @@ import { PlanCard } from '@/components/plan-card';
 import { ListingGrid } from '@/components/shop';
 import { Avatar, Button, DisplayText, MediaPlaceholder } from '@/components/primitives';
 import { useSurface, useSurfaceStyles } from '@/components/surface';
+import { UnderlineTabs } from '@/components/underline-tabs';
 import { pickPhoto } from '@/lib/photos';
 import { boardPosts } from '@/lib/boards';
 import { coverFor } from '@/lib/cover';
@@ -31,40 +34,33 @@ import type { Post, User } from '@/lib/types';
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
-export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pageTop = 0 }: { user: User; isMe: boolean; footer?: ReactNode; /** Space to leave above the name when there's no cover (the status bar on your own profile). */ topInset?: number; /** Called with the tab row's position when you pick a tab, so the screen can scroll it to the top (founder, Nov 19 2026). */ onTabChange?: (tabsY: number) => void; /** Where the scrolling page starts on screen (0, or under a back bar). */ pageTop?: number }) {
+export function ProfileView({
+  user,
+  isMe,
+  footer,
+  topInset = 0,
+  scrollRef,
+  scrollY,
+  refreshControl,
+  contentBottom = 0,
+}: {
+  user: User;
+  isMe: boolean;
+  footer?: ReactNode;
+  /** Space to leave above the name when there's no cover, and where the tab row pins (the status bar on your own profile). */
+  topInset?: number;
+  /** The profile scrolls itself; screens pass a ref to scroll it (tap the tab to go to the top) and a shared value to follow it (pull to refresh). */
+  scrollRef?: RefObject<ComponentRef<typeof Animated.ScrollView> | null>;
+  scrollY?: SharedValue<number>;
+  refreshControl?: ReactElement<RefreshControlProps>;
+  contentBottom?: number;
+}) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
   const router = useRouter();
   const { state, actions } = useStore();
   const niches = useNiches();
-  const [tab, setTab] = useState<Tab>('all');
-  const tabsY = useRef(0);
-  const tabsRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  const { height: windowH } = useWindowDimensions();
-  const rootRef = useRef<ComponentRef<typeof View>>(null);
-  // Set when you tap a tab after scrolling down the profile at all.
-  const picked = useRef(false);
-  const pickTab = (t: Tab) => {
-    if (!onTabChange) return setTab(t);
-    rootRef.current?.measureInWindow((_x, rootY) => {
-      picked.current = rootY < pageTop - 1;
-      setTab(t);
-    });
-  };
-  // After the new tab has drawn (the Top 4 rows above the tabs come and go with
-  // some tabs), find where the tab row ended up and let the screen scroll it
-  // to the top if it's out of view (founder, Nov 19 2026).
-  useEffect(() => {
-    if (!picked.current || !onTabChange) return;
-    picked.current = false;
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        tabsRef.current?.measureInWindow((_x, rowY) => rootRef.current?.measureInWindow((_rx, rootY) => onTabChange(rowY - rootY)));
-      }),
-    );
-    return () => cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  const { width: W, height: windowH } = useWindowDimensions();
   const [diaryView, setDiaryView] = useState<'list' | 'calendar'>('list');
   const [editing, setEditing] = useState(false);
   // Where the small picture is, so the enlarged one can glide out of it.
@@ -84,7 +80,6 @@ export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pag
   const goals = visibleGoals(state.goals, user.id, state.me?.id).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt) || b.createdAt - a.createdAt);
   const weekly = goals.filter((g) => g.kind === 'habit' && !g.doneAt);
   const isNicheTab = (t: Tab): t is NicheId => t !== 'all' && t !== 'shop' && t !== 'diary' && t !== 'goals' && t !== 'boards';
-  const shown = tab === 'all' ? posts : isNicheTab(tab) ? posts.filter((p) => p.niche === tab) : [];
   // The niche this person is most active in (posts and diary), so the profile
   // looks the same whichever niche was last open on Home.
   const activity: Partial<Record<NicheId, number>> = {};
@@ -92,11 +87,10 @@ export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pag
   for (const l of logs) activity[l.niche] = (activity[l.niche] ?? 0) + 1;
   const mainNiche: NicheId = NICHE_ORDER.reduce((best, id) => ((activity[id] ?? 0) > (activity[best] ?? 0) ? id : best), 'cooking' as NicheId);
   const withPicks = NICHE_ORDER.filter((id) => (state.favorites[user.id]?.[id]?.length ?? 0) > 0);
-  // Top 4 rows: the niche tab you're on; on "All", every niche with picks (or, if you have none yet, your main niche so you can start one). Never the niche last open on Home.
+  // Top 4 rows: every niche with picks (or, if you have none yet, your main niche so you can start one). Never the niche last open on Home.
+  // The same rows on every tab, so the top of the profile never changes height as you switch.
   const favNiches: NicheId[] =
-    isNicheTab(tab)
-      ? [tab]
-      : withPicks.length
+    withPicks.length
         ? withPicks
         : isMe
           ? [mainNiche]
@@ -113,8 +107,209 @@ export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pag
     .sort((a, b) => a.date.localeCompare(b.date));
   const openList = (tab: 'followers' | 'following') => router.push({ pathname: '/connections/[id]', params: { id: user.id, tab } });
 
+  // ---- Tabs as pages you can swipe between (founder, Nov 19 2026) ----
+  // The tab row pins to the top as you scroll (like Instagram). The tabs sit
+  // side by side; swipe or tap and the row slides like Home's niche pages.
+  // Switching while scrolled down starts the new tab at its top, right under
+  // the pinned row.
+  const tabs = ['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[];
+  const tabLabel = (t: Tab) => (t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label);
+  const [index, setIndexRaw] = useState(0);
+  const [target, setTarget] = useState(0);
+  const current = Math.min(index, tabs.length - 1);
+  const ownScrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
+  const scroller = scrollRef ?? ownScrollRef;
+  const ownY = useSharedValue(0);
+  const y = scrollY ?? ownY;
+  const tabsTop = useSharedValue(0);
+  const pos = useSharedValue(0);
+  const start = useSharedValue(0);
+  const [heights, setHeights] = useState<Partial<Record<Tab, number>>>({});
+  const [stuck, setStuck] = useState(false);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    y.set(e.contentOffset.y);
+  });
+  // How far into the tabs you've scrolled: 0 until the row pins.
+  const depth = useDerivedValue(() => Math.max(0, y.get() - (tabsTop.get() - topInset)));
+  useAnimatedReaction(
+    () => y.get() >= tabsTop.get() - topInset && tabsTop.get() > 0,
+    (now, before) => {
+      if (now !== before) scheduleOnRN(setStuck, now);
+    },
+  );
+  const scrollAfter = useRef(false);
+  const settle = (i: number) => {
+    scrollAfter.current = depth.get() > 0;
+    setIndexRaw(i);
+    setTarget(i);
+  };
+  // Once the new tab is in place, start it at its top under the pinned row.
+  useLayoutEffect(() => {
+    if (!scrollAfter.current) return;
+    scrollAfter.current = false;
+    scroller.current?.scrollTo({ y: tabsTop.get() - topInset, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+  const goTo = (i: number) => {
+    if (i === current) return;
+    setTarget(i);
+    pos.set(withTiming(-i * W, { duration: 320, easing: Easing.out(Easing.cubic), reduceMotion: ReduceMotion.System }, (done) => {
+      if (done) scheduleOnRN(settle, i);
+    }));
+  };
+  const last = tabs.length - 1;
+  const pan = usePanGesture({
+    activeOffsetX: [-14, 14],
+    failOffsetY: [-12, 12],
+    onActivate: () => {
+      'worklet';
+      start.set(pos.get());
+    },
+    onUpdate: (e) => {
+      'worklet';
+      const min = -last * W;
+      let x = start.get() + e.translationX;
+      // A little give past the first and last tab.
+      if (x > 0) x *= 0.25;
+      if (x < min) x = min + (x - min) * 0.25;
+      pos.set(x);
+    },
+    onDeactivate: (e) => {
+      'worklet';
+      const from = Math.round(-start.get() / W);
+      let to = Math.round(-pos.get() / W);
+      if (Math.abs(e.velocityX) > 500) to = from + (e.velocityX < 0 ? 1 : -1);
+      to = Math.max(0, Math.min(last, to));
+      scheduleOnRN(setTarget, to);
+      pos.set(withSpring(-to * W, { duration: 380, dampingRatio: 1, reduceMotion: ReduceMotion.System }, (done) => {
+        if (done) scheduleOnRN(settle, to);
+      }));
+    },
+  });
+  // Keep the row lined up if the tab list or screen width changes.
+  useEffect(() => {
+    pos.set(-current * W);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [W, tabs.length]);
+  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pos.get() }] }));
+  const tabRow = (
+    <UnderlineTabs label="Profile sections" inset={10} value={tabs[Math.min(target, last)]} onChange={(k) => goTo(tabs.indexOf(k as Tab))} items={tabs.map((t) => ({ key: t, label: tabLabel(t) }))} />
+  );
+  const pageMin = windowH - topInset - 48;
+
+  const shownFor = (t: Tab) => (t === 'all' ? posts : isNicheTab(t) ? posts.filter((p) => p.niche === t) : []);
+  const page = (t: Tab) => (
+    <>
+      {t === 'goals' ? (
+        <View style={styles.diary}>
+          {isMe && weekly.length ? (
+            <Text style={[styles.goalsLine, { color: surface.text }]}>
+              {(() => {
+                const left = weekly.filter((g) => progress(g).fraction < 1).length;
+                return left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`;
+              })()}
+            </Text>
+          ) : null}
+          <View style={{ gap: 10 }}>
+            {goals.map((g) => (
+              <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
+            ))}
+          </View>
+          {goals.length === 0 ? (
+            <Text style={styles.diaryEmpty}>
+              {isMe ? 'Set a goal and check in when you work on it. Streaks are weekly, rest weeks never break one, and goals are private unless you choose otherwise.' : 'No public goals.'}
+            </Text>
+          ) : null}
+          {isMe ? (
+            <View style={{ flexDirection: 'row', gap: 22 }}>
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} style={styles.logLink}>
+                <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
+                <Text style={[styles.logLinkText, { color: surface.text }]}>New goal</Text>
+              </Pressable>
+              {goals.length ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push('/goals')} style={styles.logLink}>
+                  <Text style={[styles.logLinkText, { color: surface.text }]}>All goals</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+          {isMe && goals.some((g) => g.visibility === 'private') ? <Text style={styles.diaryNote}>Goals with a lock are private. Others only see the ones you put on your profile.</Text> : null}
+        </View>
+      ) : t === 'diary' ? (
+        <View style={styles.diary}>
+          {isMe ? <RecapCard niche={mainNiche} /> : null}
+          {logs.length ? (
+            <View style={styles.diaryHead}>
+              <View style={styles.diaryStatsRow}>
+                <SerifStat value={String(logs.length)} label="logged" ink={surface.text} muted={surface.muted} />
+                <SerifStat value={String(thisMonth)} label="this month" ink={surface.text} muted={surface.muted} />
+                <SerifStat value={avg ? avg.toFixed(1) : '–'} label="average ★" ink={surface.text} muted={surface.muted} />
+              </View>
+              {/* List or calendar (founder, Nov 17 2026: A's list, B's calendar, your pick). */}
+              <View accessibilityRole="radiogroup" accessibilityLabel="Diary view" style={styles.viewToggle}>
+                {(['list', 'calendar'] as const).map((v) => {
+                  const on = diaryView === v;
+                  return (
+                    <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={v === 'list' ? 'List' : 'Calendar'} onPress={() => setDiaryView(v)} style={[styles.viewButton, on && { backgroundColor: '#FFFFFF' }]}>
+                      {v === 'list' ? <ListIcon size={19} color={on ? surface.text : surface.muted} /> : <CalendarIcon size={19} color={on ? surface.text : surface.muted} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+          {isMe ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })} style={styles.logLink}>
+              <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
+              <Text style={[styles.logLinkText, { color: surface.text }]}>Add a diary entry</Text>
+            </Pressable>
+          ) : null}
+          {logs.length === 0 ? (
+            <Text style={styles.diaryEmpty}>
+              {isMe
+                ? 'Your diary is private by default: a record of everything you make, with stars and notes for next time. Tap “I made this” on any post, or log something of your own.'
+                : 'Nothing in their diary yet.'}
+            </Text>
+          ) : diaryView === 'list' ? (
+            <DiaryList logs={logs} showPrivacy={isMe} />
+          ) : (
+            <DiaryCalendar logs={logs} />
+          )}
+          {isMe && logs.length ? <Text style={styles.diaryNote}>Entries with a lock are private. Everything else shows here on your profile.</Text> : null}
+        </View>
+      ) : t === 'boards' ? (
+        <View style={styles.boardGrid}>
+          {boards.map((b) => {
+            const bp = boardPosts(b, state.posts);
+            return <BoardCard key={b.id} name={b.name} posts={bp} count={bp.length} width={cardW} onPress={() => router.push({ pathname: '/boards/[id]', params: { id: b.id } })} />;
+          })}
+        </View>
+      ) : t === 'shop' ? (
+        <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />
+      ) : shownFor(t).length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>No posts yet</Text>
+          {isMe ? (
+            <>
+              <Text style={styles.emptyBody}>Share your first dish, a question, or progress toward a goal.</Text>
+              <Button label="Create a post" color={surface.text} onPress={() => router.navigate('/create')} />
+            </>
+          ) : null}
+        </View>
+      ) : (
+        // The "All" tab mixes niches, so tiles get niche borders like Discover and Saved.
+        <PostSquares posts={shownFor(t)} nicheBorders={t === 'all' && nicheTabs.length > 1} />
+      )}
+
+      {footer}
+    </>
+  );
+
   return (
-    <View ref={rootRef} collapsable={false}>
+    <View style={{ flex: 1 }}>
+      <Animated.ScrollView ref={scroller} onScroll={onScroll} scrollEventThrottle={16} refreshControl={refreshControl} contentContainerStyle={{ paddingBottom: contentBottom }}>
+      {/* Everything above the tab row. Its height is where the row sits (also right on the web, which only reports size changes). */}
+      <View onLayout={(e) => tabsTop.set(e.nativeEvent.layout.height)}>
       {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
       <View style={styles.head}>
         <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>
@@ -230,7 +425,7 @@ export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pag
         </View>
       ) : null}
 
-      {favNiches.length && tab !== 'shop' && tab !== 'goals' && tab !== 'boards' ? (
+      {favNiches.length ? (
         <View style={styles.favs}>
           {favNiches.map((id) => (
             <TopFour key={id} userId={user.id} niche={id} isMe={isMe} />
@@ -238,124 +433,44 @@ export function ProfileView({ user, isMe, footer, topInset = 0, onTabChange, pag
         </View>
       ) : null}
 
-      {/* Tabs keep their natural width (no wrapped labels) and scroll sideways if they don't all fit. */}
-      <ScrollView ref={tabsRef} horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" onLayout={(e) => (tabsY.current = e.nativeEvent.layout.y)} style={styles.tabs} contentContainerStyle={styles.tabsRow}>
-        {(['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[]).map((t) => {
-          const selected = t === tab;
-          return (
-            <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => pickTab(t)} style={[styles.tab, { borderBottomColor: selected ? surface.text : 'transparent' }]}>
-              <Text numberOfLines={1} style={[styles.tabText, { color: selected ? surface.text : surface.muted }]}>{t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      </View>
+      <View>{tabRow}</View>
 
-      {/* Every tab's content fades in the same way, and is at least a screen tall so the tab row can sit at the top. */}
-      <Animated.View key={tab} entering={FadeIn.duration(180).reduceMotion(ReduceMotion.System)} style={{ minHeight: windowH }}>
-      {tab === 'goals' ? (
-        <View style={styles.diary}>
-          {isMe && weekly.length ? (
-            <Text style={[styles.goalsLine, { color: surface.text }]}>
-              {(() => {
-                const left = weekly.filter((g) => progress(g).fraction < 1).length;
-                return left === 0 ? 'Every weekly goal done this week.' : `${left === 1 ? 'One' : left} to do this week.`;
-              })()}
-            </Text>
-          ) : null}
-          <View style={{ gap: 10 }}>
-            {goals.map((g) => (
-              <GoalCard key={g.id} goal={g} viewerIsOwner={isMe} />
+      {/* The pages, side by side. The box is as tall as the tab you're on. */}
+      <GestureDetector gesture={pan}>
+        <View style={{ overflow: 'hidden', height: heights[tabs[current]] }}>
+          <Animated.View style={[{ flexDirection: 'row', width: W * tabs.length, alignItems: 'flex-start' }, rowStyle]}>
+            {tabs.map((t, i) => (
+              <TabPage key={t} active={i === current} depth={depth} width={W} minHeight={pageMin} onHeight={(hgt) => setHeights((prev) => (prev[t] === hgt ? prev : { ...prev, [t]: hgt }))}>
+                {page(t)}
+              </TabPage>
             ))}
-          </View>
-          {goals.length === 0 ? (
-            <Text style={styles.diaryEmpty}>
-              {isMe ? 'Set a goal and check in when you work on it. Streaks are weekly, rest weeks never break one, and goals are private unless you choose otherwise.' : 'No public goals.'}
-            </Text>
-          ) : null}
-          {isMe ? (
-            <View style={{ flexDirection: 'row', gap: 22 }}>
-              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/goals/new', params: { niche: mainNiche } })} style={styles.logLink}>
-                <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
-                <Text style={[styles.logLinkText, { color: surface.text }]}>New goal</Text>
-              </Pressable>
-              {goals.length ? (
-                <Pressable accessibilityRole="button" onPress={() => router.push('/goals')} style={styles.logLink}>
-                  <Text style={[styles.logLinkText, { color: surface.text }]}>All goals</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-          {isMe && goals.some((g) => g.visibility === 'private') ? <Text style={styles.diaryNote}>Goals with a lock are private. Others only see the ones you put on your profile.</Text> : null}
+          </Animated.View>
         </View>
-      ) : tab === 'diary' ? (
-        <View style={styles.diary}>
-          {isMe ? <RecapCard niche={mainNiche} /> : null}
-          {logs.length ? (
-            <View style={styles.diaryHead}>
-              <View style={styles.diaryStatsRow}>
-                <SerifStat value={String(logs.length)} label="logged" ink={surface.text} muted={surface.muted} />
-                <SerifStat value={String(thisMonth)} label="this month" ink={surface.text} muted={surface.muted} />
-                <SerifStat value={avg ? avg.toFixed(1) : '–'} label="average ★" ink={surface.text} muted={surface.muted} />
-              </View>
-              {/* List or calendar (founder, Nov 17 2026: A's list, B's calendar, your pick). */}
-              <View accessibilityRole="radiogroup" accessibilityLabel="Diary view" style={styles.viewToggle}>
-                {(['list', 'calendar'] as const).map((v) => {
-                  const on = diaryView === v;
-                  return (
-                    <Pressable key={v} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={v === 'list' ? 'List' : 'Calendar'} onPress={() => setDiaryView(v)} style={[styles.viewButton, on && { backgroundColor: '#FFFFFF' }]}>
-                      {v === 'list' ? <ListIcon size={19} color={on ? surface.text : surface.muted} /> : <CalendarIcon size={19} color={on ? surface.text : surface.muted} />}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
-          {isMe ? (
-            <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/log/new', params: { niche: mainNiche } })} style={styles.logLink}>
-              <PlusIcon size={16} color={surface.text} strokeWidth={2.4} />
-              <Text style={[styles.logLinkText, { color: surface.text }]}>Add a diary entry</Text>
-            </Pressable>
-          ) : null}
-          {logs.length === 0 ? (
-            <Text style={styles.diaryEmpty}>
-              {isMe
-                ? 'Your diary is private by default: a record of everything you make, with stars and notes for next time. Tap “I made this” on any post, or log something of your own.'
-                : 'Nothing in their diary yet.'}
-            </Text>
-          ) : diaryView === 'list' ? (
-            <DiaryList logs={logs} showPrivacy={isMe} />
-          ) : (
-            <DiaryCalendar logs={logs} />
-          )}
-          {isMe && logs.length ? <Text style={styles.diaryNote}>Entries with a lock are private. Everything else shows here on your profile.</Text> : null}
-        </View>
-      ) : tab === 'boards' ? (
-        <View style={styles.boardGrid}>
-          {boards.map((b) => {
-            const bp = boardPosts(b, state.posts);
-            return <BoardCard key={b.id} name={b.name} posts={bp} count={bp.length} width={cardW} onPress={() => router.push({ pathname: '/boards/[id]', params: { id: b.id } })} />;
-          })}
-        </View>
-      ) : tab === 'shop' ? (
-        <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />
-      ) : shown.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No posts yet</Text>
-          {isMe ? (
-            <>
-              <Text style={styles.emptyBody}>Share your first dish, a question, or progress toward a goal.</Text>
-              <Button label="Create a post" color={surface.text} onPress={() => router.navigate('/create')} />
-            </>
-          ) : null}
-        </View>
-      ) : (
-        // The "All" tab mixes niches, so tiles get niche borders like Discover and Saved.
-        <PostSquares posts={shown} nicheBorders={tab === 'all' && nicheTabs.length > 1} />
-      )}
+      </GestureDetector>
+      </Animated.ScrollView>
 
-        {footer}
-      </Animated.View>
+      {/* The tab row pinned at the top once you scroll past it. */}
+      {stuck ? (
+        <View style={[styles.pinned, { paddingTop: topInset, backgroundColor: surface.ground }]}>
+          {tabRow}
+        </View>
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * One tab's page in the sliding row. While you're scrolled down into the tabs,
+ * the pages beside the one you're on are shifted down to line up with it, so
+ * the one sliding in shows its top, right under the pinned tab row.
+ */
+function TabPage({ active, depth, width, minHeight, onHeight, children }: { active: boolean; depth: SharedValue<number>; width: number; minHeight: number; onHeight: (h: number) => void; children: ReactNode }) {
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: active ? 0 : depth.get() }] }));
+  return (
+    <Animated.View accessibilityElementsHidden={!active} importantForAccessibility={active ? 'auto' : 'no-hide-descendants'} onLayout={(e) => onHeight(e.nativeEvent.layout.height)} style={[{ width, minHeight }, style]}>
+      {children}
+    </Animated.View>
   );
 }
 
@@ -479,6 +594,7 @@ const makeStyles = (sf: Surface) =>
   favs: { paddingHorizontal: 20, marginTop: 20, gap: 16 },
   diary: { paddingHorizontal: 20, paddingTop: 14, gap: 8 },
   goalsLine: { fontFamily: fonts.displayItalic, fontSize: 22, lineHeight: 26, marginBottom: 4 },
+  pinned: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5 },
   diaryHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 4 },
   diaryStatsRow: { flexDirection: 'row', gap: 22 },
   viewToggle: { flexDirection: 'row', padding: 3, borderRadius: 14, backgroundColor: 'rgba(31,26,20,0.06)' },

@@ -4,7 +4,7 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Animated from 'react-native-reanimated';
+import Animated, { useSharedValue } from 'react-native-reanimated';
 
 import { ChevronLeftIcon } from '@/components/icons';
 import { usePullRefresh } from '@/components/pull-refresh';
@@ -20,7 +20,8 @@ function ProfileScreenInner() {
   const surface = useSurface();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
-  const pull = usePullRefresh(surface.text);
+  const scrollY = useSharedValue(0);
+  const pull = usePullRefresh(surface.text, scrollY);
   useTabReselect('profile', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
   const router = useRouter();
   const { state, actions } = useStore();
@@ -45,14 +46,16 @@ function ProfileScreenInner() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-    <Animated.ScrollView ref={scrollRef} onScroll={pull.onScroll} scrollEventThrottle={16} refreshControl={pull.refreshControl} style={styles.screen} contentContainerStyle={{ paddingBottom: 120 }}>
+    <View style={[{ flex: 1 }, styles.screen]}>
       <ProfileView
         user={me}
         isMe
         topInset={insets.top}
         // Picking a tab while scrolled past the tab row brings the row back to the top.
-        onTabChange={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - insets.top), animated: true })}
+        scrollRef={scrollRef}
+        scrollY={scrollY}
+        refreshControl={pull.refreshControl}
+        contentBottom={120}
         footer={
           <View style={styles.settings}>
             <Text style={styles.settingsTitle}>Archive</Text>
@@ -115,7 +118,6 @@ function ProfileScreenInner() {
           </View>
         }
       />
-    </Animated.ScrollView>
     {pull.spinner}
     </View>
   );

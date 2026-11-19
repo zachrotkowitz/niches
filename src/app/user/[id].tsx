@@ -28,14 +28,11 @@ function UserScreenInner() {
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => setRefreshing(false), 900);
   };
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  const [listTop, setListTop] = useState(0);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/discover'));
 
   return (
     <View style={styles.screen}>
-      {/* The page scrolls below this bar, so its bottom edge is the top of the visible page. */}
-      <View onLayout={(e) => setListTop(e.nativeEvent.layout.y + e.nativeEvent.layout.height)} style={[styles.nav, { paddingTop: insets.top + 4 }]}>
+      <View style={[styles.nav, { paddingTop: insets.top + 4 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} style={styles.back}>
           <ChevronLeftIcon color={surface.text} />
           <Text style={styles.backText}>Back</Text>
@@ -44,14 +41,12 @@ function UserScreenInner() {
         <View style={{ width: 80 }} />
       </View>
       {user ? (
-        <ScrollView ref={scrollRef} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-          <ProfileView
-            user={user}
-            isMe={user.id === state.me?.id}
-            pageTop={listTop}
-            onTabChange={(y) => scrollRef.current?.scrollTo({ y, animated: true })}
-          />
-        </ScrollView>
+        <ProfileView
+          user={user}
+          isMe={user.id === state.me?.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />}
+          contentBottom={insets.bottom + 40}
+        />
       ) : (
         <View style={{ padding: 20, gap: 14 }}>
           <Text style={{ fontSize: 17, color: surface.text }}>This account isn’t available.</Text>
