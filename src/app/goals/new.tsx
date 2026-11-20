@@ -128,7 +128,7 @@ export default function NewGoalSheet() {
         value={value}
         onChangeText={set}
         keyboardType={numeric ? 'decimal-pad' : 'default'}
-        maxLength={numeric ? 7 : 20}
+        maxLength={numeric ? 7 : undefined}
         selectionColor={ground.text}
         style={[styles.inline, styles.fill, { color: ground.text, textAlign: 'center' }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
       />
@@ -180,10 +180,9 @@ export default function NewGoalSheet() {
                 value={title}
                 onChangeText={setTitle}
                 multiline
-                maxLength={60}
                 autoFocus={Platform.OS !== 'web'}
                 selectionColor={ground.text}
-                style={[styles.goalInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+                style={[styles.goalInput, { color: ground.text }, Platform.OS === 'web' ? ({ outlineStyle: 'none', fieldSizing: 'content' } as object) : null]}
               />
             </View>
 
@@ -286,7 +285,7 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   nicheText: { fontSize: 14 },
   card: { padding: 16, borderRadius: 20, backgroundColor: '#FFFFFF' },
-  goalInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 33, minHeight: 66, paddingVertical: 2, textAlignVertical: 'top' },
+  goalInput: { fontFamily: fonts.display, fontSize: 28, lineHeight: 33, minHeight: 66, maxHeight: 170, paddingVertical: 2, textAlignVertical: 'top' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 52 },
   rowValue: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, flexShrink: 1 },
   steps: { flexDirection: 'row', gap: 8 },

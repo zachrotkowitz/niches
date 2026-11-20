@@ -460,7 +460,7 @@ function EditSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; o
   return (
     <Sheet visible={visible} onClose={onClose} title="Edit goal">
       <View style={{ gap: 14, paddingHorizontal: 4, paddingBottom: 8 }}>
-        <TextInput accessibilityLabel="Goal title" value={title} onChangeText={setTitle} maxLength={60} style={styles.input} selectionColor={niche.accent} />
+        <TextInput accessibilityLabel="Goal title" value={title} onChangeText={setTitle} style={styles.input} selectionColor={niche.accent} />
         {goal.kind === 'habit' ? (
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[1, 2, 3, 4, 5, 6, 7].map((n) => (
