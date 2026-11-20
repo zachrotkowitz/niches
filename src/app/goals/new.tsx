@@ -116,16 +116,23 @@ export default function NewGoalSheet() {
       </Text>
     </Pressable>
   );
-  const field = (value: string, set: (v: string) => void, label: string, width: number, numeric = true) => (
-    <TextInput
-      accessibilityLabel={label}
-      value={value}
-      onChangeText={set}
-      keyboardType={numeric ? 'decimal-pad' : 'default'}
-      maxLength={numeric ? 7 : 20}
-      selectionColor={ground.text}
-      style={[styles.inline, { color: ground.text, borderBottomColor: ground.muted, width }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
-    />
+  // Each box is as wide as what's typed in it, so the line reads like a sentence:
+  // "Reach 13 loaves" (founder, Nov 20 2026). An invisible copy of the text sets the width.
+  const field = (value: string, set: (v: string) => void, label: string, minWidth: number, numeric = true) => (
+    <View style={[styles.sizer, { borderBottomColor: ground.muted, minWidth }]}>
+      <Text style={[styles.inline, styles.ghost]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {value || ' '}
+      </Text>
+      <TextInput
+        accessibilityLabel={label}
+        value={value}
+        onChangeText={set}
+        keyboardType={numeric ? 'decimal-pad' : 'default'}
+        maxLength={numeric ? 7 : 20}
+        selectionColor={ground.text}
+        style={[styles.inline, styles.fill, { color: ground.text, textAlign: 'center' }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+      />
+    </View>
   );
 
   return (
@@ -207,8 +214,8 @@ export default function NewGoalSheet() {
                 <View style={styles.row}>
                   <View style={styles.inlineRow}>
                     <Text style={[styles.rowValue, { color: ground.text }]}>Reach</Text>
-                    {field(target, setTarget, 'Number to reach', 64)}
-                    {field(unit, setUnit, 'Of what, like loaves', 110, false)}
+                    {field(target, setTarget, 'Number to reach', 28)}
+                    {field(unit, setUnit, 'Of what, like loaves', 70, false)}
                   </View>
                   {stepButtons(() => setTarget(String(Math.max(1, (t ?? 1) - 1))), () => setTarget(String((t ?? 0) + 1)), (t ?? 1) <= 1)}
                 </View>
@@ -220,10 +227,10 @@ export default function NewGoalSheet() {
                 <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
                   <View style={styles.inlineRow}>
                     <Text style={[styles.rowValue, { color: ground.text }]}>From</Text>
-                    {field(start, setStart, 'Where you are now', 56)}
+                    {field(start, setStart, 'Where you are now', 28)}
                     <Text style={[styles.rowValue, { color: ground.text }]}>to</Text>
-                    {field(target, setTarget, 'Your goal', 56)}
-                    {field(unit, setUnit, 'Unit, like kg or min', 56, false)}
+                    {field(target, setTarget, 'Your goal', 28)}
+                    {field(unit, setUnit, 'Unit, like kg or min', 44, false)}
                   </View>
                   <View style={{ flexDirection: 'row', gap: 18 }}>
                     {(['up', 'down'] as const).map((d) => (
@@ -285,8 +292,11 @@ const styles = StyleSheet.create({
   steps: { flexDirection: 'row', gap: 8 },
   step: { width: TOUCH, height: TOUCH, borderRadius: 22, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 22, lineHeight: 24 },
-  inlineRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8, flexShrink: 1 },
-  inline: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, borderBottomWidth: 1, paddingVertical: 0 },
+  inlineRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', columnGap: 6, rowGap: 6, flexShrink: 1 },
+  inline: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, paddingVertical: 0 },
+  sizer: { borderBottomWidth: 1, paddingHorizontal: 4 },
+  ghost: { opacity: 0 },
+  fill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: 0, margin: 0 },
   linkRow: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
   linkText: { fontSize: 14 },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: StyleSheet.hairlineWidth * 2, paddingTop: 12 },
