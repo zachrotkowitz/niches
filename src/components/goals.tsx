@@ -135,7 +135,7 @@ export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsO
     if (goal.kind === 'best') return open({ checkin: '1' });
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const id = actions.checkIn(goal.id, { date: isoDay() });
-    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : `Checked in for this ${periodOf(goal)}`, { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, id) });
+    toast(goal.kind === 'total' ? `+1 ${goal.unit ?? ''}`.trim() : `Logged for ${goal.title}`, { label: 'Undo', onPress: () => actions.removeCheckIn(goal.id, id) });
   };
 
   return (
@@ -158,11 +158,24 @@ export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsO
           <Text style={styles.meta} numberOfLines={1}>{hidden ? goalRule(goal) : goalSubline(goal)}</Text>
         </View>
       </View>
-      {viewerIsOwner && !done ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`Check in: ${goal.title}`} onPress={quick} hitSlop={6} style={({ pressed }) => [styles.plus, { backgroundColor: niche.mid, transform: [{ scale: pressed ? 0.9 : 1 }] }]}>
-          <PlusIcon size={20} color={niche.ink} strokeWidth={2.4} />
-        </Pressable>
-      ) : null}
+      {/* A button that says what it does (founder picked B, Nov 20 2026): the + looked like it opened the goal. */}
+      {viewerIsOwner && !done
+        ? (() => {
+            const met = goal.kind === 'habit' && weekDone(goal).done;
+            const word = goal.kind === 'best' ? 'Log a result' : goal.kind === 'total' ? 'Add 1' : met ? 'Logged' : 'Log';
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${word === 'Logged' ? 'Log another' : word}: ${goal.title}`}
+                onPress={quick}
+                hitSlop={6}
+                style={({ pressed }) => [styles.log, met ? { backgroundColor: niche.accent, borderColor: niche.accent } : { borderColor: colors.text }, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
+                {met ? <CheckIcon size={14} color="#FFFFFF" strokeWidth={2.8} /> : <PlusIcon size={14} color={colors.text} strokeWidth={2.6} />}
+                <Text style={[styles.logText, { color: met ? '#FFFFFF' : colors.text }]}>{word}</Text>
+              </Pressable>
+            );
+          })()
+        : null}
     </Pressable>
   );
 }
@@ -176,5 +189,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.display, fontSize: 24, lineHeight: 26, color: colors.text },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   meta: { fontSize: 13, color: colors.textMuted, flexShrink: 1 },
-  plus: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  log: { minHeight: 38, paddingHorizontal: 12, borderRadius: 19, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  logText: { fontSize: 13, fontWeight: '700' },
 });
