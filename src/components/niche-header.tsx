@@ -58,9 +58,12 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
   const rule = useAnimatedStyle(() => ({ opacity: interpolate(scroll.get() / TITLE, [0.8, 1], [0, 1], 'clamp') }));
 
   // Long names ("Photography") shrink to fit on one line next to the dashes.
-  const titleSize = Math.min(76, Math.floor((Math.min(width, 640) - 110) / (niche.label.length * 0.43)));
   const hasShop = SHOP_NICHES.includes(niche.id);
   const inShop = hasShop && state.homeMode === 'shop';
+  // In the shop the big title is just "Cooking shop" (founder, Nov 20 2026).
+  const title = inShop ? `${niche.label} shop` : niche.label;
+  const titleSize = Math.min(76, Math.floor((Math.min(width, 640) - 110) / (title.length * 0.43)));
+  const cartCount = state.cart.reduce((n, c) => n + c.qty, 0);
   const now = new Date();
   const fresh = state.posts.filter((p) => p.niche === niche.id && inFeeds(state, p) && now.getTime() - p.createdAt < FRESH_WINDOW_MS).length;
   const meta = inShop ? `${niche.label} shop` : `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}${niche.open ? ` · ${fresh} new` : ''}`;
@@ -97,18 +100,46 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
     <Animated.View style={[styles.header, { paddingTop: insets.top + 6 }, bg]}>
       <View style={styles.topRow}>
         <View style={styles.left}>
-          <Animated.View style={[styles.leftLayer, eyebrow]} pointerEvents="none">
-            <Text style={[styles.meta, { color: niche.inkSoft }]} numberOfLines={1}>{meta}</Text>
-          </Animated.View>
+          {inShop ? (
+            <Animated.View style={[styles.leftLayer, eyebrow]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Back to the ${niche.label} feed`} onPress={() => actions.setHomeMode('feed')} hitSlop={8} style={styles.backToFeed}>
+                <ChevronLeftIcon size={15} color={niche.inkSoft} />
+                <Text style={[styles.meta, { color: niche.inkSoft }]} numberOfLines={1}>{niche.label} feed</Text>
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <Animated.View style={[styles.leftLayer, eyebrow]} pointerEvents="none">
+              <Text style={[styles.meta, { color: niche.inkSoft }]} numberOfLines={1}>{meta}</Text>
+            </Animated.View>
+          )}
           <Animated.View style={[styles.leftLayer, compact]}>
             {/* Also covers the date line at the top of the feed, so tapping there opens the niche list too. */}
             <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={open} style={styles.compact}>
-              <Text style={[styles.compactTitle, { color: niche.ink }]} numberOfLines={1}>{niche.label}</Text>
+              <Text style={[styles.compactTitle, { color: niche.ink }]} numberOfLines={1}>{title}</Text>
               {chevron(16)}
               <View style={{ marginLeft: 6 }}>{dashes}</View>
             </Pressable>
           </Animated.View>
         </View>
+        {inShop ? (
+          // In the shop: your own shop, your orders and the cart (founder liked these up top).
+          <View style={styles.icons}>
+            <Pressable accessibilityRole="link" onPress={() => router.push('/shop/dashboard')} style={styles.textLink}>
+              <Text style={[styles.textLinkText, { color: niche.ink }]}>Your shop</Text>
+            </Pressable>
+            <Pressable accessibilityRole="link" onPress={() => router.push('/shop/orders')} style={styles.textLink}>
+              <Text style={[styles.textLinkText, { color: niche.ink }]}>Orders</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`} onPress={() => router.push('/shop/cart')} style={styles.iconButton}>
+              <BagIcon color={niche.ink} />
+              {cartCount ? (
+                <View style={[styles.cartBadge, { backgroundColor: niche.ink }]}>
+                  <Text style={[styles.cartBadgeText, { color: niche.mid }]}>{cartCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
+        ) : (
         <View style={styles.icons}>
           {hasShop ? (
             <Pressable
@@ -136,12 +167,13 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
             <BellIcon color={niche.ink} />
           </Pressable>
         </View>
+        )}
       </View>
 
       <Animated.View style={[styles.bigRow, big]}>
         <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={open} style={styles.bigButton}>
           <Text accessibilityRole="header" style={[styles.bigTitle, { color: niche.ink, fontSize: titleSize, lineHeight: TITLE - 4 }]} numberOfLines={1}>
-            {niche.label}
+            {title}
           </Text>
           <View style={{ marginTop: 14 }}>{chevron(20)}</View>
         </Pressable>
@@ -190,6 +222,11 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
 }
 
 const styles = StyleSheet.create({
+  backToFeed: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32 },
+  textLink: { minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 6 },
+  textLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+  cartBadge: { position: 'absolute', top: 6, right: 4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center' },
+  cartBadgeText: { fontSize: 10, fontWeight: '800' },
   header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5, overflow: 'hidden' },
   topRow: { height: ROW, flexDirection: 'row', alignItems: 'center', paddingLeft: 20, paddingRight: 8 },
   left: { flex: 1, height: ROW },

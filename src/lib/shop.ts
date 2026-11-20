@@ -32,6 +32,8 @@ export type Listing = {
   imageUri?: string;
   createdAt: number;
   sold: number;
+  /** How many times others opened it (seller's dashboard only). */
+  views?: number;
 };
 
 export type CartItem = { listingId: string; qty: number };

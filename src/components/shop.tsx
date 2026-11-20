@@ -1,16 +1,17 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER } from '@/components/feed-grid';
-import { BagIcon, BookmarkIcon, DownloadIcon } from '@/components/icons';
+import { BagIcon, BookmarkIcon, DownloadIcon, SearchIcon } from '@/components/icons';
+import { useSurface } from '@/components/surface';
 import { useSwipeBlocked } from '@/components/niche-swipe';
-import { Button, DisplayText } from '@/components/primitives';
+import { DisplayText } from '@/components/primitives';
 import { CATEGORIES, formatPrice, type Listing } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
 import { listingPhoto } from '@/lib/demo-photos';
-import { colors, TOUCH, type Niche } from '@/lib/theme';
+import { colors, fonts, TOUCH, type Niche } from '@/lib/theme';
 
 const HEIGHTS = [210, 170, 240, 190, 220, 180];
 function listingHeight(l: Listing) {
@@ -117,41 +118,101 @@ export function ShopThisBar({ postId }: { postId: string }) {
   );
 }
 
-/** A niche's shop, shown on Home when the Feed/Shop switch is on Shop. */
+const WEEK = 7 * 24 * 3600 * 1000;
+
+/** Which listings a shelf (or its "See all" page) shows. Shared by Home's shop and /shop/browse. */
+export function shelfListings(listings: Listing[], following: Record<string, boolean>, section: string): { title: string; items: Listing[] } {
+  const followed = listings.filter((l) => following[l.sellerId]).sort((a, b) => b.createdAt - a.createdAt);
+  if (section === 'following') {
+    // Follow nobody yet? Show the best sellers instead, so the shelf is never empty.
+    return followed.length ? { title: 'From people you follow', items: followed } : { title: 'Best sellers', items: [...listings].sort((a, b) => b.sold - a.sold) };
+  }
+  if (section === 'new') {
+    const newest = [...listings].sort((a, b) => b.createdAt - a.createdAt);
+    const week = newest.filter((l) => Date.now() - l.createdAt < WEEK);
+    return week.length >= 2 ? { title: 'New this week', items: week } : { title: 'New lately', items: newest };
+  }
+  return { title: 'Everything', items: [...listings].sort((a, b) => b.createdAt - a.createdAt) };
+}
+
+/** One item on a shelf: photo, title, price. */
+function ShelfItem({ listing }: { listing: Listing }) {
+  const router = useRouter();
+  const swiping = useSwipeBlocked();
+  const surface = useSurface();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${listing.title}, ${formatPrice(listing.priceCents)}`}
+      onPress={() => !swiping() && router.push({ pathname: '/shop/[id]', params: { id: listing.id } })}
+      style={({ pressed }) => [styles.shelfItem, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+      <View style={[styles.shelfPhoto, { backgroundColor: listing.mediaColor }]}>
+        {listingPhoto(listing) ? <Image source={listingPhoto(listing)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+        {listing.format === 'digital' ? (
+          <View style={styles.digital}>
+            <DownloadIcon size={11} color="#FFFFFF" />
+            <Text style={styles.digitalText}>Digital</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={[styles.shelfTitle, { color: surface.text }]} numberOfLines={2}>{listing.title}</Text>
+      <Text style={[styles.shelfPrice, { color: surface.text }]}>{formatPrice(listing.priceCents)}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * A niche's shop on Home (founder, Nov 20 2026: B's shelves; "See all" opens
+ * A's Etsy-style grid): a search bar, then shelves you scroll sideways,
+ * From people you follow and New this week, and a link to every listing.
+ */
 export function NicheShop({ niche }: { niche: Niche }) {
   const router = useRouter();
   const { state } = useStore();
   const swiping = useSwipeBlocked();
-  const cartCount = state.cart.reduce((n, c) => n + c.qty, 0);
-  const listings = state.listings.filter((l) => l.niche === niche.id).sort((a, b) => b.createdAt - a.createdAt);
-  const cats = CATEGORIES[niche.id] ?? [];
+  const surface = useSurface();
+  const listings = state.listings.filter((l) => l.niche === niche.id);
+  const go = (section: string) => !swiping() && router.push({ pathname: '/shop/browse', params: { niche: niche.id, section } });
+
+  if (!listings.length)
+    return (
+      <View style={[styles.empty, { backgroundColor: niche.field }]}>
+        <DisplayText size={22} color={niche.ink}>Nothing for sale yet</DisplayText>
+        <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Be the first to list something in {niche.label}.</Text>
+      </View>
+    );
 
   return (
-    <View>
-      <View style={styles.shopBar}>
-        <Text style={styles.shopMeta}>{listings.length} {listings.length === 1 ? 'listing' : 'listings'} · {cats.slice(0, 3).join(', ').toLowerCase()}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Cart, ${cartCount} items`} onPress={() => !swiping() && router.push('/shop/cart')} style={styles.cartButton}>
-          <BagIcon size={20} color={colors.text} />
-          {cartCount ? (
-            <View style={[styles.badge, { backgroundColor: niche.accent }]}>
-              <Text style={styles.badgeText}>{cartCount}</Text>
+    <View style={{ paddingTop: 6 }}>
+      <Pressable accessibilityRole="search" accessibilityLabel={`Search the ${niche.label} shop`} onPress={() => go('search')} style={styles.searchBar}>
+        <SearchIcon size={18} color={colors.textMuted} />
+        <Text style={styles.searchText} numberOfLines={1}>Search the {niche.label} shop</Text>
+      </Pressable>
+      {(['following', 'new'] as const).map((key) => {
+        const shelf = shelfListings(listings, state.following, key);
+        if (!shelf.items.length) return null;
+        return (
+          <View key={key} style={styles.shelf}>
+            <View style={styles.shelfHead}>
+              <Text style={[styles.shelfName, { color: surface.text }]}>{shelf.title}</Text>
+              <Pressable accessibilityRole="link" accessibilityLabel={`See all: ${shelf.title}`} onPress={() => go(key)} hitSlop={8}>
+                <Text style={[styles.seeAll, { color: surface.text }]}>See all</Text>
+              </Pressable>
             </View>
-          ) : null}
-        </Pressable>
-      </View>
-      <View style={styles.actions}>
-        <Button label="Sell something" color={niche.accent} style={{ flex: 1 }} onPress={() => !swiping() && router.push({ pathname: '/shop/new', params: { niche: niche.id } })} />
-        <Button label="Your orders" tone="outline" style={{ flex: 1 }} onPress={() => !swiping() && router.push('/shop/orders')} />
-      </View>
-      {listings.length ? (
-        <ListingGrid listings={listings} />
-      ) : (
-        <View style={[styles.empty, { backgroundColor: niche.field }]}>
-          <DisplayText size={22} color={niche.ink}>Nothing for sale yet</DisplayText>
-          <Text style={[styles.emptyBody, { color: niche.inkSoft }]}>Be the first to list something in {niche.label}.</Text>
-        </View>
-      )}
-      <Text style={styles.end}>That’s every listing in {niche.label}. Food can’t be sold on Niches; recipes and cookbooks can.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
+              {shelf.items.slice(0, 8).map((l) => (
+                <ShelfItem key={l.id} listing={l} />
+              ))}
+            </ScrollView>
+          </View>
+        );
+      })}
+      <Pressable accessibilityRole="link" onPress={() => go('all')} style={styles.everything}>
+        <Text style={[styles.everythingText, { color: surface.text }]}>
+          See every listing in {niche.label} <Text style={{ color: surface.muted, textDecorationLine: 'none' }}>· {listings.length}</Text>
+        </Text>
+      </Pressable>
+      <Text style={[styles.end, { color: surface.muted }]}>Food can’t be sold on Niches; recipes and cookbooks can.</Text>
     </View>
   );
 }
@@ -180,5 +241,18 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 4 },
   empty: { margin: 20, padding: 20, borderRadius: 20, gap: 8 },
   emptyBody: { fontSize: 15, lineHeight: 21 },
-  end: { textAlign: 'center', fontSize: 13, lineHeight: 18, color: colors.textMuted, paddingHorizontal: 32, paddingVertical: 24 },
+  searchBar: { marginHorizontal: 20, minHeight: 46, borderRadius: 23, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
+  searchText: { fontSize: 15, color: colors.textMuted, flexShrink: 1 },
+  shelf: { marginTop: 22, gap: 10 },
+  shelfHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 20 },
+  shelfName: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30 },
+  seeAll: { fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  shelfRow: { gap: 12, paddingHorizontal: 20 },
+  shelfItem: { width: 150, gap: 5 },
+  shelfPhoto: { height: 172, borderRadius: 16, overflow: 'hidden' },
+  shelfTitle: { fontSize: 14, fontWeight: '600', lineHeight: 18 },
+  shelfPrice: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  everything: { marginTop: 26, marginHorizontal: 20, minHeight: TOUCH, justifyContent: 'center' },
+  everythingText: { fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
+  end: { textAlign: 'center', fontSize: 12, lineHeight: 17, paddingHorizontal: 32, paddingVertical: 18 },
 });

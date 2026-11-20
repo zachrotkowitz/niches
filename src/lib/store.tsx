@@ -101,6 +101,7 @@ type Action =
   | { type: 'setHomeMode'; mode: 'feed' | 'shop' }
   | { type: 'toggleSavedListing'; id: string }
   | { type: 'addListing'; listing: Listing }
+  | { type: 'viewListing'; id: string }
   | { type: 'deleteListing'; id: string }
   | { type: 'setCart'; cart: CartItem[] }
   | { type: 'placeOrders'; orders: Order[] }
@@ -261,6 +262,8 @@ function reducer(state: State, action: Action): State {
       else next[action.id] = true;
       return { ...state, savedListings: next };
     }
+    case 'viewListing':
+      return { ...state, listings: state.listings.map((l) => (l.id === action.id ? { ...l, views: (l.views ?? 0) + 1 } : l)) };
     case 'addListing':
       return { ...state, listings: [action.listing, ...state.listings] };
     case 'deleteListing':
@@ -523,6 +526,8 @@ function useStoreValue() {
         dispatch({ type: 'addListing', listing: { ...input, id, createdAt: Date.now(), sold: 0 } });
         return id;
       },
+      /** Counted for the seller's dashboard when someone else opens a listing. */
+      viewListing: (id: string) => dispatch({ type: 'viewListing', id }),
       deleteListing: (id: string) => dispatch({ type: 'deleteListing', id }),
       setCart: (cart: CartItem[]) => dispatch({ type: 'setCart', cart }),
       /** Demo checkout: one order per seller, nothing is charged. */
