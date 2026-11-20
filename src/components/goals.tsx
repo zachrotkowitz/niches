@@ -107,7 +107,8 @@ export function goalSubline(goal: Goal) {
     const s = streak(goal);
     const w = weekDone(goal);
     const per = periodOf(goal);
-    if (w.done) return `Done this ${per}${w.extra ? ` · ${w.extra} extra` : ''}${s > 1 ? ` · ${s}-${per} streak` : ''}`;
+    // Past the goal it says so in words, no math (founder picked option 4, Nov 20 2026).
+    if (w.done) return `${w.extra ? `Beat it this ${per}` : `Done this ${per}`}${s > 1 ? ` · ${s}-${per} streak` : ''}`;
     return `${p.headline === 'Rest week' ? 'Rest week' : `${p.headline} this ${per}`}${s > 1 ? ` · ${s}-${per} streak` : ''}`;
   }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();

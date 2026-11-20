@@ -329,7 +329,7 @@ function summaryLine(goal: Goal, streakNow = 0) {
   const p = progress(goal);
   if (goal.kind === 'habit') {
     const w = weekDone(goal);
-    if (w.done) return `Done this ${periodOf(goal)}${w.extra ? ` · ${w.extra} extra` : ''}`;
+    if (w.done) return w.extra ? `You beat your goal this ${periodOf(goal)}` : `Done this ${periodOf(goal)}`;
     return p.headline === 'Rest week' ? 'Your streak is safe' : streakNow > 0 ? `${p.headline} this ${periodOf(goal)}` : `${p.headline} so far`;
   }
   if (goal.kind === 'total') return `${p.headline.replace(' / ', ' of ')} ${goal.unit ?? ''}`.trim();
