@@ -34,6 +34,8 @@ export type Listing = {
   sold: number;
   /** How many times others opened it (seller's dashboard only). */
   views?: number;
+  /** Sellers can switch reviews off for a listing (founder, Nov 20 2026). On by default. */
+  reviewsOff?: boolean;
 };
 
 export type CartItem = { listingId: string; qty: number };
@@ -100,5 +102,48 @@ export function seedListings(now: number): Listing[] {
     { id: 'l_golden_print', sellerId: 'u_nadia', niche: 'photography', title: 'Golden Hour, 35mm (11×14)', category: 'Print', format: 'physical', priceCents: 4500, shippingCents: 600, linkedPostId: 'p_photo_golden', mediaColor: '#D98A3D', mediaLabel: 'Golden hour print', description: 'Printed from the scanned negative on lustre paper. Signed and numbered.', createdAt: now - 4 * H, sold: 19 },
     { id: 'l_portra_presets', sellerId: 'u_nadia', niche: 'photography', title: 'Warm Film Presets', category: 'Presets', format: 'digital', priceCents: 1500, mediaColor: '#E0A86B', mediaLabel: 'Warm film presets', description: 'Six Lightroom presets for a warm, film-like look. Works on phone and desktop.', createdAt: now - 8 * D, sold: 112 },
     { id: 'l_rain_print', sellerId: 'u_omar', niche: 'photography', title: 'Rain, Night (print)', category: 'Print', format: 'physical', priceCents: 4000, shippingCents: 600, linkedPostId: 'p_photo_night', mediaColor: '#1F2A44', mediaLabel: 'Rainy street at night print', description: 'A 12×18 print of the rainy-night street, on metallic paper so the lights glow.', createdAt: now - 12 * H, sold: 6 },
+  ];
+}
+
+// ——— Reviews (founder, Nov 20 2026) ———
+
+/** Only people who bought a listing can review it; one review each, which they can change. The seller can reply once. */
+export type Review = {
+  id: string;
+  listingId: string;
+  authorId: string;
+  /** 1–5 stars. */
+  rating: number;
+  text?: string;
+  createdAt: number;
+  reply?: { text: string; at: number };
+};
+
+export function averageRating(reviews: Pick<Review, 'rating'>[]): number {
+  if (!reviews.length) return 0;
+  return Math.round((reviews.reduce((n, r) => n + r.rating, 0) / reviews.length) * 10) / 10;
+}
+
+export function seedReviews(now: number): Review[] {
+  const D = 24 * 3600 * 1000;
+  const r = (id: string, listingId: string, authorId: string, rating: number, text: string, daysAgo: number, reply?: string): Review => ({
+    id,
+    listingId,
+    authorId,
+    rating,
+    text,
+    createdAt: now - daysAgo * D,
+    reply: reply ? { text: reply, at: now - (daysAgo - 0.5) * D } : undefined,
+  });
+  return [
+    r('r1', 'l_pasta_notes', 'u_lu', 5, 'The dough ratio page alone was worth it. My pappardelle finally holds together.', 2, 'So glad! Send me a photo of the pappardelle.'),
+    r('r2', 'l_pasta_notes', 'u_sam', 4, 'Clear and fun to read. Wish it had a gluten-free chapter.', 7),
+    r('r3', 'l_pasta_notes', 'u_dev', 5, 'Bought it for the shapes section. Orecchiette on the first try.', 12),
+    r('r4', 'l_weeknight_loaves', 'u_maya', 5, 'The starter schedule fits a work week, which nothing else I tried did.', 4),
+    r('r5', 'l_weeknight_loaves', 'u_priya', 4, 'Lovely little book. Shipping took a week.', 10, 'Thanks Priya! I print these by hand, so it can take a few days.'),
+    r('r6', 'l_chili_crisp', 'u_maya', 5, 'The smoky chipotle one is on everything now.', 3),
+    r('r7', 'l_golden_print', 'u_omar', 5, 'Even better in person. The colors glow.', 6),
+    r('r8', 'l_portra_presets', 'u_kenji', 4, 'Great on daylight shots, a bit orange indoors.', 9),
+    r('r9', 'l_harbor_print', 'u_kenji', 5, 'Packed beautifully and signed on the back like promised.', 1),
   ];
 }

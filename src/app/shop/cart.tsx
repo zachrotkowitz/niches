@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CheckIcon, ChevronLeftIcon, LockIcon } from '@/components/icons';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
+import { CheckoutSheet } from '@/components/checkout-sheet';
 import { FEE_RATE, formatPrice, type Listing, type Order } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
 import { listingPhoto } from '@/lib/demo-photos';
@@ -24,6 +25,7 @@ export default function CartScreen() {
   const [name, setName] = useState(state.me?.displayName ?? '');
   const [address, setAddress] = useState('');
   const [placed, setPlaced] = useState<Order[]>([]);
+  const [paying, setPaying] = useState(false);
   const accent = niches[state.niche].accent;
 
   const lines = state.cart
@@ -168,12 +170,23 @@ export default function CartScreen() {
       {lines.length ? (
         <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           {step === 'cart' ? (
-            <Button label={`Checkout · ${formatPrice(subtotal + shipping)}`} color={accent} onPress={() => setStep('checkout')} />
+            <Button label={`Checkout · ${formatPrice(subtotal + shipping)}`} color={accent} onPress={() => setPaying(true)} />
           ) : (
             <Button label={`Place order · ${formatPrice(subtotal + shipping)}`} color={accent} disabled={!canPay} onPress={pay} />
           )}
         </View>
       ) : null}
+      {/* The same one-sheet checkout as "Buy now" (founder, Nov 20 2026). */}
+      <CheckoutSheet
+        visible={paying}
+        items={state.cart}
+        onClose={() => setPaying(false)}
+        onPlaced={(orders) => {
+          setPaying(false);
+          if (orders.length === 1) router.replace({ pathname: '/shop/order/[id]', params: { id: orders[0].id, fresh: '1' } });
+          else router.replace('/shop/orders');
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

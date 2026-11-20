@@ -9,7 +9,7 @@ import { MAX_FAVORITES, seedFavorites, seedLogs, type FavoriteRef, type LogEntry
 import { seedGoals, type CheckIn, type Goal } from './goals';
 import { sampleFavorites, sampleYear } from './recap';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
-import { feeFor, seedListings, type CartItem, type Listing, type Order, type OrderStatus } from './shop';
+import { feeFor, seedListings, seedReviews, type CartItem, type Listing, type Order, type OrderStatus, type Review } from './shop';
 import { sampleBoards, seedBoards, type Board } from './boards';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { appGround, DEFAULT_APP_GROUND, NICHE_ORDER, resolveNiches, type NicheId } from './theme';
@@ -59,6 +59,7 @@ type State = {
   savedListings: Record<string, true>;
   cart: CartItem[];
   orders: Order[];
+  reviews: Review[];
   /** Creators you're a member of, with the time you joined. */
   memberships: Record<string, number>;
   /** Members-only posts you unlocked one at a time. */
@@ -102,6 +103,10 @@ type Action =
   | { type: 'toggleSavedListing'; id: string }
   | { type: 'addListing'; listing: Listing }
   | { type: 'viewListing'; id: string }
+  | { type: 'dropFromCart'; ids: string[] }
+  | { type: 'upsertReview'; review: Review }
+  | { type: 'replyReview'; id: string; text: string }
+  | { type: 'setListingReviews'; id: string; off: boolean }
   | { type: 'deleteListing'; id: string }
   | { type: 'setCart'; cart: CartItem[] }
   | { type: 'placeOrders'; orders: Order[] }
@@ -160,6 +165,7 @@ function freshState(): Persisted {
     savedListings: {},
     cart: [],
     orders: [],
+    reviews: seedReviews(now),
     memberships: {},
     unlocks: {},
     creatorApplication: null,
@@ -262,6 +268,14 @@ function reducer(state: State, action: Action): State {
       else next[action.id] = true;
       return { ...state, savedListings: next };
     }
+    case 'upsertReview':
+      return { ...state, reviews: [action.review, ...state.reviews.filter((r) => !(r.listingId === action.review.listingId && r.authorId === action.review.authorId))] };
+    case 'replyReview':
+      return { ...state, reviews: state.reviews.map((r) => (r.id === action.id && !r.reply ? { ...r, reply: { text: action.text, at: Date.now() } } : r)) };
+    case 'setListingReviews':
+      return { ...state, listings: state.listings.map((l) => (l.id === action.id ? { ...l, reviewsOff: action.off } : l)) };
+    case 'dropFromCart':
+      return { ...state, cart: state.cart.filter((c) => !action.ids.includes(c.listingId)) };
     case 'viewListing':
       return { ...state, listings: state.listings.map((l) => (l.id === action.id ? { ...l, views: (l.views ?? 0) + 1 } : l)) };
     case 'addListing':
@@ -528,6 +542,12 @@ function useStoreValue() {
       },
       /** Counted for the seller's dashboard when someone else opens a listing. */
       viewListing: (id: string) => dispatch({ type: 'viewListing', id }),
+      /** A buyer's review; writing again replaces their earlier one. */
+      reviewListing: (listingId: string, authorId: string, rating: number, text?: string) =>
+        dispatch({ type: 'upsertReview', review: { id: makeId('r'), listingId, authorId, rating, text: text?.trim() || undefined, createdAt: Date.now() } }),
+      /** The seller's one reply to a review. */
+      replyToReview: (id: string, text: string) => dispatch({ type: 'replyReview', id, text }),
+      setListingReviews: (id: string, off: boolean) => dispatch({ type: 'setListingReviews', id, off }),
       deleteListing: (id: string) => dispatch({ type: 'deleteListing', id }),
       setCart: (cart: CartItem[]) => dispatch({ type: 'setCart', cart }),
       /** Demo checkout: one order per seller, nothing is charged. */
@@ -559,7 +579,8 @@ function useStoreValue() {
           status: o.lines.every((l) => l.format === 'digital') ? ('ready' as const) : ('paid' as const),
         }));
         dispatch({ type: 'placeOrders', orders });
-        dispatch({ type: 'setCart', cart: [] });
+        // Only what was bought leaves the cart, so "Buy now" on one item keeps the rest.
+        dispatch({ type: 'dropFromCart', ids: cart.map((x) => x.listingId) });
         return orders;
       },
       /** Demo only: pretend a demo account bought one of your listings. */
