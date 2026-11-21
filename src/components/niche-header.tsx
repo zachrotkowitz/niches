@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Easing, FadeInUp, FadeOut, ReduceMotion, interpolate, interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOut, ReduceMotion, interpolate, interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BagIcon, BellIcon, CalendarIcon, CheckIcon, ChevronLeftIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
@@ -123,7 +123,7 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
         </View>
         {inShop ? (
           // In the shop: your own shop, your orders and the cart (founder liked these up top).
-          <View style={styles.icons}>
+          <Animated.View key="shop" entering={FadeIn.duration(220)} style={styles.icons}>
             <Pressable accessibilityRole="link" onPress={() => router.push('/shop/dashboard')} style={styles.textLink}>
               <Text style={[styles.textLinkText, { color: niche.ink }]}>Your shop</Text>
             </Pressable>
@@ -138,9 +138,9 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
                 </View>
               ) : null}
             </Pressable>
-          </View>
+          </Animated.View>
         ) : (
-        <View style={styles.icons}>
+        <Animated.View key="feed" entering={FadeIn.duration(220)} style={styles.icons}>
           {hasShop ? (
             <Pressable
               accessibilityRole="button"
@@ -166,15 +166,16 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
           <Pressable accessibilityRole="button" accessibilityLabel="Notification digest" style={styles.iconButton}>
             <BellIcon color={niche.ink} />
           </Pressable>
-        </View>
+        </Animated.View>
         )}
       </View>
 
       <Animated.View style={[styles.bigRow, big]}>
         <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={open} style={styles.bigButton}>
-          <Text accessibilityRole="header" style={[styles.bigTitle, { color: niche.ink, fontSize: titleSize, lineHeight: TITLE - 4 }]} numberOfLines={1}>
+          {/* The title fades to its new words when you open or leave the shop. */}
+          <Animated.Text key={title} entering={FadeIn.duration(220)} accessibilityRole="header" style={[styles.bigTitle, { color: niche.ink, fontSize: titleSize, lineHeight: TITLE - 4, fontFamily: fonts.displayItalic }]} numberOfLines={1}>
             {title}
-          </Text>
+          </Animated.Text>
           <View style={{ marginTop: 14 }}>{chevron(20)}</View>
         </Pressable>
         <View style={{ paddingBottom: 22 }}>{dashes}</View>

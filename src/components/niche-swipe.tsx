@@ -5,7 +5,6 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { SHOP_NICHES } from '@/lib/shop';
 import { useStore } from '@/lib/store';
 import { NICHE_ORDER, type NicheId } from '@/lib/theme';
 
@@ -49,19 +48,8 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
   const [width, setWidth] = useState(window.width);
   const index = NICHE_ORDER.indexOf(state.niche);
   const last = NICHE_ORDER.length - 1;
-  // In a niche's shop, swiping right goes back to that niche's feed; swiping
-  // left still turns to the next niche (founder, Nov 21 2026).
-  const inShop = state.homeMode === 'shop' && SHOP_NICHES.includes(state.niche);
-  const shopMode = useSharedValue(inShop);
-  useEffect(() => {
-    shopMode.set(inShop);
-  }, [inShop, shopMode]);
   const exempt = useSharedValue(false);
   const ignoring = useSharedValue(false);
-  const exitShop = () => {
-    actions.setHomeMode('feed');
-    if (Platform.OS !== 'web') void Haptics.selectionAsync();
-  };
 
   const start = useSharedValue(0);
   const target = useSharedValue(index);
@@ -108,11 +96,6 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
     onUpdate: (e) => {
       'worklet';
       if (ignoring.get()) return;
-      if (shopMode.get() && e.translationX > 0) {
-        // Swiping right in a shop: a little give under the finger, then let go to leave the shop.
-        position.set(start.get() + e.translationX * 0.25);
-        return;
-      }
       const w = pageWidth.get();
       const min = -last * w;
       let x = start.get() + e.translationX;
@@ -126,11 +109,6 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
       if (ignoring.get()) return;
       const w = pageWidth.get();
       const from = target.get();
-      if (shopMode.get() && e.translationX > 0) {
-        position.set(withSpring(-from * w, SNAP));
-        if (!e.canceled && (e.translationX > w * 0.18 || e.velocityX > 450)) scheduleOnRN(exitShop);
-        return;
-      }
       const travelled = -(position.get() - -from * w) / w; // pages moved, + is forward
       let to = from;
       if (!e.canceled && (Math.abs(travelled) > 0.33 || Math.abs(e.velocityX) > 500)) {

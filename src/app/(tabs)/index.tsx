@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
-import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, interpolate, ReduceMotion, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
 import { FeedGrid } from '@/components/feed-grid';
 import { FeedPost } from '@/components/feed-post';
@@ -44,27 +44,45 @@ export default function HomeScreen() {
           return (
             <SurfaceProvider value={floodSurface(niche)}>
               <View style={{ flex: 1, backgroundColor: niche.mid }}>
-                {/* Feed and shop both stay mounted and just swap, like switching tabs: no reload, no flash (founder, Nov 21 2026). */}
-                {niche.open ? (
-                  <View style={{ flex: 1, display: hasShop && state.homeMode === 'shop' ? 'none' : 'flex' }}>
-                    <OpenFeed niche={niche} scroll={scroll} active={!(hasShop && state.homeMode === 'shop')} />
-                  </View>
+                {hasShop ? (
+                  <FeedOrShop niche={niche} scroll={scroll} inShop={state.homeMode === 'shop'} />
+                ) : niche.open ? (
+                  <OpenFeed niche={niche} scroll={scroll} />
                 ) : (
                   <ComingSoon niche={niche} scroll={scroll} />
                 )}
-                {hasShop ? (
-                  <View style={{ flex: 1, display: state.homeMode === 'shop' ? 'flex' : 'none' }}>
-                    <PageScroll scroll={scroll} nicheId={id} active={state.homeMode === 'shop'}>
-                      <NicheShop niche={niche} />
-                    </PageScroll>
-                  </View>
-                ) : null}
               </View>
             </SurfaceProvider>
           );
         }}
       />
       <NicheHeader position={position} scrolls={scrolls} />
+    </View>
+  );
+}
+
+/**
+ * A niche's feed and its shop, both kept alive so switching never reloads
+ * anything; they cross-fade over about a fifth of a second (founder, Nov 21 2026:
+ * the instant swap read as a flash).
+ */
+function FeedOrShop({ niche, scroll, inShop }: { niche: Niche; scroll: SharedValue<number>; inShop: boolean }) {
+  const shown = useSharedValue(inShop ? 1 : 0);
+  useEffect(() => {
+    shown.set(withTiming(inShop ? 1 : 0, { duration: 220, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.System }));
+  }, [inShop, shown]);
+  const feedStyle = useAnimatedStyle(() => ({ opacity: 1 - shown.get() }));
+  const shopStyle = useAnimatedStyle(() => ({ opacity: shown.get() }));
+  return (
+    <View style={{ flex: 1 }}>
+      <Animated.View pointerEvents={inShop ? 'none' : 'auto'} accessibilityElementsHidden={inShop} importantForAccessibility={inShop ? 'no-hide-descendants' : 'auto'} style={[StyleSheet.absoluteFill, feedStyle]}>
+        <OpenFeed niche={niche} scroll={scroll} active={!inShop} />
+      </Animated.View>
+      <Animated.View pointerEvents={inShop ? 'auto' : 'none'} accessibilityElementsHidden={!inShop} importantForAccessibility={inShop ? 'auto' : 'no-hide-descendants'} style={[StyleSheet.absoluteFill, shopStyle]}>
+        <PageScroll scroll={scroll} nicheId={niche.id} active={inShop}>
+          <NicheShop niche={niche} />
+        </PageScroll>
+      </Animated.View>
     </View>
   );
 }
