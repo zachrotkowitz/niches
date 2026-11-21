@@ -163,7 +163,8 @@ function ShelfItem({ listing }: { listing: Listing }) {
 /**
  * A niche's shop on Home (founder, Nov 20 2026: B's shelves; "See all" opens
  * A's Etsy-style grid): a search bar, then shelves you scroll sideways,
- * From people you follow and New this week, and a link to every listing.
+ * Best sellers, New this week, From people you follow, then every listing
+ * in a two-across grid that ends.
  */
 export function NicheShop({ niche }: { niche: Niche }) {
   const router = useRouter();
@@ -209,11 +210,13 @@ export function NicheShop({ niche }: { niche: Niche }) {
           </View>
         );
       })}
-      <Pressable accessibilityRole="link" onPress={() => go('all')} style={styles.everything}>
-        <Text style={[styles.everythingText, { color: surface.text }]}>
-          See every listing in {niche.label} <Text style={{ color: surface.muted, textDecorationLine: 'none' }}>· {listings.length}</Text>
+      {/* Everything, newest first, as A's two-across grid that simply ends (founder, Nov 21 2026; replaces the "See every listing" link). */}
+      <View style={styles.everything}>
+        <Text accessibilityRole="header" style={[styles.shelfName, { color: surface.text }]}>
+          Everything in <Text style={{ fontFamily: fonts.displayItalic }}>{niche.label}</Text>
         </Text>
-      </Pressable>
+      </View>
+      <ListingGrid listings={shelfListings(listings, state.following, 'all').items} />
       <Text style={[styles.end, { color: surface.muted }]}>Food can’t be sold on Niches; recipes and cookbooks can.</Text>
     </View>
   );
@@ -254,7 +257,6 @@ const styles = StyleSheet.create({
   shelfPhoto: { height: 172, borderRadius: 16, overflow: 'hidden' },
   shelfTitle: { fontSize: 14, fontWeight: '600', lineHeight: 18 },
   shelfPrice: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  everything: { marginTop: 26, marginHorizontal: 20, minHeight: TOUCH, justifyContent: 'center' },
-  everythingText: { fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
+  everything: { marginTop: 30, paddingHorizontal: 20 },
   end: { textAlign: 'center', fontSize: 12, lineHeight: 17, paddingHorizontal: 32, paddingVertical: 18 },
 });
