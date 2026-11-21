@@ -66,11 +66,14 @@ export default function HomeScreen() {
 /** A niche page's scroll view: starts below the header, ends clear of the floating tab bar, and reports its offset. */
 function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>; nicheId: NicheId; children: ReactNode }) {
   const top = useHeaderHeight();
-  const { state } = useStore();
+  const { state, actions } = useStore();
   const ref = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   // Tap Home while on Home: the niche you're looking at glides back to the top.
   useTabReselect('index', () => {
-    if (state.niche === nicheId) ref.current?.scrollTo({ y: 0, animated: true });
+    if (state.niche !== nicheId) return;
+    // In the shop, tapping Home goes back to the feed (founder, Nov 21 2026).
+    if (state.homeMode === 'shop' && SHOP_NICHES.includes(nicheId)) actions.setHomeMode('feed');
+    else ref.current?.scrollTo({ y: 0, animated: true });
   });
   const onScroll = useAnimatedScrollHandler((e) => {
     scroll.set(e.contentOffset.y);

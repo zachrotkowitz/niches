@@ -6,7 +6,7 @@ import { Text } from '@/components/text';
 import { NICHE_BORDER } from '@/components/feed-grid';
 import { BagIcon, BookmarkIcon, DownloadIcon, SearchIcon } from '@/components/icons';
 import { useSurface } from '@/components/surface';
-import { useSwipeBlocked } from '@/components/niche-swipe';
+import { useSwipeBlocked, useSwipeExempt } from '@/components/niche-swipe';
 import { DisplayText } from '@/components/primitives';
 import { CATEGORIES, formatPrice, type Listing } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
@@ -173,6 +173,8 @@ export function NicheShop({ niche }: { niche: Niche }) {
   const surface = useSurface();
   const listings = state.listings.filter((l) => l.niche === niche.id);
   const go = (section: string) => !swiping() && router.push({ pathname: '/shop/browse', params: { niche: niche.id, section } });
+  // Swiping a shelf scrolls it; swiping anywhere else goes back to the feed.
+  const exempt = useSwipeExempt();
 
   if (!listings.length)
     return (
@@ -199,7 +201,7 @@ export function NicheShop({ niche }: { niche: Niche }) {
                 <Text style={[styles.seeAll, { color: surface.text }]}>See all</Text>
               </Pressable>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow} {...exempt}>
               {shelf.items.slice(0, 8).map((l) => (
                 <ShelfItem key={l.id} listing={l} />
               ))}

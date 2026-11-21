@@ -5,6 +5,7 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { SHOP_NICHES } from '@/lib/shop';
 import { useStore } from '@/lib/store';
 import { NICHE_ORDER, type NicheId } from '@/lib/theme';
 
@@ -15,6 +16,20 @@ const SwipeGuard = createContext<{ current: boolean }>({ current: false });
 export function useSwipeBlocked() {
   const guard = useContext(SwipeGuard);
   return () => guard.current;
+}
+
+/**
+ * Rows that scroll sideways on their own (the shop's shelves) mark touches that
+ * start on them, so the page swipe leaves those alone.
+ */
+const SwipeExempt = createContext<SharedValue<boolean> | null>(null);
+export function useSwipeExempt() {
+  const exempt = useContext(SwipeExempt);
+  return {
+    onTouchStart: () => exempt?.set(true),
+    onTouchEnd: () => exempt?.set(false),
+    onTouchCancel: () => exempt?.set(false),
+  };
 }
 
 const SNAP = { duration: 380, dampingRatio: 1, reduceMotion: ReduceMotion.System } as const;
@@ -34,6 +49,19 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
   const [width, setWidth] = useState(window.width);
   const index = NICHE_ORDER.indexOf(state.niche);
   const last = NICHE_ORDER.length - 1;
+  // In a niche's shop, a sideways swipe goes back to that niche's feed instead
+  // of turning to the next niche (founder, Nov 21 2026). Niches switch from the title there.
+  const inShop = state.homeMode === 'shop' && SHOP_NICHES.includes(state.niche);
+  const shopMode = useSharedValue(inShop);
+  useEffect(() => {
+    shopMode.set(inShop);
+  }, [inShop, shopMode]);
+  const exempt = useSharedValue(false);
+  const ignoring = useSharedValue(false);
+  const exitShop = () => {
+    actions.setHomeMode('feed');
+    if (Platform.OS !== 'web') void Haptics.selectionAsync();
+  };
 
   const start = useSharedValue(0);
   const target = useSharedValue(index);
@@ -73,11 +101,18 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
     failOffsetY: [-12, 12],
     onActivate: () => {
       'worklet';
+      ignoring.set(exempt.get());
       start.set(position.get());
-      scheduleOnRN(startDrag);
+      if (!ignoring.get()) scheduleOnRN(startDrag);
     },
     onUpdate: (e) => {
       'worklet';
+      if (ignoring.get()) return;
+      if (shopMode.get()) {
+        // A little give under the finger, then let go to leave the shop.
+        position.set(start.get() + e.translationX * 0.25);
+        return;
+      }
       const w = pageWidth.get();
       const min = -last * w;
       let x = start.get() + e.translationX;
@@ -88,8 +123,14 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
     },
     onDeactivate: (e) => {
       'worklet';
+      if (ignoring.get()) return;
       const w = pageWidth.get();
       const from = target.get();
+      if (shopMode.get()) {
+        position.set(withSpring(-from * w, SNAP));
+        if (!e.canceled && (Math.abs(e.translationX) > w * 0.18 || Math.abs(e.velocityX) > 450)) scheduleOnRN(exitShop);
+        return;
+      }
       const travelled = -(position.get() - -from * w) / w; // pages moved, + is forward
       let to = from;
       if (!e.canceled && (Math.abs(travelled) > 0.33 || Math.abs(e.velocityX) > 500)) {
@@ -111,6 +152,7 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
   return (
     <View style={{ flex: 1, overflow: 'hidden' }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       <SwipeGuard.Provider value={guard}>
+      <SwipeExempt.Provider value={exempt}>
       <GestureDetector gesture={pan}>
         <Animated.View style={[{ flex: 1, flexDirection: 'row', width: width * NICHE_ORDER.length }, rowStyle]}>
           {NICHE_ORDER.map((id) => (
@@ -120,6 +162,7 @@ export function NichePager({ position, renderPage }: { position: SharedValue<num
           ))}
         </Animated.View>
       </GestureDetector>
+      </SwipeExempt.Provider>
       </SwipeGuard.Provider>
     </View>
   );
