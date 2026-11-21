@@ -218,6 +218,9 @@ export function NicheShop({ niche }: { niche: Niche }) {
   );
 }
 
+/** Room under the heading for the open menu (its height plus space above the tab bar). */
+const MENU_ROOM = 420;
+
 type Sort = 'new' | 'top' | 'priceUp' | 'priceDown';
 type Show = 'all' | 'digital' | 'physical';
 const SORTS: { key: Exclude<Sort, 'new'>; label: string; short: string }[] = [
@@ -260,7 +263,7 @@ function EverythingGrid({ niche, listings, reviews }: { niche: Niche; listings: 
   const [show, setShow] = useState<Show>('all');
   const [open, setOpen] = useState(false);
   const items = sortListings(listings, reviews, sort, show);
-  const picked = [SORTS.find((x) => x.key === sort)?.short, SHOWS.find((x) => x.key === show)?.short].filter(Boolean).join(' · ');
+  const picked = [SORTS.find((x) => x.key === sort)?.short, SHOWS.find((x) => x.key === show)?.short].filter(Boolean).join(', ');
   const clear = () => (setSort('new'), setShow('all'));
   const row = (label: string, on: boolean, onPress: () => void) => (
     <Pressable key={label} accessibilityRole="menuitem" accessibilityState={{ selected: on }} onPress={() => (onPress(), setOpen(false))} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}>
@@ -281,19 +284,17 @@ function EverythingGrid({ niche, listings, reviews }: { niche: Niche; listings: 
           </View>
         </Pressable>
       </View>
-      {picked ? (
+      {picked && !open ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Clear sort and filter" onPress={clear} hitSlop={8} style={styles.clear}>
           <Text style={[styles.clearText, { color: surface.muted }]}>Clear</Text>
         </Pressable>
       ) : null}
-      <View style={{ marginHorizontal: -20 }}>
+      {/* Always tall enough for the menu, so it can be scrolled to even when nothing matches (founder, Nov 21 2026). */}
+      <View style={{ marginHorizontal: -20, minHeight: open || !items.length ? MENU_ROOM : undefined }}>
         {items.length ? (
           <ListingGrid listings={items} />
         ) : (
-          <Text style={[styles.none, { color: surface.muted }]}>
-            {sort === 'top' ? 'Nothing here has 4 stars or more yet.' : 'Nothing like that here yet.'}{' '}
-            <Text onPress={clear} style={{ color: surface.text, fontWeight: '700', textDecorationLine: 'underline' }}>Clear</Text>
-          </Text>
+          <Text style={[styles.none, { color: surface.muted }]}>No results available</Text>
         )}
       </View>
       {open ? (
