@@ -123,10 +123,9 @@ const WEEK = 7 * 24 * 3600 * 1000;
 /** Which listings a shelf (or its "See all" page) shows. Shared by Home's shop and /shop/browse. */
 export function shelfListings(listings: Listing[], following: Record<string, boolean>, section: string): { title: string; items: Listing[] } {
   const followed = listings.filter((l) => following[l.sellerId]).sort((a, b) => b.createdAt - a.createdAt);
-  if (section === 'following') {
-    // Follow nobody yet? Show the best sellers instead, so the shelf is never empty.
-    return followed.length ? { title: 'From people you follow', items: followed } : { title: 'Best sellers', items: [...listings].sort((a, b) => b.sold - a.sold) };
-  }
+  if (section === 'best') return { title: 'Best sellers', items: [...listings].sort((a, b) => b.sold - a.sold) };
+  // Only shown when you follow someone who sells in this niche.
+  if (section === 'following') return { title: 'From people you follow', items: followed };
   if (section === 'new') {
     const newest = [...listings].sort((a, b) => b.createdAt - a.createdAt);
     const week = newest.filter((l) => Date.now() - l.createdAt < WEEK);
@@ -190,7 +189,8 @@ export function NicheShop({ niche }: { niche: Niche }) {
         <SearchIcon size={18} color={colors.textMuted} />
         <Text style={styles.searchText} numberOfLines={1}>Search the {niche.label} shop</Text>
       </Pressable>
-      {(['following', 'new'] as const).map((key) => {
+      {/* Same order in every niche's shop (founder, Nov 21 2026): best sellers, what's new, then people you follow. */}
+      {(['best', 'new', 'following'] as const).map((key) => {
         const shelf = shelfListings(listings, state.following, key);
         if (!shelf.items.length) return null;
         return (
