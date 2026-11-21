@@ -1,14 +1,15 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER } from '@/components/feed-grid';
-import { BagIcon, BookmarkIcon, DownloadIcon, SearchIcon } from '@/components/icons';
+import { BagIcon, BookmarkIcon, CheckIcon, ChevronLeftIcon, DownloadIcon, SearchIcon } from '@/components/icons';
 import { useSurface } from '@/components/surface';
 import { useSwipeBlocked, useSwipeExempt } from '@/components/niche-swipe';
 import { DisplayText } from '@/components/primitives';
-import { CATEGORIES, formatPrice, type Listing } from '@/lib/shop';
+import { averageRating, CATEGORIES, formatPrice, type Listing, type Review } from '@/lib/shop';
 import { useNiches, useStore } from '@/lib/store';
 import { listingPhoto } from '@/lib/demo-photos';
 import { colors, fonts, TOUCH, type Niche } from '@/lib/theme';
@@ -211,13 +212,103 @@ export function NicheShop({ niche }: { niche: Niche }) {
         );
       })}
       {/* Everything, newest first, as A's two-across grid that simply ends (founder, Nov 21 2026; replaces the "See every listing" link). */}
-      <View style={styles.everything}>
-        <Text accessibilityRole="header" style={[styles.shelfName, { color: surface.text }]}>
+      <EverythingGrid niche={niche} listings={listings} reviews={state.reviews} />
+      <Text style={[styles.end, { color: surface.muted }]}>Food can’t be sold on Niches; recipes and cookbooks can.</Text>
+    </View>
+  );
+}
+
+type Sort = 'new' | 'top' | 'priceUp' | 'priceDown';
+type Show = 'all' | 'digital' | 'physical';
+const SORTS: { key: Exclude<Sort, 'new'>; label: string; short: string }[] = [
+  { key: 'top', label: 'Top rated', short: 'Top rated' },
+  { key: 'priceUp', label: 'Price: low to high', short: 'Price ↑' },
+  { key: 'priceDown', label: 'Price: high to low', short: 'Price ↓' },
+];
+const SHOWS: { key: Show; label: string; short: string }[] = [
+  { key: 'all', label: 'Everything', short: '' },
+  { key: 'digital', label: 'Digital downloads', short: 'Digital' },
+  { key: 'physical', label: 'Ships to you', short: 'Ships' },
+];
+
+/** Sort and filter for the Everything grid, then the grid. */
+export function sortListings(listings: Listing[], reviews: Review[], sort: Sort, show: Show): Listing[] {
+  let out = listings.filter((l) => show === 'all' || (show === 'digital' ? l.format === 'digital' : l.format === 'physical'));
+  if (sort === 'top') {
+    // Top rated = 4 stars and up (founder, Nov 21 2026), best first; reviews switched off don't count.
+    const rated = out
+      .map((l) => ({ l, r: l.reviewsOff ? 0 : averageRating(reviews.filter((x) => x.listingId === l.id)) }))
+      .filter((x) => x.r >= 4);
+    return rated.sort((a, b) => b.r - a.r || b.l.createdAt - a.l.createdAt).map((x) => x.l);
+  }
+  out = [...out].sort((a, b) => b.createdAt - a.createdAt);
+  if (sort === 'priceUp') out.sort((a, b) => a.priceCents - b.priceCents);
+  if (sort === 'priceDown') out.sort((a, b) => b.priceCents - a.priceCents);
+  return out;
+}
+
+/**
+ * "Everything in Cooking" with one quiet word at the right, "Sort ▾" (founder
+ * picked option A, Nov 21 2026; canvas page "Shop"). It opens a small white
+ * menu like the niche switcher: Sort (Top rated, Price up, Price down; no
+ * Newest or Best sellers since the shelves cover those) and Show (Everything,
+ * Digital downloads, Ships to you). With nothing picked it's newest first.
+ */
+function EverythingGrid({ niche, listings, reviews }: { niche: Niche; listings: Listing[]; reviews: Review[] }) {
+  const surface = useSurface();
+  const [sort, setSort] = useState<Sort>('new');
+  const [show, setShow] = useState<Show>('all');
+  const [open, setOpen] = useState(false);
+  const items = sortListings(listings, reviews, sort, show);
+  const picked = [SORTS.find((x) => x.key === sort)?.short, SHOWS.find((x) => x.key === show)?.short].filter(Boolean).join(' · ');
+  const clear = () => (setSort('new'), setShow('all'));
+  const row = (label: string, on: boolean, onPress: () => void) => (
+    <Pressable key={label} accessibilityRole="menuitem" accessibilityState={{ selected: on }} onPress={() => (onPress(), setOpen(false))} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}>
+      <Text style={[styles.menuText, { fontWeight: on ? '700' : '500' }]}>{label}</Text>
+      {on ? <CheckIcon size={17} color={niche.ink} /> : null}
+    </Pressable>
+  );
+  return (
+    <View style={styles.everything}>
+      <View style={styles.everythingHead}>
+        <Text accessibilityRole="header" style={[styles.shelfName, { color: surface.text, flexShrink: 1 }]}>
           Everything in <Text style={{ fontFamily: fonts.displayItalic }}>{niche.label}</Text>
         </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={picked ? `Sort and filter: ${picked}` : 'Sort and filter'} accessibilityState={{ expanded: open }} onPress={() => setOpen((o) => !o)} hitSlop={10} style={styles.sortWord}>
+          <Text style={[styles.sortText, { color: surface.text }]}>{picked || 'Sort'}</Text>
+          <View style={{ transform: [{ rotate: open ? '90deg' : '-90deg' }] }}>
+            <ChevronLeftIcon size={15} color={surface.text} />
+          </View>
+        </Pressable>
       </View>
-      <ListingGrid listings={shelfListings(listings, state.following, 'all').items} />
-      <Text style={[styles.end, { color: surface.muted }]}>Food can’t be sold on Niches; recipes and cookbooks can.</Text>
+      {picked ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear sort and filter" onPress={clear} hitSlop={8} style={styles.clear}>
+          <Text style={[styles.clearText, { color: surface.muted }]}>Clear</Text>
+        </Pressable>
+      ) : null}
+      <View style={{ marginHorizontal: -20 }}>
+        {items.length ? (
+          <ListingGrid listings={items} />
+        ) : (
+          <Text style={[styles.none, { color: surface.muted }]}>
+            {sort === 'top' ? 'Nothing here has 4 stars or more yet.' : 'Nothing like that here yet.'}{' '}
+            <Text onPress={clear} style={{ color: surface.text, fontWeight: '700', textDecorationLine: 'underline' }}>Clear</Text>
+          </Text>
+        )}
+      </View>
+      {open ? (
+        <>
+          {/* Tap anywhere else in the grid to close; nothing is dimmed (founder). */}
+          <Pressable accessibilityLabel="Close menu" onPress={() => setOpen(false)} style={[StyleSheet.absoluteFill, { zIndex: 1, marginHorizontal: -20 }]} />
+          <View accessibilityRole="menu" style={styles.menu}>
+            <Text style={styles.menuLabel}>SORT</Text>
+            {SORTS.map((x) => row(x.label, sort === x.key, () => setSort(sort === x.key ? 'new' : x.key)))}
+            <View style={styles.menuRule} />
+            <Text style={styles.menuLabel}>SHOW</Text>
+            {SHOWS.map((x) => row(x.label, show === x.key, () => setShow(x.key)))}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -258,5 +349,16 @@ const styles = StyleSheet.create({
   shelfTitle: { fontSize: 14, fontWeight: '600', lineHeight: 18 },
   shelfPrice: { fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
   everything: { marginTop: 30, paddingHorizontal: 20 },
+  everythingHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  sortWord: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 32 },
+  sortText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
+  clear: { alignSelf: 'flex-end', paddingTop: 2 },
+  clearText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+  none: { fontSize: 15, lineHeight: 21, paddingHorizontal: 20, paddingTop: 16 },
+  menu: { position: 'absolute', top: 40, right: 16, width: 236, zIndex: 2, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderRadius: 18, backgroundColor: '#FFFFFF', shadowColor: '#123D2A', shadowOpacity: 0.18, shadowRadius: 17, shadowOffset: { width: 0, height: 12 }, elevation: 10 },
+  menuLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.9, color: colors.textMuted, paddingTop: 4 },
+  menuRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  menuText: { fontSize: 15, color: colors.text },
+  menuRule: { height: StyleSheet.hairlineWidth * 2, backgroundColor: 'rgba(31,26,20,0.12)', marginVertical: 6 },
   end: { textAlign: 'center', fontSize: 12, lineHeight: 17, paddingHorizontal: 32, paddingVertical: 18 },
 });
