@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -44,15 +44,21 @@ export default function HomeScreen() {
           return (
             <SurfaceProvider value={floodSurface(niche)}>
               <View style={{ flex: 1, backgroundColor: niche.mid }}>
-                {hasShop && state.homeMode === 'shop' ? (
-                  <PageScroll scroll={scroll} nicheId={id}>
-                    <NicheShop niche={niche} />
-                  </PageScroll>
-                ) : niche.open ? (
-                  <OpenFeed niche={niche} scroll={scroll} />
+                {/* Feed and shop both stay mounted and just swap, like switching tabs: no reload, no flash (founder, Nov 21 2026). */}
+                {niche.open ? (
+                  <View style={{ flex: 1, display: hasShop && state.homeMode === 'shop' ? 'none' : 'flex' }}>
+                    <OpenFeed niche={niche} scroll={scroll} active={!(hasShop && state.homeMode === 'shop')} />
+                  </View>
                 ) : (
                   <ComingSoon niche={niche} scroll={scroll} />
                 )}
+                {hasShop ? (
+                  <View style={{ flex: 1, display: state.homeMode === 'shop' ? 'flex' : 'none' }}>
+                    <PageScroll scroll={scroll} nicheId={id} active={state.homeMode === 'shop'}>
+                      <NicheShop niche={niche} />
+                    </PageScroll>
+                  </View>
+                ) : null}
               </View>
             </SurfaceProvider>
           );
@@ -64,18 +70,24 @@ export default function HomeScreen() {
 }
 
 /** A niche page's scroll view: starts below the header, ends clear of the floating tab bar, and reports its offset. */
-function PageScroll({ scroll, nicheId, children }: { scroll: SharedValue<number>; nicheId: NicheId; children: ReactNode }) {
+function PageScroll({ scroll, nicheId, active = true, children }: { scroll: SharedValue<number>; nicheId: NicheId; active?: boolean; children: ReactNode }) {
   const top = useHeaderHeight();
   const { state, actions } = useStore();
   const ref = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   // Tap Home while on Home: the niche you're looking at glides back to the top.
+  // Each page remembers its own scroll, and hands it to the header when it's the one showing.
+  const own = useSharedValue(0);
+  useEffect(() => {
+    if (active) scroll.set(own.get());
+  }, [active, own, scroll]);
   useTabReselect('index', () => {
-    if (state.niche !== nicheId) return;
+    if (state.niche !== nicheId || !active) return;
     // In the shop, tapping Home goes back to the feed (founder, Nov 21 2026).
     if (state.homeMode === 'shop' && SHOP_NICHES.includes(nicheId)) actions.setHomeMode('feed');
     else ref.current?.scrollTo({ y: 0, animated: true });
   });
   const onScroll = useAnimatedScrollHandler((e) => {
+    own.set(e.contentOffset.y);
     scroll.set(e.contentOffset.y);
   });
   // Pull down at the top to refresh, like Instagram (founder, Nov 2026). The
@@ -134,14 +146,14 @@ function useNicheFeed(niche: Niche) {
   }, [state, niche.id]);
 }
 
-function OpenFeed({ niche, scroll }: { niche: Niche; scroll: SharedValue<number> }) {
+function OpenFeed({ niche, scroll, active = true }: { niche: Niche; scroll: SharedValue<number>; active?: boolean }) {
   const { state } = useStore();
   const { all } = useNicheFeed(niche);
 
   // One continuous feed, newest first (founder, Nov 2026): no "older posts"
   // button, no divider, no end card. It stops after the last post.
   return (
-    <PageScroll scroll={scroll} nicheId={niche.id}>
+    <PageScroll scroll={scroll} nicheId={niche.id} active={active}>
       <FeedSection posts={all} layout={state.layout} />
       {all.length === 0 ? <Text style={[styles.endText, { color: niche.inkSoft, paddingTop: 8 }]}>No {niche.label} posts yet.</Text> : null}
     </PageScroll>
