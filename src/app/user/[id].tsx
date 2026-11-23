@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon } from '@/components/icons';
 import { Button } from '@/components/primitives';
-import { ProfileView } from '@/components/profile-view';
+import { ProfileView, type ProfileTab } from '@/components/profile-view';
 import { SurfaceProvider, useSurface, useSurfaceStyles } from '@/components/surface';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { groundSurface, TOUCH, type Surface } from '@/lib/theme';
@@ -16,7 +16,7 @@ import { groundSurface, TOUCH, type Surface } from '@/lib/theme';
 function UserScreenInner() {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, usersById } = useStore();
@@ -46,6 +46,7 @@ function UserScreenInner() {
           isMe={user.id === state.me?.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={surface.text} colors={[surface.text]} />}
           contentBottom={insets.bottom + 40}
+          initialTab={tab as ProfileTab | undefined}
         />
       ) : (
         <View style={{ padding: 20, gap: 14 }}>

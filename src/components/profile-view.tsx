@@ -31,6 +31,7 @@ import { connections, hasAccess, isVisible, useNiches, useStore, visibleLogs } f
 import { colors, fonts, NICHE_ORDER, TOUCH, type NicheId, type Surface } from '@/lib/theme';
 import type { Post, User } from '@/lib/types';
 
+export type ProfileTab = Tab;
 type Tab = 'all' | NicheId | 'shop' | 'diary' | 'goals' | 'boards';
 
 /** One profile per person, with a tab per niche they post in. Used for you and for others. */
@@ -43,6 +44,7 @@ export function ProfileView({
   scrollY,
   refreshControl,
   contentBottom = 0,
+  initialTab,
 }: {
   user: User;
   isMe: boolean;
@@ -54,6 +56,8 @@ export function ProfileView({
   scrollY?: SharedValue<number>;
   refreshControl?: ReactElement<RefreshControlProps>;
   contentBottom?: number;
+  /** Open on this tab when it exists, e.g. 'shop' from a listing's Visit shop (founder, Nov 23 2026). */
+  initialTab?: Tab;
 }) {
   const styles = useSurfaceStyles(makeStyles);
   const surface = useSurface();
@@ -114,8 +118,10 @@ export function ProfileView({
   // the pinned row.
   const tabs = ['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[];
   const tabLabel = (t: Tab) => (t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label);
-  const [index, setIndexRaw] = useState(0);
-  const [target, setTarget] = useState(0);
+  const startAt = Math.max(0, initialTab ? tabs.indexOf(initialTab) : 0);
+  const [index, setIndexRaw] = useState(startAt);
+  const [target, setTarget] = useState(startAt);
+  const jumped = useRef(false);
   const current = Math.min(index, tabs.length - 1);
   const ownScrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   const scroller = scrollRef ?? ownScrollRef;
@@ -303,7 +309,16 @@ export function ProfileView({
       {/* The tab row (child 1) sticks natively: the phone itself keeps it at the top while scrolling, in step at any speed (founder's screen recording, Nov 19 2026). */}
       <Animated.ScrollView ref={scroller} onScroll={onScroll} scrollEventThrottle={16} refreshControl={refreshControl} stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: contentBottom }}>
       {/* Everything above the tab row. Its height is where the row sits (also right on the web, which only reports size changes). */}
-      <View onLayout={(e) => tabsTop.set(e.nativeEvent.layout.height)}>
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          tabsTop.set(h);
+          // Opened on a tab (Visit shop): glide down so that tab shows right under the pinned row.
+          if (startAt > 0 && !jumped.current) {
+            jumped.current = true;
+            setTimeout(() => scroller.current?.scrollTo({ y: h - topInset, animated: true }), 250);
+          }
+        }}>
       {cover ? <CoverCollage layout={cover.layout} posts={cover.posts} style={styles.cover} /> : <View style={{ height: topInset + 20 }} />}
       <View style={styles.head}>
         <View style={[styles.identity, cover ? { marginTop: -46 } : null]}>

@@ -141,7 +141,7 @@ export default function ListingScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Seller: ${seller?.displayName}. Visit shop`}
-              onPress={() => (isMine ? router.push('/shop/dashboard') : router.push({ pathname: '/user/[id]', params: { id: listing.sellerId } }))}
+              onPress={() => (isMine ? router.push('/shop/dashboard') : router.push({ pathname: '/user/[id]', params: { id: listing.sellerId, tab: 'shop' } }))}
               style={[styles.seller, { borderColor: ground.line }]}>
               <Avatar user={seller} size={40} />
               <View style={{ flex: 1 }}>

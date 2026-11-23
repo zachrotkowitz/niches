@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useRef, useState, type ComponentRef } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Text } from '@/components/text';
 
 import { NICHE_BORDER } from '@/components/feed-grid';
@@ -219,7 +219,9 @@ export function NicheShop({ niche }: { niche: Niche }) {
 }
 
 /** About how tall the open menu is; with less grid than this below the heading it opens upward. */
-const MENU_HEIGHT = 360;
+const MENU_HEIGHT = 340;
+/** The floating tab bar and the space around it at the bottom of the screen. */
+const TAB_BAR_ROOM = 100;
 
 type Sort = 'new' | 'top' | 'priceUp' | 'priceDown';
 type Show = 'all' | 'digital' | 'physical';
@@ -262,10 +264,17 @@ function EverythingGrid({ niche, listings, reviews }: { niche: Niche; listings: 
   const [sort, setSort] = useState<Sort>('new');
   const [show, setShow] = useState<Show>('all');
   const [open, setOpen] = useState(false);
-  const [gridH, setGridH] = useState(0);
-  const [boxH, setBoxH] = useState(0);
-  // Short on room (few or no results): open upward, over the shelves (founder, Nov 23 2026).
-  const up = gridH < MENU_HEIGHT;
+  // Where the Sort word is on screen, so the menu can sit next to it in a
+  // full-screen layer: a tap anywhere outside closes it (founder, Nov 23 2026).
+  const wordRef = useRef<ComponentRef<typeof View>>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const win = useWindowDimensions();
+  const toggle = () => {
+    if (open) return setOpen(false);
+    wordRef.current?.measureInWindow((x, y, w, h) => (setAnchor({ x, y, w, h }), setOpen(true)));
+  };
+  // Short on room below (above the tab bar): open upward instead (founder, Nov 23 2026).
+  const up = !!anchor && win.height - (anchor.y + anchor.h) - TAB_BAR_ROOM < MENU_HEIGHT;
   const items = sortListings(listings, reviews, sort, show);
   const picked = [SORTS.find((x) => x.key === sort)?.short, SHOWS.find((x) => x.key === show)?.short].filter(Boolean).join(', ');
   const clear = () => (setSort('new'), setShow('all'));
@@ -276,43 +285,47 @@ function EverythingGrid({ niche, listings, reviews }: { niche: Niche; listings: 
     </Pressable>
   );
   return (
-    <View style={styles.everything} onLayout={(e) => setBoxH(e.nativeEvent.layout.height)}>
+    <View style={styles.everything}>
       <View style={styles.everythingHead}>
         <Text accessibilityRole="header" style={[styles.shelfName, { color: surface.text, flexShrink: 1 }]}>
           Everything in <Text style={{ fontFamily: fonts.displayItalic }}>{niche.label}</Text>
         </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={picked ? `Sort and filter: ${picked}` : 'Sort and filter'} accessibilityState={{ expanded: open }} onPress={() => setOpen((o) => !o)} hitSlop={10} style={styles.sortWord}>
+        <View ref={wordRef} collapsable={false}>
+        <Pressable accessibilityRole="button" accessibilityLabel={picked ? `Sort and filter: ${picked}` : 'Sort and filter'} accessibilityState={{ expanded: open }} onPress={toggle} hitSlop={10} style={styles.sortWord}>
           <Text style={[styles.sortText, { color: surface.text }]}>{picked || 'Sort'}</Text>
           <View style={{ transform: [{ rotate: open ? '90deg' : '-90deg' }] }}>
             <ChevronLeftIcon size={15} color={surface.text} />
           </View>
         </Pressable>
+        </View>
       </View>
       {picked && !open ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Clear sort and filter" onPress={clear} hitSlop={8} style={styles.clear}>
           <Text style={[styles.clearText, { color: surface.muted }]}>Clear</Text>
         </Pressable>
       ) : null}
-      <View style={{ marginHorizontal: -20 }} onLayout={(e) => setGridH(e.nativeEvent.layout.height)}>
+      <View style={{ marginHorizontal: -20 }}>
         {items.length ? (
           <ListingGrid listings={items} />
         ) : (
           <Text style={[styles.none, { color: surface.muted }]}>No results available</Text>
         )}
       </View>
-      {open ? (
-        <>
-          {/* Tap anywhere else in the grid to close; nothing is dimmed (founder). */}
-          <Pressable accessibilityLabel="Close menu" onPress={() => setOpen(false)} style={[StyleSheet.absoluteFill, { zIndex: 1, marginHorizontal: -20 }]} />
-          <View accessibilityRole="menu" style={[styles.menu, up ? { bottom: boxH + 6 } : { top: 40 }]}>
+      <Modal visible={open && !!anchor} transparent animationType="none" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+        {/* Tap anywhere to close; nothing is dimmed (founder). */}
+        <Pressable accessibilityLabel="Close menu" onPress={() => setOpen(false)} style={StyleSheet.absoluteFill} />
+        {anchor ? (
+          <View
+            accessibilityRole="menu"
+            style={[styles.menu, { right: Math.max(12, win.width - (anchor.x + anchor.w)) }, up ? { bottom: win.height - anchor.y + 8 } : { top: anchor.y + anchor.h + 8 }]}>
             <Text style={styles.menuLabel}>SORT</Text>
             {SORTS.map((x) => row(x.label, sort === x.key, () => setSort(sort === x.key ? 'new' : x.key)))}
             <View style={styles.menuRule} />
             <Text style={styles.menuLabel}>SHOW</Text>
             {SHOWS.map((x) => row(x.label, show === x.key, () => setShow(x.key)))}
           </View>
-        </>
-      ) : null}
+        ) : null}
+      </Modal>
     </View>
   );
 }
@@ -359,7 +372,7 @@ const styles = StyleSheet.create({
   clear: { alignSelf: 'flex-end', paddingTop: 2 },
   clearText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   none: { fontSize: 15, lineHeight: 21, paddingHorizontal: 20, paddingTop: 16 },
-  menu: { position: 'absolute', right: 16, width: 236, zIndex: 2, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderRadius: 18, backgroundColor: '#FFFFFF', shadowColor: '#123D2A', shadowOpacity: 0.18, shadowRadius: 17, shadowOffset: { width: 0, height: 12 }, elevation: 10 },
+  menu: { position: 'absolute', width: 236, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderRadius: 18, backgroundColor: '#FFFFFF', shadowColor: '#123D2A', shadowOpacity: 0.18, shadowRadius: 17, shadowOffset: { width: 0, height: 12 }, elevation: 10 },
   menuLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.9, color: colors.textMuted, paddingTop: 4 },
   menuRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   menuText: { fontSize: 15, color: colors.text },
