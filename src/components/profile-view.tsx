@@ -116,8 +116,8 @@ export function ProfileView({
   // side by side; swipe or tap and the row slides like Home's niche pages.
   // Switching while scrolled down starts the new tab at its top, right under
   // the pinned row.
-  const tabs = ['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[];
-  const tabLabel = (t: Tab) => (t === 'all' ? 'All' : t === 'shop' ? `Shop · ${listings.length}` : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label);
+  const tabs = ['all', ...nicheTabs, ...(logs.length || isMe ? ['diary'] : []), ...(goals.length || isMe ? ['goals'] : []), ...(listings.length || isMe ? ['shop'] : []), ...(boards.length ? ['boards'] : [])] as Tab[];
+  const tabLabel = (t: Tab) => (t === 'all' ? 'All' : t === 'shop' ? (listings.length ? `Shop · ${listings.length}` : 'Shop') : t === 'diary' ? 'Diary' : t === 'goals' ? 'Goals' : t === 'boards' ? 'Collections' : niches[t].label);
   const startAt = Math.max(0, initialTab ? tabs.indexOf(initialTab) : 0);
   const [index, setIndexRaw] = useState(startAt);
   const [target, setTarget] = useState(startAt);
@@ -282,6 +282,13 @@ export function ProfileView({
             const bp = boardPosts(b, state.posts);
             return <BoardCard key={b.id} name={b.name} posts={bp} count={bp.length} width={cardW} onPress={() => router.push({ pathname: '/boards/[id]', params: { id: b.id } })} />;
           })}
+        </View>
+      ) : t === 'shop' && !listings.length ? (
+        // Your own empty shop (founder, Nov 24 2026): one way in to selling.
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>Nothing for sale yet</Text>
+          <Text style={styles.emptyBody}>Sell the recipe, a print or a zine. Buyers pay no fees; Niches keeps 5%.</Text>
+          <Button label="Open your shop" color={surface.text} onPress={() => router.push('/shop/dashboard')} />
         </View>
       ) : t === 'shop' ? (
         <ListingGrid listings={listings} nicheBorders={new Set(listings.map((l) => l.niche)).size > 1} />

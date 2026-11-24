@@ -8,6 +8,7 @@ import { Sheet, type SheetItem } from '@/components/sheet';
 import { useSavePost } from '@/components/save';
 import { useToast } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
+import { SHOP_NICHES } from '@/lib/shop';
 import { useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
 import type { Post, ReportReason } from '@/lib/types';
@@ -31,6 +32,7 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
   const { state, actions, usersById } = useStore();
   const [step, setStep] = useState<Step>('menu');
   const isMine = !!state.me && post.authorId === state.me.id;
+  const listingForPost = state.listings.find((l) => l.linkedPostId === post.id);
   const saved = !!state.saves[post.id];
   // Top 4 for this post's niche ("Top 4 dishes", "Top 4 pieces", "Top 4 photos").
   const top = diaryWords(post.niche).top;
@@ -106,6 +108,14 @@ export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visib
     ? [
         { label: 'Edit', detail: 'Change the caption or progress label.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id } })) },
         { label: 'Adjust preview', detail: 'Choose how this post looks in grids.', onPress: run(() => router.push({ pathname: '/post/edit/[id]', params: { id: post.id, section: 'preview' } })) },
+        // Sell from your own posts (founder, Nov 24 2026): opens Sell something filled in from the post.
+        ...(SHOP_NICHES.includes(post.niche) && post.kind !== 'text' && !post.archived
+          ? [
+              listingForPost
+                ? { label: 'See your listing', detail: 'It shows as a Shop this bar under this post.', onPress: run(() => router.push({ pathname: '/shop/[id]', params: { id: listingForPost.id } })) }
+                : { label: 'Sell this', detail: 'List the recipe, a print or a zine in the shop.', onPress: run(() => router.push({ pathname: '/shop/new', params: { postId: post.id } })) },
+            ]
+          : []),
         ...(post.kind !== 'text' && !post.archived
           ? [
               {

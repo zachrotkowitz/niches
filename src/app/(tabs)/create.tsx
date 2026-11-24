@@ -18,6 +18,7 @@ import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { AdjustSlider } from '@/components/slider';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
+import { SHOP_NICHES } from '@/lib/shop';
 import { diaryWords } from '@/lib/diary';
 import { shortTitle } from '@/lib/format';
 import { goalRule, weekNumber, weekStrip } from '@/lib/goals';
@@ -750,11 +751,18 @@ function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }
             style={styles.secondary}>
             <Text style={[styles.secondaryText, { color: niche.ink }]}>Also add it to your {words.diary}</Text>
           </Pressable>
-        ) : (
+        ) : null}
+        {/* Selling, one tap away (founder, Nov 24 2026): a plain link under the diary one. */}
+        {!question && post && SHOP_NICHES.includes(posted.niche) ? (
+          <Pressable accessibilityRole="link" onPress={() => { onDone(); router.push({ pathname: '/shop/new', params: { postId: posted.id } }); }} style={styles.secondary}>
+            <Text style={[styles.secondaryText, { color: niche.ink }]}>Sell something</Text>
+          </Pressable>
+        ) : null}
+        {question || !post ? (
           <Pressable accessibilityRole="button" onPress={() => { onDone(); router.push({ pathname: '/post/[id]', params: { id: posted.id } }); }} style={styles.secondary}>
             <Text style={[styles.secondaryText, { color: niche.ink }]}>See your question</Text>
           </Pressable>
-        )}
+        ) : null}
         {posted.membersOnly ? (
           <View style={styles.lockNote}>
             <LockIcon size={12} color={niche.inkSoft} />
