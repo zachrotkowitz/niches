@@ -126,7 +126,8 @@ export default function NewListingScreen() {
   const now = { niche: nicheId, format, kind, other, title, description, price, shipping, quantity, photos, linkedPostId };
   const changed = JSON.stringify(now) !== JSON.stringify(initial);
   // Backing out after a change asks "Save as draft?" (founder, Nov 24 2026).
-  const close = () => (changed ? setAskDraft(true) : leave());
+  // A saved draft always asks, so you can keep it or delete it without editing first (founder, Nov 24 2026).
+  const close = () => (changed || draft ? setAskDraft(true) : leave());
   const saveDraft = () => {
     if (!state.me) return;
     actions.saveDraft({ id: draft?.id ?? `d_${Date.now().toString(36)}`, sellerId: state.me.id, ...now, savedAt: Date.now() });
@@ -422,14 +423,24 @@ export default function NewListingScreen() {
       <Modal visible={askDraft} transparent animationType="slide" onRequestClose={() => setAskDraft(false)} statusBarTranslucent>
         {/* Nothing behind is dimmed (founder); tap above to keep editing. */}
         <Pressable accessibilityRole="button" accessibilityLabel="Keep editing" style={{ flex: 1 }} onPress={() => setAskDraft(false)} />
-        <View accessibilityViewIsModal style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+        {/* A white sheet with a cream preview of the draft, so the two don't blend (founder, Nov 24 2026). */}
+        <View accessibilityViewIsModal style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
           <View style={styles.grabber} />
-          <Text accessibilityRole="header" style={[styles.sheetTitle, { color: ground.text }]}>Save as draft?</Text>
-          <Text style={[styles.sheetBody, { color: ground.muted }]}>You can finish it later from Your shop. Only you can see drafts.</Text>
+          <Text accessibilityRole="header" style={[styles.sheetTitle, { color: ground.text }]}>{draft ? 'Keep this draft?' : 'Save as draft?'}</Text>
+          <View style={[styles.preview, { backgroundColor: ground.ground }]}>
+            <View style={[styles.previewPhoto, { backgroundColor: niche.mid }]}>
+              {photos[0] ? <Image source={{ uri: photos[0] }} contentFit="cover" style={StyleSheet.absoluteFill} /> : seen ? <Image source={seen} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={20} color={niche.ink} />}
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={[styles.previewTitle, { color: title.trim() ? ground.text : ground.muted }]} numberOfLines={2}>{title.trim() || 'Untitled'}</Text>
+              <Text style={[styles.previewSub, { color: ground.muted }]} numberOfLines={1}>{niche.label} shop{priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}</Text>
+            </View>
+          </View>
+          <Text style={[styles.sheetBody, { color: ground.muted }]}>Finish it later from Your shop. Only you can see drafts.</Text>
           <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.listIt, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
             <Text style={[styles.listItText, { color: ground.ground }]}>Save draft</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.keepEditing, { borderColor: ground.text, opacity: pressed ? 0.7 : 1 }]}>
+          <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.keepEditing, { backgroundColor: ground.ground, opacity: pressed ? 0.7 : 1 }]}>
             <Text style={[styles.keepEditingText, { color: ground.text }]}>Keep editing</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={dropDraft} hitSlop={8} style={styles.deleteHit}>
@@ -490,11 +501,15 @@ const styles = StyleSheet.create({
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   listIt: { minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   listItText: { fontSize: 16, fontWeight: '700' },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowColor: '#1F1A14', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowColor: '#1F1A14', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(31,26,20,0.18)' },
   sheetTitle: { fontFamily: fonts.displayItalic, fontSize: 32, lineHeight: 36 },
   sheetBody: { fontSize: 14, lineHeight: 20 },
-  keepEditing: { minHeight: 50, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  keepEditing: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 18 },
+  previewPhoto: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  previewTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 24 },
+  previewSub: { fontSize: 12 },
   keepEditingText: { fontSize: 15, fontWeight: '700' },
   deleteHit: { alignSelf: 'center', minHeight: 36, justifyContent: 'center' },
   deleteText: { fontSize: 14, fontWeight: '700', color: '#A3402B', textDecorationLine: 'underline' },
