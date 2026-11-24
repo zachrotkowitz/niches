@@ -7,7 +7,7 @@ import Animated, { Easing, FadeIn, FadeInDown, FadeInLeft, FadeInRight, FadeOut,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CameraIcon, CheckIcon, ChevronLeftIcon, CloseIcon, LockIcon, PlusIcon, TextIcon } from '@/components/icons';
+import { CameraIcon, CheckIcon, ChevronLeftIcon, CloseIcon, LockIcon, PencilIcon, PlusIcon, TextIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
@@ -93,7 +93,10 @@ export default function CreateScreen() {
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   // More photos after the first (founder, Nov 24 2026), each framed and edited like the first.
   const [more, setMore] = useState<string[]>([]);
-  const [editingMore, setEditingMore] = useState<PickedPhoto | null>(null);
+  // The photo editor, for a new extra photo (index null) or to re-edit / replace one in place.
+  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null } | null>(null);
+  // Which photo shows big on the write step; tap a thumbnail to show it (founder, Nov 24 2026).
+  const [shown, setShown] = useState(0);
   const [picking, setPicking] = useState(false);
   // Cropping or saving a filter takes a moment.
   const [working, setWorking] = useState(false);
@@ -203,6 +206,7 @@ export default function CreateScreen() {
     setGoalId(null);
     setPhoto(null);
     setMore([]);
+    setShown(0);
     setSource(null);
     setCropped(null);
     setFraming(START_FRAMING);
@@ -299,13 +303,40 @@ export default function CreateScreen() {
     setMore(keys.slice(1));
   };
   const removeAt = async (i: number) => {
+    setShown((n) => (n >= i && n > 0 ? n - 1 : n));
     if (i === 0) return clearPhoto();
     setMore((m) => m.filter((_, j) => j !== i - 1));
   };
   const addMore = async () => {
     if (more.length >= MAX_MORE) return;
     const picked = await pickPhoto();
-    if (picked) setEditingMore(picked);
+    if (picked) setEditing({ photo: picked, index: null });
+  };
+  // Edit (pencil) re-opens the editor on the photo showing; Change picks a new one for that spot.
+  const editShown = async () => setEditing({ photo: shown === 0 && photo ? photo : await withSize(allPhotos[shown]), index: shown });
+  const changeShown = async () => {
+    if (shown === 0) {
+      backToPhoto();
+      void choosePhoto();
+      return;
+    }
+    const picked = await pickPhoto();
+    if (picked) setEditing({ photo: picked, index: shown });
+  };
+  const editDone = (p: PickedPhoto) => {
+    if (!editing) return;
+    if (editing.index === null) {
+      setMore((m) => [...m, p.uri]);
+      setShown(allPhotos.length);
+    } else if (editing.index === 0) {
+      setSource(p);
+      setCropped(null);
+      setPhoto(p);
+    } else {
+      const at = editing.index - 1;
+      setMore((m) => m.map((u, j) => (j === at ? p.uri : u)));
+    }
+    setEditing(null);
   };
 
   if (step === 'photo') {
@@ -414,19 +445,23 @@ export default function CreateScreen() {
             photo ? (
               <>
               <Animated.View key="photo" entering={appear} exiting={vanish} layout={glide} style={styles.photoCard}>
-                <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
+                <Image source={{ uri: allPhotos[Math.min(shown, allPhotos.length - 1)] ?? photo.uri }} accessibilityLabel={`Photo ${shown + 1}`} contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
                 <View style={styles.photoButtons}>
-                  <Pressable accessibilityRole="button" onPress={clearPhoto} style={styles.photoChip}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${shown + 1}`} onPress={() => void removeAt(Math.min(shown, allPhotos.length - 1))} style={[styles.photoChip, { borderColor: ground.text }]}>
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Remove</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { backToPhoto(); void choosePhoto(); }} style={[styles.photoChip, { flexDirection: 'row', gap: 6 }]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Edit photo ${shown + 1}`} onPress={() => void editShown()} style={[styles.photoChip, { flexDirection: 'row', gap: 6, borderColor: ground.text }]}>
+                    <PencilIcon size={14} color={ground.text} />
+                    <Text style={[styles.photoChipText, { color: ground.text }]}>Edit</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Change photo ${shown + 1}`} onPress={() => void changeShown()} style={[styles.photoChip, { flexDirection: 'row', gap: 6, borderColor: ground.text }]}>
                     <CameraIcon size={15} color={ground.text} />
                     <Text style={[styles.photoChipText, { color: ground.text }]}>Change</Text>
                   </Pressable>
                 </View>
               </Animated.View>
               {/* Numbered 1–10, drag to reorder, like Instagram (founder, Nov 24 2026); shared with Sell something. */}
-              <PhotoStrip uris={allPhotos} max={MAX_MORE + 1} ink={ground.text} line={ground.line} onReorder={(keys) => void reorderPhotos(keys)} onRemove={(i) => void removeAt(i)} onAdd={addMore} />
+              <PhotoStrip uris={allPhotos} max={MAX_MORE + 1} selected={Math.min(shown, allPhotos.length - 1)} onSelect={setShown} ink={ground.text} line={ground.line} onReorder={(keys) => { const cur = allPhotos[shown]; void reorderPhotos(keys); setShown(Math.max(0, keys.indexOf(cur))); }} onRemove={(i) => void removeAt(i)} onAdd={addMore} />
               </>
             ) : (
               <Animated.View key="add" entering={appear} exiting={vanish} layout={glide}>
@@ -568,7 +603,7 @@ export default function CreateScreen() {
       </KeyboardAvoidingView>
       </Animated.View>
       {draftPrompt}
-      <PhotoEditor photo={editingMore} title="Another photo" onCancel={() => setEditingMore(null)} onDone={(p) => (setMore((m) => [...m, p.uri]), setEditingMore(null))} />
+      <PhotoEditor photo={editing?.photo ?? null} title={editing?.index === null ? 'Another photo' : `Photo ${(editing?.index ?? 0) + 1}`} onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
 }
@@ -833,7 +868,7 @@ const styles = StyleSheet.create({
   photoCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 4 },
   photo: { width: '100%' },
   photoButtons: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 8 },
-  photoChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  photoChip: { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1.5, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   photoChipText: { fontSize: 13, fontWeight: '700' },
   addRow: { marginHorizontal: 20, marginTop: 14, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },
   addRowIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
