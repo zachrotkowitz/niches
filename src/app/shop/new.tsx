@@ -5,17 +5,18 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CameraIcon, CheckIcon, CloseIcon } from '@/components/icons';
+import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
 import { postPhoto } from '@/lib/demo-photos';
-import { pickPhoto, type PickedPhoto } from '@/lib/photos';
+import { pickPhoto } from '@/lib/photos';
 import { CATEGORIES, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, type NicheId } from '@/lib/theme';
 import { shortTitle } from '@/lib/format';
 
+const MAX_PHOTOS = 8;
 const SWATCHES = ['#C8553D', '#C9A877', '#6E8B4E', '#E0A43A', '#8E2F4F', '#5A6FD0', '#2D3142', '#D98A3D'];
 const webInput = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 
@@ -56,7 +57,9 @@ export default function NewListingScreen() {
   const [price, setPrice] = useState('');
   const [shipping, setShipping] = useState('5');
   const [quantity, setQuantity] = useState('');
-  const [photo, setPhoto] = useState<PickedPhoto | null>(fromPost?.imageUri ? { uri: fromPost.imageUri, width: 0, height: 0 } as PickedPhoto : null);
+  // Several photos (founder, Nov 24 2026): the first is the cover; buyers swipe through the rest.
+  const [photos, setPhotos] = useState<string[]>(fromPost?.imageUri ? [fromPost.imageUri] : []);
+  const [shown, setShown] = useState(0);
   const [linkedPostId, setLinkedPostId] = useState<string | undefined>(fromPost?.id);
   const [choosingPost, setChoosingPost] = useState(false);
   const [ownWork, setOwnWork] = useState(false);
@@ -68,11 +71,23 @@ export default function NewListingScreen() {
   const linked = myPosts.find((p) => p.id === linkedPostId);
   const category = kind === 'other' ? other.trim() : kind;
   const ready = !!state.me && title.trim().length > 2 && priceCents !== null && shippingCents !== null && ownWork;
-  const seen = photo ? { uri: photo.uri } : fromPost ? postPhoto(fromPost) : undefined;
+  const seen = photos[shown] ? { uri: photos[shown] } : !photos.length && fromPost ? postPhoto(fromPost) : undefined;
 
-  const choosePhoto = async () => {
+  const addPhoto = async () => {
+    if (photos.length >= MAX_PHOTOS) return;
     const picked = await pickPhoto();
-    if (picked) setPhoto(picked);
+    if (picked) {
+      setPhotos((ps) => [...ps, picked.uri]);
+      setShown(photos.length);
+    }
+  };
+  const removePhoto = (i: number) => {
+    setPhotos((ps) => ps.filter((_, j) => j !== i));
+    setShown((n) => Math.max(0, n > i || n === photos.length - 1 ? n - 1 : n));
+  };
+  const makeCover = (i: number) => {
+    setPhotos((ps) => [ps[i], ...ps.filter((_, j) => j !== i)]);
+    setShown(0);
   };
   const pickNiche = (id: NicheId) => {
     setNicheId(id);
@@ -95,8 +110,9 @@ export default function NewListingScreen() {
       shippingCents: format === 'physical' ? shippingCents ?? 0 : undefined,
       stock: format === 'physical' && Number.isInteger(q) && q > 0 ? q : undefined,
       linkedPostId,
-      mediaColor: photo ? '#E3E5E1' : linked?.mediaColor ?? SWATCHES[Math.floor(Math.random() * SWATCHES.length)],
-      imageUri: photo?.uri,
+      mediaColor: photos.length ? '#E3E5E1' : linked?.mediaColor ?? SWATCHES[Math.floor(Math.random() * SWATCHES.length)],
+      imageUri: photos[0],
+      moreImageUris: photos.length > 1 ? photos.slice(1) : undefined,
       mediaLabel: title.trim(),
     });
     toast(`Listed in the ${niche.label} shop`);
@@ -159,13 +175,13 @@ export default function NewListingScreen() {
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {/* The photo, big, like the listing page buyers will see. */}
-          <Pressable accessibilityRole="button" accessibilityLabel={seen ? 'Change photo' : 'Add a photo'} onPress={choosePhoto} style={[styles.photo, { backgroundColor: seen ? '#E3E5E1' : niche.mid }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={seen ? `Photo ${shown + 1} of ${Math.max(1, photos.length)}` : 'Add a photo'} disabled={!!photos.length} onPress={addPhoto} style={[styles.photo, { backgroundColor: seen ? '#E3E5E1' : niche.mid }]}>
             {seen ? (
               <Image source={seen} contentFit="cover" style={StyleSheet.absoluteFill} />
             ) : (
               <View style={styles.addPhoto}>
                 <CameraIcon size={34} color={niche.ink} />
-                <Text style={[styles.addPhotoText, { color: niche.ink }]}>Add a photo</Text>
+                <Text style={[styles.addPhotoText, { color: niche.ink }]}>Add photos</Text>
               </View>
             )}
           </Pressable>
@@ -173,22 +189,46 @@ export default function NewListingScreen() {
             <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} style={styles.round}>
               <CloseIcon size={18} />
             </Pressable>
-            {seen ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Change photo" onPress={choosePhoto} style={styles.changePhoto}>
-                <Text style={styles.changePhotoText}>Change photo</Text>
+            {shown > 0 ? (
+              <Pressable accessibilityRole="button" onPress={() => makeCover(shown)} style={styles.changePhoto}>
+                <Text style={styles.changePhotoText}>Make it the cover</Text>
               </Pressable>
             ) : null}
           </View>
+          {photos.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs} keyboardShouldPersistTaps="handled">
+              {photos.map((uri, i) => (
+                <View key={uri + i}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={i === 0 ? 'Cover photo' : `Photo ${i + 1}`} accessibilityState={{ selected: i === shown }} onPress={() => setShown(i)} style={[styles.thumb, { borderColor: i === shown ? ground.text : 'transparent' }]}>
+                    <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 1}`} onPress={() => removePhoto(i)} hitSlop={6} style={styles.thumbX}>
+                    <CloseIcon size={11} strokeWidth={2.6} />
+                  </Pressable>
+                  {i === 0 ? <Text style={[styles.cover, { color: ground.muted }]}>Cover</Text> : null}
+                </View>
+              ))}
+              {photos.length < MAX_PHOTOS ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Add another photo" onPress={addPhoto} style={[styles.thumb, styles.addThumb, { borderColor: ground.line }]}>
+                  <PlusIcon size={20} color={ground.text} />
+                </Pressable>
+              ) : null}
+            </ScrollView>
+          ) : null}
 
           <View style={styles.body}>
-            <Eyebrow>New listing · {niche.label} shop</Eyebrow>
+            <Eyebrow>New listing</Eyebrow>
+            {/* Shop first, then the title (founder, Nov 24 2026). */}
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.boxLabel, { color: ground.muted }]}>SHOP</Text>
+              {words('Which shop', SHOP_NICHES.map((id) => ({ key: id, label: niches[id].label, color: niches[id].accent })), nicheId, (k) => pickNiche(k as NicheId))}
+            </View>
+            <Text style={[styles.boxLabel, { color: ground.muted, marginBottom: -8 }]}>WHAT ARE YOU SELLING?</Text>
             <View style={styles.card}>
               <TextInput
-                accessibilityLabel="Title"
+                accessibilityLabel="What are you selling?"
                 value={title}
                 onChangeText={setTitle}
-                placeholder="What are you selling?"
-                placeholderTextColor={ground.muted}
                 selectionColor={niche.accent}
                 multiline
                 numberOfLines={Platform.OS === 'web' ? 1 : undefined}
@@ -237,9 +277,9 @@ export default function NewListingScreen() {
                   )
                 : null}
               {stacked(
-                'Kind',
+                'Item category',
                 <>
-                  {words('Kind', [...(CATEGORIES[nicheId] ?? []).map((c) => ({ key: c, label: c })), { key: 'other', label: 'Other' }], kind, (k) => setKind(k === kind ? '' : k))}
+                  {words('Item category', [...(CATEGORIES[nicheId] ?? []).map((c) => ({ key: c, label: c })), { key: 'other', label: 'Other' }], kind, (k) => setKind(k === kind ? '' : k))}
                   {kind === 'other' ? (
                     <View style={[styles.card, styles.otherBox]}>
                       <TextInput
@@ -258,7 +298,6 @@ export default function NewListingScreen() {
                 </>,
                 'Optional',
               )}
-              {stacked('Shop', words('Which shop', SHOP_NICHES.map((id) => ({ key: id, label: niches[id].label, color: niches[id].accent })), nicheId, (k) => pickNiche(k as NicheId)))}
               {myPosts.length ? (
                 <View style={[styles.kind, { borderBottomColor: ground.line }]}>
                   <Pressable accessibilityRole="button" accessibilityLabel="Shop this bar: choose a post" onPress={() => setChoosingPost((o) => !o)} style={styles.rowInner}>
@@ -339,6 +378,11 @@ const styles = StyleSheet.create({
   overPhoto: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   round: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   changePhoto: { height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.92)', justifyContent: 'center' },
+  thumbs: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  thumb: { width: 62, height: 62, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
+  addThumb: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  thumbX: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  cover: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 3 },
   changePhotoText: { fontSize: 13, fontWeight: '700', color: '#1F1A14' },
   body: { paddingHorizontal: 20, paddingTop: 18, gap: 14 },
   card: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, backgroundColor: '#FFFFFF' },

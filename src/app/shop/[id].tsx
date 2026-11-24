@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CheckoutSheet } from '@/components/checkout-sheet';
@@ -14,7 +14,7 @@ import { ListingGrid } from '@/components/shop';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
-import { listingPhoto } from '@/lib/demo-photos';
+import { listingPhotos } from '@/lib/demo-photos';
 import { timeAgo } from '@/lib/format';
 import { SEED_USERS } from '@/lib/seed';
 import { averageRating, FEE_RATE, feeFor, formatPrice, type CartItem } from '@/lib/shop';
@@ -45,6 +45,8 @@ export default function ListingScreen() {
   const [writing, setWriting] = useState(false);
   const [replyFor, setReplyFor] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const { width } = useWindowDimensions();
 
   const listing = state.listings.find((l) => l.id === id);
   const meId = state.me?.id;
@@ -68,6 +70,7 @@ export default function ListingScreen() {
   }
 
   const niche = niches[listing.niche];
+  const photos = listingPhotos(listing);
   const seller = usersById[listing.sellerId];
   const saved = !!state.savedListings[listing.id];
   const inCart = state.cart.find((c) => c.listingId === listing.id);
@@ -104,8 +107,34 @@ export default function ListingScreen() {
     <SurfaceProvider value={ground}>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ground.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }} keyboardShouldPersistTaps="handled">
-          <View accessible accessibilityRole="image" accessibilityLabel={`Photo: ${listing.mediaLabel}`} style={[styles.hero, { backgroundColor: listing.mediaColor }]}>
-            {listingPhoto(listing) ? <Image source={listingPhoto(listing)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+          <View style={[styles.hero, { backgroundColor: listing.mediaColor }]}>
+            {photos.length > 1 ? (
+              // More than one photo: swipe through them, with dots (founder, Nov 24 2026).
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(e) => setPhotoIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+                onScroll={Platform.OS === 'web' ? (e) => setPhotoIndex(Math.round(e.nativeEvent.contentOffset.x / width)) : undefined}
+                scrollEventThrottle={64}>
+                {photos.map((ph, i) => (
+                  <View key={i} accessible accessibilityRole="image" accessibilityLabel={`Photo ${i + 1} of ${photos.length}: ${listing.mediaLabel}`} style={{ width, height: '100%' }}>
+                    <Image source={ph} contentFit="cover" style={StyleSheet.absoluteFill} />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View accessible accessibilityRole="image" accessibilityLabel={`Photo: ${listing.mediaLabel}`} style={StyleSheet.absoluteFill}>
+                {photos[0] ? <Image source={photos[0]} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+              </View>
+            )}
+            {photos.length > 1 ? (
+              <View style={styles.dots} pointerEvents="none">
+                {photos.map((_, i) => (
+                  <View key={i} style={[styles.dot, i === photoIndex ? styles.dotOn : null]} />
+                ))}
+              </View>
+            ) : null}
           </View>
           {/* Round buttons float over the photo. */}
           <View style={[styles.floatRow, { top: insets.top + 6 }]}>
@@ -357,7 +386,10 @@ export default function ListingScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { height: 380 },
+  hero: { height: 380, overflow: 'hidden' },
+  dots: { position: 'absolute', bottom: 14, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' },
+  dotOn: { width: 18, backgroundColor: '#FFFFFF' },
   floatRow: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between' },
   round: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center' },
   body: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },

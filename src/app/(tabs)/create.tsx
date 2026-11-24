@@ -683,12 +683,14 @@ function PostedScreen({ posted, onDone }: { posted: Posted; onDone: () => void }
   const monday = new Date();
   monday.setHours(0, 0, 0, 0);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const mine = state.posts.filter((p) => p.authorId === state.me?.id && p.niche === posted.niche && !p.archived && p.createdAt >= monday.getTime());
+  // A text post only counts once it's in your diary, so it says you made something (founder, Nov 24 2026).
+  const inDiary = new Set(state.logs.filter((l) => l.userId === state.me?.id && l.postId).map((l) => l.postId));
+  const mine = state.posts.filter((p) => p.authorId === state.me?.id && p.niche === posted.niche && !p.archived && p.createdAt >= monday.getTime() && (p.kind !== 'text' || inDiary.has(p.id)));
   const byDay: (Post | undefined)[] = DAY_LETTERS.map((_, i) => {
     const start = monday.getTime() + i * 86400000;
     return mine.filter((p) => p.createdAt >= start && p.createdAt < start + 86400000).sort((a, b) => b.createdAt - a.createdAt)[0];
   });
-  const made = mine.filter((p) => p.kind !== 'text').length;
+  const made = mine.length;
   const todayIndex = (new Date().getDay() + 6) % 7;
 
   const title = question ? `Asked in ${niche.label}.` : `Shared with ${niche.label}.`;

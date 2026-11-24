@@ -91,6 +91,12 @@ export function listingPhoto(l: { id: string; imageUri?: string }): Photo | unde
   return l.imageUri ? { uri: l.imageUri } : get(LISTINGS[l.id])?.src;
 }
 
+/** Every photo of a listing, cover first. */
+export function listingPhotos(l: { id: string; imageUri?: string; moreImageUris?: string[] }): Photo[] {
+  const first = listingPhoto(l);
+  return [...(first ? [first] : []), ...(l.moreImageUris ?? []).map((uri) => ({ uri }))];
+}
+
 /** A diary entry's own photo, else the photo of the post it came from, else a photo matching the dish. */
 export function logPhoto(l: { postId?: string; title: string; imageUri?: string }): Photo | undefined {
   if (l.imageUri) return { uri: l.imageUri };

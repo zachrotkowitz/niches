@@ -30,6 +30,8 @@ export type Listing = {
   mediaLabel: string;
   /** A real product photo, when one was picked. */
   imageUri?: string;
+  /** More photos after the first (founder, Nov 24 2026); buyers swipe through them on the listing page. */
+  moreImageUris?: string[];
   createdAt: number;
   sold: number;
   /** How many times others opened it (seller's dashboard only). */
