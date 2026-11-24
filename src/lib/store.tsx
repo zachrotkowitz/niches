@@ -670,7 +670,7 @@ function useStoreValue() {
       addComment(postId: string, authorId: string, text: string) {
         dispatch({ type: 'addComment', comment: { id: makeId('c'), postId, authorId, text, createdAt: Date.now() } });
       },
-      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; imageUri?: string; imageAspect?: number; progressLabel?: string; goalId?: string; premium?: boolean; unlockCents?: number }): string {
+      createPost(input: { authorId: string; niche: NicheId; kind: PostKind; caption: string; mediaColor?: string; mediaLabel?: string; imageUri?: string; imageAspect?: number; moreImageUris?: string[]; progressLabel?: string; goalId?: string; premium?: boolean; unlockCents?: number }): string {
         const id = makeId('p');
         dispatch({ type: 'addPost', post: { id, createdAt: Date.now(), ...input } });
         // A progress post toward a goal counts as a check-in.

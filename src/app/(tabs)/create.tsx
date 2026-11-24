@@ -7,7 +7,7 @@ import Animated, { Easing, FadeIn, FadeInDown, FadeInLeft, FadeInRight, FadeOut,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
-import { CameraIcon, CheckIcon, ChevronLeftIcon, CloseIcon, LockIcon, TextIcon } from '@/components/icons';
+import { CameraIcon, CheckIcon, ChevronLeftIcon, CloseIcon, LockIcon, PlusIcon, TextIcon } from '@/components/icons';
 import { DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { TAB_BAR_SPACE } from '@/components/tab-bar';
@@ -15,7 +15,7 @@ import { Text } from '@/components/text';
 import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
-import { EditStep } from '@/components/photo-editor';
+import { EditStep, PhotoEditor, withSize } from '@/components/photo-editor';
 import { DraftPrompt } from '@/components/draft-prompt';
 import { useToast } from '@/components/toast';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
@@ -51,6 +51,8 @@ const vanish = FadeOut.duration(140).reduceMotion(ReduceMotion.System);
 
 // Shown behind a photo while it loads.
 const LOADING_TINT = '#E3E5E1';
+/** Photos after the first; 10 in all, like Instagram. */
+const MAX_MORE = 9;
 
 /** What was just shared, for the "Shared with Cooking." screen. */
 type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLabel?: string; membersOnly: boolean };
@@ -88,6 +90,9 @@ export default function CreateScreen() {
   const [cropped, setCropped] = useState<PickedPhoto | null>(null);
   const [edits, setEdits] = useState<PhotoEdits>(NO_EDITS);
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  // More photos after the first (founder, Nov 24 2026), each framed and edited like the first.
+  const [more, setMore] = useState<string[]>([]);
+  const [editingMore, setEditingMore] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
   // Cropping or saving a filter takes a moment.
   const [working, setWorking] = useState(false);
@@ -176,6 +181,7 @@ export default function CreateScreen() {
       mediaColor: postKind === 'photo' ? LOADING_TINT : undefined,
       imageUri: postKind === 'photo' ? photo?.uri : undefined,
       imageAspect: postKind === 'photo' && photo ? photo.height / photo.width : undefined,
+      moreImageUris: postKind === 'photo' && photo && more.length ? more : undefined,
       mediaLabel: postKind === 'photo' ? shortTitle(caption.trim()) : undefined,
       // Progress labels say "week 4", never the numbers: those stay private on the goal.
       progressLabel: kind === 'progress' ? (pickedGoal ? `${pickedGoal.title}, week ${weekNumber(pickedGoal)}` : goal.trim()) : undefined,
@@ -195,6 +201,7 @@ export default function CreateScreen() {
     setGoal('');
     setGoalId(null);
     setPhoto(null);
+    setMore([]);
     setSource(null);
     setCropped(null);
     setFraming(START_FRAMING);
@@ -208,7 +215,7 @@ export default function CreateScreen() {
   };
 
   // Backing out: a saved draft always asks; a new post asks once there's something in it.
-  const hasContent = !!(caption.trim() || photo || source || goal.trim());
+  const hasContent = !!(caption.trim() || photo || source || goal.trim() || more.length);
   const leave = () => {
     reset();
     setDraftId(null);
@@ -219,7 +226,7 @@ export default function CreateScreen() {
   const saveDraft = () => {
     if (!state.me) return;
     const pic = photo ?? source ?? undefined;
-    actions.savePostDraft({ id: draftId ?? `pd_${Date.now().toString(36)}`, authorId: state.me.id, niche: nicheId, kind, caption, goal, goalId, photo: pic ? { uri: pic.uri, width: pic.width, height: pic.height } : undefined, membersOnly, savedAt: Date.now() });
+    actions.savePostDraft({ id: draftId ?? `pd_${Date.now().toString(36)}`, authorId: state.me.id, niche: nicheId, kind, caption, goal, goalId, photo: pic ? { uri: pic.uri, width: pic.width, height: pic.height } : undefined, morePhotos: more.length ? more : undefined, membersOnly, savedAt: Date.now() });
     toast('Saved to your drafts');
     leave();
   };
@@ -240,6 +247,7 @@ export default function CreateScreen() {
       setSource(d.photo);
       setPhoto(d.photo);
     }
+    setMore(d.morePhotos ?? []);
     setStep('write');
   };
   const myDrafts = state.postDrafts.filter((d) => d.authorId === state.me?.id);
@@ -263,10 +271,24 @@ export default function CreateScreen() {
     setCameBack(true);
     setStep('photo');
   };
-  const clearPhoto = () => {
+  const clearPhoto = async () => {
+    // Removing the first photo moves the next one up, so the others aren't lost.
+    if (more.length) {
+      const next = await withSize(more[0]);
+      setMore((m) => m.slice(1));
+      setSource(next);
+      setCropped(null);
+      setPhoto(next);
+      return;
+    }
     setSource(null);
     setCropped(null);
     setPhoto(null);
+  };
+  const addMore = async () => {
+    if (more.length >= MAX_MORE) return;
+    const picked = await pickPhoto();
+    if (picked) setEditingMore(picked);
   };
 
   if (step === 'photo') {
@@ -373,6 +395,7 @@ export default function CreateScreen() {
 
           {needsPhoto ? (
             photo ? (
+              <>
               <Animated.View key="photo" entering={appear} exiting={vanish} layout={glide} style={styles.photoCard}>
                 <Image source={{ uri: photo.uri }} accessibilityLabel="Your photo" contentFit="cover" style={[styles.photo, { aspectRatio: 1 / Math.min(1.25, Math.max(0.8, photo.height / photo.width)), backgroundColor: LOADING_TINT }]} />
                 <View style={styles.photoButtons}>
@@ -385,6 +408,30 @@ export default function CreateScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.moreRow} keyboardShouldPersistTaps="handled">
+                <View>
+                  <View style={[styles.moreThumb, { borderColor: ground.text }]}>
+                    <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+                  </View>
+                  <Text style={[styles.moreCover, { color: ground.muted }]}>First</Text>
+                </View>
+                {more.map((uri, i) => (
+                  <View key={uri + i}>
+                    <View style={[styles.moreThumb, { borderColor: 'transparent' }]}>
+                      <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+                    </View>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 2}`} onPress={() => setMore((m) => m.filter((_, j) => j !== i))} hitSlop={6} style={styles.moreX}>
+                      <CloseIcon size={11} strokeWidth={2.6} />
+                    </Pressable>
+                  </View>
+                ))}
+                {more.length < MAX_MORE ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="Add another photo" onPress={addMore} style={[styles.moreThumb, styles.moreAdd, { borderColor: ground.line }]}>
+                    <PlusIcon size={20} color={ground.text} />
+                  </Pressable>
+                ) : null}
+              </ScrollView>
+              </>
             ) : (
               <Animated.View key="add" entering={appear} exiting={vanish} layout={glide}>
               <Pressable
@@ -525,6 +572,7 @@ export default function CreateScreen() {
       </KeyboardAvoidingView>
       </Animated.View>
       {draftPrompt}
+      <PhotoEditor photo={editingMore} title="Another photo" onCancel={() => setEditingMore(null)} onDone={(p) => (setMore((m) => [...m, p.uri]), setEditingMore(null))} />
     </SurfaceProvider>
   );
 }
@@ -786,6 +834,11 @@ const styles = StyleSheet.create({
   masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   share: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   shareText: { fontSize: 15, fontWeight: '700' },
+  moreRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  moreThumb: { width: 62, height: 62, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
+  moreAdd: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  moreX: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  moreCover: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 3 },
   photoCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 4 },
   photo: { width: '100%' },
   photoButtons: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 8 },

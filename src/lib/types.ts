@@ -51,6 +51,8 @@ export type Post = {
   mediaColor?: string;
   /** A real photo (local file on phones, inline data on web) when one was picked. */
   imageUri?: string;
+  /** More photos after the first (founder, Nov 24 2026); swipe through them. */
+  moreImageUris?: string[];
   /** Photo height ÷ width, so feeds can show it at its natural shape. */
   imageAspect?: number;
   /** Describes the media, for screen readers and the placeholder label. */
@@ -96,6 +98,7 @@ export type PostDraft = {
   goal: string;
   goalId: string | null;
   photo?: { uri: string; width: number; height: number };
+  morePhotos?: string[];
   membersOnly: boolean;
   savedAt: number;
 };

@@ -91,6 +91,12 @@ export function listingPhoto(l: { id: string; imageUri?: string }): Photo | unde
   return l.imageUri ? { uri: l.imageUri } : get(LISTINGS[l.id])?.src;
 }
 
+/** Every photo of a post, first one first. */
+export function postPhotos(p: { id: string; imageUri?: string; moreImageUris?: string[] }): Photo[] {
+  const first = postPhoto(p);
+  return [...(first ? [first] : []), ...(p.moreImageUris ?? []).map((uri) => ({ uri }))];
+}
+
 /** Every photo of a listing, cover first. */
 export function listingPhotos(l: { id: string; imageUri?: string; moreImageUris?: string[] }): Photo[] {
   const first = listingPhoto(l);

@@ -11,7 +11,8 @@ import { PostMenu } from '@/components/post-menu';
 import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
 import { useSurface } from '@/components/surface';
-import { postAspect } from '@/lib/demo-photos';
+import { postAspect, postPhotos } from '@/lib/demo-photos';
+import { PhotoPager } from '@/components/photo-pager';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -80,11 +81,17 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
         </Pressable>
       ) : null}
       {!locked && post.kind === 'photo' ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>
-          <View style={inset}>
-            <MediaPlaceholder post={post} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} />
+        post.moreImageUris?.length ? (
+          <View style={[inset, { overflow: 'hidden' }]}>
+            <PhotoPager photos={postPhotos(post)} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} label={post.mediaLabel ?? 'Post'} onPress={inDetail ? undefined : open} />
           </View>
-        </Pressable>
+        ) : (
+          <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>
+            <View style={inset}>
+              <MediaPlaceholder post={post} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} />
+            </View>
+          </Pressable>
+        )
       ) : null}
       {!locked && post.kind === 'video' ? (
         <View style={inset}>

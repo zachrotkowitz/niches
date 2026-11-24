@@ -12,7 +12,8 @@ import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { useSavePost } from '@/components/save';
 import { ShopThisBar } from '@/components/shop';
 import { Text } from '@/components/text';
-import { postAspect } from '@/lib/demo-photos';
+import { postAspect, postPhotos } from '@/lib/demo-photos';
+import { PhotoPager } from '@/components/photo-pager';
 import { shortTitle, timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { fonts, TOUCH } from '@/lib/theme';
@@ -105,9 +106,13 @@ export function FeedPost({ post }: { post: Post }) {
         {post.kind === 'video' ? (
           <VideoPlaceholder post={post} height={height} />
         ) : (
-          <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open}>
-            <MediaPlaceholder post={post} height={height} showLabel={false} />
-          </Pressable>
+          post.moreImageUris?.length ? (
+            <PhotoPager photos={postPhotos(post)} height={height} label={post.mediaLabel ?? 'Post'} onPress={open} />
+          ) : (
+            <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open}>
+              <MediaPlaceholder post={post} height={height} showLabel={false} />
+            </Pressable>
+          )
         )}
         {/* A soft shadow at the bottom of the photo keeps the white name readable on any picture. */}
         <View pointerEvents="none" style={styles.scrim}>
