@@ -121,6 +121,7 @@ type Action =
   | { type: 'addLog'; log: LogEntry }
   | { type: 'updateLog'; id: string; patch: Partial<LogEntry> }
   | { type: 'deleteLog'; id: string }
+  | { type: 'restoreLog'; log: LogEntry; checkIns: { goalId: string; checkIn: CheckIn }[] }
   | { type: 'toggleWant'; postId: string }
   | { type: 'wantDone'; postId: string }
   | { type: 'setFavorites'; userId: string; niche: NicheId; refs: FavoriteRef[] }
@@ -317,6 +318,16 @@ function reducer(state: State, action: Action): State {
       return state.me ? { ...state, me: { ...state.me, ...action.patch } } : state;
     case 'addLog':
       return { ...state, logs: [action.log, ...state.logs] };
+    case 'restoreLog':
+      // Undo a removal: the entry and the goal check-ins it had made.
+      return {
+        ...state,
+        logs: [action.log, ...state.logs.filter((l) => l.id !== action.log.id)],
+        goals: state.goals.map((g) => {
+          const back = action.checkIns.filter((c) => c.goalId === g.id).map((c) => c.checkIn);
+          return back.length ? { ...g, checkIns: [...g.checkIns, ...back] } : g;
+        }),
+      };
     case 'updateLog':
       return { ...state, logs: state.logs.map((l) => (l.id === action.id ? { ...l, ...action.patch } : l)) };
     case 'deleteLog': {
@@ -660,6 +671,7 @@ function useStoreValue() {
       },
       updateLog: (id: string, patch: Partial<LogEntry>) => dispatch({ type: 'updateLog', id, patch }),
       deleteLog: (id: string) => dispatch({ type: 'deleteLog', id }),
+      restoreLog: (log: LogEntry, checkIns: { goalId: string; checkIn: CheckIn }[]) => dispatch({ type: 'restoreLog', log, checkIns }),
       toggleWant: (postId: string) => dispatch({ type: 'toggleWant', postId }),
       setFavorites: (userId: string, niche: NicheId, refs: FavoriteRef[]) => dispatch({ type: 'setFavorites', userId, niche, refs }),
       setAvatar: (avatarUri: string) => dispatch({ type: 'updateMe', patch: { avatarUri } }),
