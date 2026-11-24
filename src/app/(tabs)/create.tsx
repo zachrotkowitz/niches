@@ -16,7 +16,7 @@ import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { EditStep, PhotoEditor, withSize } from '@/components/photo-editor';
-import { ReorderRow } from '@/components/reorder-row';
+import { PhotoStrip } from '@/components/photo-strip';
 import { DraftPrompt } from '@/components/draft-prompt';
 import { useToast } from '@/components/toast';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
@@ -54,8 +54,6 @@ const vanish = FadeOut.duration(140).reduceMotion(ReduceMotion.System);
 const LOADING_TINT = '#E3E5E1';
 /** Photos after the first; 10 in all, like Instagram. */
 const MAX_MORE = 9;
-const THUMB = 62;
-const THUMB_GAP = 10;
 
 /** What was just shared, for the "Shared with Cooking." screen. */
 type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLabel?: string; membersOnly: boolean };
@@ -96,8 +94,6 @@ export default function CreateScreen() {
   // More photos after the first (founder, Nov 24 2026), each framed and edited like the first.
   const [more, setMore] = useState<string[]>([]);
   const [editingMore, setEditingMore] = useState<PickedPhoto | null>(null);
-  // True while a thumbnail is being dragged, so the strip doesn't scroll under your finger.
-  const [arranging, setArranging] = useState(false);
   const [picking, setPicking] = useState(false);
   // Cropping or saving a filter takes a moment.
   const [working, setWorking] = useState(false);
@@ -429,40 +425,8 @@ export default function CreateScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
-              {/* Hold a photo and drag it to change the order, like Instagram (founder, Nov 24 2026). The first one leads the post. */}
-              <ScrollView horizontal scrollEnabled={!arranging} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.moreRow} keyboardShouldPersistTaps="handled">
-                <View style={{ width: allPhotos.length * (THUMB + THUMB_GAP) - THUMB_GAP, height: THUMB + 18 }}>
-                  <ReorderRow
-                    slots={allPhotos.length}
-                    gap={THUMB_GAP}
-                    itemHeight={() => THUMB + 18}
-                    onDragChange={setArranging}
-                    onReorder={(keys) => void reorderPhotos(keys)}
-                    items={allPhotos.map((uri, i) => ({
-                      key: uri,
-                      label: i === 0 ? 'First photo' : `Photo ${i + 1}`,
-                      render: () => (
-                        <View>
-                          <View style={[styles.moreThumb, { borderColor: i === 0 ? ground.text : 'transparent' }]}>
-                            <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
-                            {allPhotos.length > 1 ? (
-                              <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 1}`} onPress={() => void removeAt(i)} hitSlop={6} style={styles.moreX}>
-                                <CloseIcon size={10} strokeWidth={2.6} />
-                              </Pressable>
-                            ) : null}
-                          </View>
-                          <Text style={[styles.moreCover, { color: ground.muted }]}>{i === 0 ? 'First' : String(i + 1)}</Text>
-                        </View>
-                      ),
-                    }))}
-                  />
-                </View>
-                {more.length < MAX_MORE ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel="Add another photo" onPress={addMore} style={[styles.moreThumb, styles.moreAdd, { borderColor: ground.line }]}>
-                    <PlusIcon size={20} color={ground.text} />
-                  </Pressable>
-                ) : null}
-              </ScrollView>
+              {/* Numbered 1–10, drag to reorder, like Instagram (founder, Nov 24 2026); shared with Sell something. */}
+              <PhotoStrip uris={allPhotos} max={MAX_MORE + 1} ink={ground.text} line={ground.line} onReorder={(keys) => void reorderPhotos(keys)} onRemove={(i) => void removeAt(i)} onAdd={addMore} />
               </>
             ) : (
               <Animated.View key="add" entering={appear} exiting={vanish} layout={glide}>
@@ -866,11 +830,6 @@ const styles = StyleSheet.create({
   masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   share: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   shareText: { fontSize: 15, fontWeight: '700' },
-  moreRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12, alignItems: 'flex-start' },
-  moreThumb: { width: 62, height: 62, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
-  moreAdd: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  moreX: { position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  moreCover: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 3 },
   photoCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 4 },
   photo: { width: '100%' },
   photoButtons: { position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 8 },

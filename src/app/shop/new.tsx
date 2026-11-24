@@ -13,6 +13,7 @@ import { postPhoto } from '@/lib/demo-photos';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { PhotoEditor, withSize } from '@/components/photo-editor';
 import { DraftPrompt } from '@/components/draft-prompt';
+import { PhotoStrip } from '@/components/photo-strip';
 import { CATEGORIES, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, type NicheId } from '@/lib/theme';
@@ -113,10 +114,6 @@ export default function NewListingScreen() {
   const removePhoto = (i: number) => {
     setPhotos((ps) => ps.filter((_, j) => j !== i));
     setShown((n) => Math.max(0, n > i || n === photos.length - 1 ? n - 1 : n));
-  };
-  const makeCover = (i: number) => {
-    setPhotos((ps) => [ps[i], ...ps.filter((_, j) => j !== i)]);
-    setShown(0);
   };
   const pickNiche = (id: NicheId) => {
     setNicheId(id);
@@ -238,37 +235,28 @@ export default function NewListingScreen() {
             </Pressable>
             {photos.length ? (
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {shown > 0 ? (
-                  <Pressable accessibilityRole="button" onPress={() => makeCover(shown)} style={styles.changePhoto}>
-                    <Text style={styles.changePhotoText}>Make it the cover</Text>
-                  </Pressable>
-                ) : null}
                 <Pressable accessibilityRole="button" accessibilityLabel={`Crop or edit photo ${shown + 1}`} onPress={() => editPhoto(shown)} style={styles.changePhoto}>
                   <Text style={styles.changePhotoText}>Edit</Text>
                 </Pressable>
               </View>
             ) : null}
           </View>
-          {photos.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs} keyboardShouldPersistTaps="handled">
-              {photos.map((uri, i) => (
-                <View key={uri + i}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={i === 0 ? 'Cover photo' : `Photo ${i + 1}`} accessibilityState={{ selected: i === shown }} onPress={() => setShown(i)} style={[styles.thumb, { borderColor: i === shown ? ground.text : 'transparent' }]}>
-                    <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
-                  </Pressable>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 1}`} onPress={() => removePhoto(i)} hitSlop={6} style={styles.thumbX}>
-                    <CloseIcon size={11} strokeWidth={2.6} />
-                  </Pressable>
-                  {i === 0 ? <Text style={[styles.cover, { color: ground.muted }]}>Cover</Text> : null}
-                </View>
-              ))}
-              {photos.length < MAX_PHOTOS ? (
-                <Pressable accessibilityRole="button" accessibilityLabel="Add another photo" onPress={addPhoto} style={[styles.thumb, styles.addThumb, { borderColor: ground.line }]}>
-                  <PlusIcon size={20} color={ground.text} />
-                </Pressable>
-              ) : null}
-            </ScrollView>
-          ) : null}
+          {/* The same numbered, draggable strip as posts (founder, Nov 24 2026). Number 1 is the cover. */}
+          <PhotoStrip
+            uris={photos}
+            max={MAX_PHOTOS}
+            selected={shown}
+            ink={ground.text}
+            line={ground.line}
+            onSelect={setShown}
+            onReorder={(next) => {
+              const cur = photos[shown];
+              setPhotos(next);
+              setShown(Math.max(0, next.indexOf(cur)));
+            }}
+            onRemove={removePhoto}
+            onAdd={addPhoto}
+          />
 
           <View style={styles.body}>
             <Eyebrow>New listing</Eyebrow>
@@ -445,11 +433,6 @@ const styles = StyleSheet.create({
   overPhoto: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   round: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   changePhoto: { height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.92)', justifyContent: 'center' },
-  thumbs: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
-  thumb: { width: 62, height: 62, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
-  addThumb: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  thumbX: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  cover: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 3 },
   changePhotoText: { fontSize: 13, fontWeight: '700', color: '#1F1A14' },
   body: { paddingHorizontal: 20, paddingTop: 18, gap: 14 },
   card: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, backgroundColor: '#FFFFFF' },
