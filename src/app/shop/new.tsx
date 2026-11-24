@@ -10,7 +10,8 @@ import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
 import { postPhoto } from '@/lib/demo-photos';
-import { pickPhoto } from '@/lib/photos';
+import { pickPhoto, type PickedPhoto } from '@/lib/photos';
+import { PhotoEditor, withSize } from '@/components/photo-editor';
 import { CATEGORIES, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, type NicheId } from '@/lib/theme';
@@ -73,13 +74,24 @@ export default function NewListingScreen() {
   const ready = !!state.me && title.trim().length > 2 && priceCents !== null && shippingCents !== null && ownWork;
   const seen = photos[shown] ? { uri: photos[shown] } : !photos.length && fromPost ? postPhoto(fromPost) : undefined;
 
+  // Crop and edit like a post photo (founder, Nov 24 2026): every new photo opens the editor; Edit reopens it.
+  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null } | null>(null);
   const addPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) return;
     const picked = await pickPhoto();
-    if (picked) {
-      setPhotos((ps) => [...ps, picked.uri]);
+    if (picked) setEditing({ photo: picked, index: null });
+  };
+  const editPhoto = async (i: number) => setEditing({ photo: await withSize(photos[i]), index: i });
+  const editDone = (p: PickedPhoto) => {
+    if (!editing) return;
+    if (editing.index === null) {
+      setPhotos((ps) => [...ps, p.uri]);
       setShown(photos.length);
+    } else {
+      const at = editing.index;
+      setPhotos((ps) => ps.map((u, j) => (j === at ? p.uri : u)));
     }
+    setEditing(null);
   };
   const removePhoto = (i: number) => {
     setPhotos((ps) => ps.filter((_, j) => j !== i));
@@ -189,10 +201,17 @@ export default function NewListingScreen() {
             <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} style={styles.round}>
               <CloseIcon size={18} />
             </Pressable>
-            {shown > 0 ? (
-              <Pressable accessibilityRole="button" onPress={() => makeCover(shown)} style={styles.changePhoto}>
-                <Text style={styles.changePhotoText}>Make it the cover</Text>
-              </Pressable>
+            {photos.length ? (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {shown > 0 ? (
+                  <Pressable accessibilityRole="button" onPress={() => makeCover(shown)} style={styles.changePhoto}>
+                    <Text style={styles.changePhotoText}>Make it the cover</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" accessibilityLabel={`Crop or edit photo ${shown + 1}`} onPress={() => editPhoto(shown)} style={styles.changePhoto}>
+                  <Text style={styles.changePhotoText}>Edit</Text>
+                </Pressable>
+              </View>
             ) : null}
           </View>
           {photos.length ? (
@@ -367,6 +386,7 @@ export default function NewListingScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <PhotoEditor photo={editing?.photo ?? null} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
 }

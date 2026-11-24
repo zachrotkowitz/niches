@@ -15,7 +15,7 @@ import { Text } from '@/components/text';
 import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
-import { AdjustSlider } from '@/components/slider';
+import { EditStep } from '@/components/photo-editor';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
 import { SHOP_NICHES } from '@/lib/shop';
@@ -572,90 +572,6 @@ function PhotoStep({
             </Pressable>
           </View>
         </View>
-      </Animated.View>
-    </SurfaceProvider>
-  );
-}
-
-/**
- * Step two (founder's option A): the framed photo with Filters (tiles you tap)
- * and Adjust (four sliders). Next saves the look into the photo.
- */
-function EditStep({ photo, edits, onEdits, working, onBack, onNext }: { photo: PickedPhoto; edits: PhotoEdits; onEdits: (e: PhotoEdits) => void; working: boolean; onBack: () => void; onNext: () => void }) {
-  const insets = useSafeAreaInsets();
-  const ground = useAppGround();
-  const { width, height } = useWindowDimensions();
-  const [tab, setTab] = useState<'filters' | 'adjust'>('filters');
-  const w = Math.min(width, 640);
-  const ratio = photo.height / photo.width;
-  const previewH = Math.round(Math.min(w * ratio, height * 0.47));
-  const previewW = Math.round(previewH / ratio);
-  const matrix = editMatrix(edits);
-
-  return (
-    <SurfaceProvider value={groundSurface(ground)}>
-      <Animated.View entering={pageIn('right')} style={{ flex: 1, paddingTop: insets.top + 4, alignItems: 'center' }}>
-        <View style={[styles.stepBar, { width: w }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Back to framing" onPress={onBack} style={styles.stepIcon}>
-            <ChevronLeftIcon color={ground.text} />
-          </Pressable>
-          <DisplayText size={24} color={ground.text}>Edit</DisplayText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: working, busy: working }}
-            disabled={working}
-            onPress={onNext}
-            style={({ pressed }) => [styles.share, { backgroundColor: ground.text, opacity: working ? 0.6 : pressed ? 0.8 : 1 }]}>
-            <Text style={[styles.shareText, { color: ground.ground }]}>{working ? 'One sec…' : 'Next'}</Text>
-          </Pressable>
-        </View>
-
-        <View style={{ width: w, height: previewH, alignItems: 'center', backgroundColor: ground.line }}>
-          <FilteredPhoto uri={photo.uri} matrix={matrix} width={previewW} height={previewH} />
-        </View>
-
-        <View style={{ width: w, marginTop: 8 }}>
-          <UnderlineTabs
-            label="Edit tools"
-            inset={10}
-            value={tab}
-            onChange={(k) => setTab(k as 'filters' | 'adjust')}
-            items={[
-              { key: 'filters', label: 'Filters' },
-              { key: 'adjust', label: 'Adjust' },
-            ]}
-          />
-        </View>
-
-        {tab === 'filters' ? (
-          <Animated.View key="filters" entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)} style={{ width: w }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {FILTERS.map((f) => {
-                const on = f.id === edits.filter;
-                return (
-                  <Pressable
-                    key={f.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: on }}
-                    accessibilityLabel={`${f.label} filter`}
-                    onPress={() => onEdits({ ...edits, filter: f.id })}
-                    style={({ pressed }) => [styles.filterTile, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-                    <View style={[styles.filterThumb, { borderColor: on ? ground.text : 'transparent' }]}>
-                      <FilteredPhoto uri={photo.uri} matrix={editMatrix({ filter: f.id, adjust: edits.adjust })} width={72} height={88} style={{ borderRadius: 11 }} />
-                    </View>
-                    <Text style={[styles.filterName, { color: on ? ground.text : ground.muted, fontWeight: on ? '700' : '500' }]}>{f.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Animated.View>
-        ) : (
-          <Animated.View key="adjust" entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)} style={{ width: w, paddingTop: 8 }}>
-            {ADJUSTMENTS.map((a) => (
-              <AdjustSlider key={a.key} label={a.label} value={edits.adjust[a.key]} onChange={(v) => onEdits({ ...edits, adjust: { ...edits.adjust, [a.key]: v } })} />
-            ))}
-          </Animated.View>
-        )}
       </Animated.View>
     </SurfaceProvider>
   );
