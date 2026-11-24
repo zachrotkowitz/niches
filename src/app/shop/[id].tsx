@@ -13,7 +13,7 @@ import { Sheet } from '@/components/sheet';
 import { ListingGrid } from '@/components/shop';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { listingPhotos } from '@/lib/demo-photos';
 import { timeAgo } from '@/lib/format';
 import { SEED_USERS } from '@/lib/seed';
@@ -33,7 +33,7 @@ export default function ListingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -70,6 +70,10 @@ export default function ListingScreen() {
   }
 
   const niche = niches[listing.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const photos = listingPhotos(listing);
   const seller = usersById[listing.sellerId];
   const saved = !!state.savedListings[listing.id];

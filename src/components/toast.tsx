@@ -6,20 +6,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ToastAction = { label: string; onPress: () => void };
 
-const ToastContext = createContext<(message: string, action?: ToastAction) => void>(() => {});
+/** `tint`: the niche's dark ink when the message is about something in a niche (founder, Nov 24 2026); otherwise near-black. */
+const ToastContext = createContext<(message: string, action?: ToastAction, tint?: string) => void>(() => {});
 
 /** Short confirmation messages ("Link copied", "Post archived"), optionally with one button ("Saved · Add to collection"). */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<string | null>(null);
   const [action, setAction] = useState<ToastAction | undefined>(undefined);
+  const [tint, setTint] = useState<string | undefined>(undefined);
   const [n, setN] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = useCallback((text: string, next?: ToastAction) => {
+  const show = useCallback((text: string, next?: ToastAction, color?: string) => {
     if (timer.current) clearTimeout(timer.current);
     setMessage(text);
     setAction(next);
+    setTint(color);
     setN((x) => x + 1);
     // A toast with a button stays a little longer so there's time to tap it.
     timer.current = setTimeout(() => setMessage(null), next ? 4500 : 2200);
@@ -34,7 +37,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', alignItems: 'center', paddingBottom: insets.bottom + 96 }]}>
         {message ? (
-          <Animated.View key={n} pointerEvents={action ? 'auto' : 'none'} entering={FadeInDown.duration(180)} exiting={FadeOutDown.duration(160)} style={styles.toast} accessibilityLiveRegion="polite" accessibilityRole="alert">
+          <Animated.View key={n} pointerEvents={action ? 'auto' : 'none'} entering={FadeInDown.duration(180)} exiting={FadeOutDown.duration(160)} style={[styles.toast, tint ? { backgroundColor: tint } : null]} accessibilityLiveRegion="polite" accessibilityRole="alert">
             <Text style={styles.text}>{message}</Text>
             {action ? (
               <Pressable

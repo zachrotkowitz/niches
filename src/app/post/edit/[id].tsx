@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GridTile } from '@/components/feed-grid';
 import { Button } from '@/components/primitives';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { shortTitle } from '@/lib/format';
 import { useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -26,7 +26,7 @@ export default function EditPostScreen() {
   const { id, section } = useLocalSearchParams<{ id: string; section?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const post = state.posts.find((p) => p.id === id);
@@ -48,6 +48,10 @@ export default function EditPostScreen() {
   }
 
   const niche = niches[post.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const previewOnly = section === 'preview';
   const ready = caption.trim().length > 0;
   const draft = { ...post, caption: caption.trim() || post.caption, previewShape: shape === 'auto' ? undefined : shape, previewTitle: title.trim() || undefined };

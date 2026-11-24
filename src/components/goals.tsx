@@ -9,7 +9,7 @@ import { Platform } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { CheckIcon, LockIcon, PlusIcon } from '@/components/icons';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { goalRule, periodOf, progress, streak, weekDone, weekStrip, type Goal, type WeekCell } from '@/lib/goals';
 import { isoDay } from '@/lib/plans';
 import { useNiches, useStore } from '@/lib/store';
@@ -123,9 +123,11 @@ export function goalSubline(goal: Goal) {
  */
 export function GoalCard({ goal, viewerIsOwner = true }: { goal: Goal; viewerIsOwner?: boolean }) {
   const router = useRouter();
-  const toast = useToast();
+  const showToast = useToast();
   const { actions } = useStore();
   const niche = useNiches()[goal.niche];
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const p = progress(goal);
   const hidden = !viewerIsOwner && goal.hideNumbers;
   const done = !!goal.doneAt;

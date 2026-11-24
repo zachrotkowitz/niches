@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFavoriteItem } from '@/components/diary';
 import { Avatar, Button } from '@/components/primitives';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { diaryWords, type FavoriteRef } from '@/lib/diary';
 import { logPhoto } from '@/lib/demo-photos';
 import { buildRecap, MONTHS, MONTHS_LONG, recapText, type Recap } from '@/lib/recap';
@@ -62,9 +62,11 @@ export default function RecapScreen() {
   const nicheId: NicheId = NICHE_ORDER.includes(params.niche) ? params.niche : 'cooking';
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const niche = useNiches()[nicheId];
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const words = diaryWords(nicheId);
   const meId = state.me?.id ?? '';
   const year = new Date().getFullYear();

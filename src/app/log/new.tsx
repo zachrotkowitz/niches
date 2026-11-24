@@ -12,7 +12,7 @@ import { CalendarIcon, CameraIcon, CheckIcon, CloseIcon } from '@/components/ico
 import { MonthCalendar } from '@/components/month-calendar';
 import { SurfaceProvider } from '@/components/surface';
 import { DisplayText } from '@/components/primitives';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { diaryWords, type LogVisibility } from '@/lib/diary';
 import { goalRule } from '@/lib/goals';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
@@ -31,7 +31,7 @@ export default function NewLogScreen() {
   const params = useLocalSearchParams<{ postId?: string; niche?: NicheId; goalId?: string; edit?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions, usersById } = useStore();
   const niches = useNiches();
   const appGround = useAppGround();
@@ -60,6 +60,10 @@ export default function NewLogScreen() {
   const [goalIds, setGoalIds] = useState<string[]>(params.goalId ? [params.goalId] : []);
 
   const niche = niches[nicheId];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const words = diaryWords(nicheId);
   const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === nicheId && !g.doneAt && g.kind !== 'best');
   const toggleGoal = (id: string) => setGoalIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));

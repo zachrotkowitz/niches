@@ -13,7 +13,7 @@ import { CheckIcon, ChevronLeftIcon, LockIcon, MoreIcon } from '@/components/ico
 import { Button, DisplayText } from '@/components/primitives';
 import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { diaryWords } from '@/lib/diary';
 import { currentBest, fmt, goalRule, periodOf, progress, streak, weekDone, weekKey, weekNumber, type Goal } from '@/lib/goals';
 import { logPhoto, postPhoto } from '@/lib/demo-photos';
@@ -35,7 +35,7 @@ export default function GoalScreen() {
   const { id, checkin } = useLocalSearchParams<{ id: string; checkin?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -57,6 +57,10 @@ export default function GoalScreen() {
   }
 
   const niche = niches[goal.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const owner = usersById[goal.userId];
   const p = progress(goal);
   const s = goal.kind === 'habit' ? streak(goal) : 0;
@@ -376,8 +380,10 @@ const ds = StyleSheet.create({
 function CheckInSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; onClose: () => void }) {
   const styles = plainStyles;
   const { actions } = useStore();
-  const toast = useToast();
+  const showToast = useToast();
   const niche = useNiches()[goal.niche];
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const [date, setDate] = useState(isoDay());
   const [value, setValue] = useState('');
   const [note, setNote] = useState('');
@@ -440,8 +446,10 @@ function CheckInSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean
 function EditSheet({ goal, visible, onClose }: { goal: Goal; visible: boolean; onClose: () => void }) {
   const styles = plainStyles;
   const { actions } = useStore();
-  const toast = useToast();
+  const showToast = useToast();
   const niche = useNiches()[goal.niche];
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const [title, setTitle] = useState(goal.title);
   const [perWeek, setPerWeek] = useState(goal.perWeek ?? 1);
   const [target, setTarget] = useState(goal.target !== undefined ? String(goal.target) : '');

@@ -10,7 +10,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { ChevronLeftIcon, CloseIcon } from '@/components/icons';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { PERIODS, type GoalKind, type GoalVisibility, type Period } from '@/lib/goals';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, NICHE_ORDER, TOUCH, type NicheId } from '@/lib/theme';
@@ -33,7 +33,7 @@ export default function NewGoalSheet() {
   const params = useLocalSearchParams<{ niche?: NicheId }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -52,6 +52,10 @@ export default function NewGoalSheet() {
   const [visibility, setVisibility] = useState<GoalVisibility>('private');
 
   const niche = niches[nicheId];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const t = num(target);
   const s0 = num(start);
   const ready = !!state.me && title.trim().length > 0 && (kind === 'habit' || (t !== undefined && t > 0)) && (kind !== 'best' || (s0 !== undefined && unit.trim().length > 0 && s0 !== t));

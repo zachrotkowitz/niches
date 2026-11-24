@@ -5,7 +5,7 @@ import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CheckIcon, ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { DiaryEntriesSheet } from '@/components/diary-entries-sheet';
 import { PostCard } from '@/components/post-card';
 import { QuickLog } from '@/components/quick-log';
@@ -21,7 +21,7 @@ export default function PostScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, usersById, actions } = useStore();
-  const toast = useToast();
+  const showToast = useToast();
   const niches = useNiches();
   const [draft, setDraft] = useState('');
   const [logging, setLogging] = useState(false);
@@ -40,6 +40,10 @@ export default function PostScreen() {
   }
 
   const niche = niches[post.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   // A post's screen is flooded in its niche's color, like the feed it came from.
   const surface = floodSurface(niche);
   const isMine = !!state.me && post.authorId === state.me.id;

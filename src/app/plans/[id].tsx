@@ -10,7 +10,7 @@ import { Avatar, DisplayText } from '@/components/primitives';
 import { Sheet } from '@/components/sheet';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { canSee, chosenDish, parseDay, participants, type Rsvp } from '@/lib/plans';
 import { cancelReminder, REMINDER_CHOICES, reminderDate, reminderLabel, planStart, scheduleReminder } from '@/lib/reminders';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
@@ -30,7 +30,7 @@ export default function PlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -57,6 +57,10 @@ export default function PlanScreen() {
   }
 
   const niche = niches[plan.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const isHost = plan.ownerId === me.id;
   const host = usersById[plan.ownerId];
   const hostFirst = host?.displayName.split(' ')[0] ?? 'Someone';

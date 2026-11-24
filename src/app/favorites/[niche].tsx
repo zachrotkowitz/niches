@@ -22,9 +22,11 @@ export default function FavoritesScreen() {
   const niche = NICHE_ORDER.includes(params.niche) ? params.niche : 'cooking';
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const n = useNiches()[niche];
+  // In this niche's dark color (founder, Nov 24 2026).
+  const toast = (message: string) => showToast(message, undefined, n.ink);
   const words = diaryWords(niche);
   const meId = state.me?.id ?? '';
   const current = state.favorites[meId]?.[niche] ?? [];

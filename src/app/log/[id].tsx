@@ -11,7 +11,7 @@ import { Eyebrow } from '@/components/discover-parts';
 import { Avatar, Button, DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { Sheet } from '@/components/sheet';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { dayLabel } from '@/lib/plans';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
@@ -24,7 +24,7 @@ export default function LogScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, usersById, actions } = useStore();
   const niches = useNiches();
   const [menu, setMenu] = useState(false);
@@ -43,6 +43,10 @@ export default function LogScreen() {
   }
 
   const niche = niches[log.niche];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const words = diaryWords(log.niche);
   const owner = usersById[log.userId];
   const source = log.postId ? state.posts.find((p) => p.id === log.postId) : undefined;

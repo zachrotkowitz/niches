@@ -8,7 +8,7 @@ import { Eyebrow } from '@/components/discover-parts';
 import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { postPhoto } from '@/lib/demo-photos';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { PhotoEditor, withSize, type PhotoOrigin } from '@/components/photo-editor';
@@ -44,7 +44,7 @@ export default function NewListingScreen() {
   const params = useLocalSearchParams<{ niche?: NicheId; postId?: string; draft?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -85,6 +85,10 @@ export default function NewListingScreen() {
   const [ownWork, setOwnWork] = useState(false);
 
   const niche = niches[nicheId];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const priceCents = toCents(price);
   const shippingCents = format === 'physical' ? (shipping.trim() === '' || shipping.trim() === '0' ? 0 : toCents(shipping)) : 0;
   const myPosts = state.posts.filter((p) => p.authorId === state.me?.id && p.niche === nicheId && !p.archived);

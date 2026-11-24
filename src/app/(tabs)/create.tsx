@@ -18,7 +18,7 @@ import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { EditStep, PhotoEditor, withSize, type PhotoOrigin } from '@/components/photo-editor';
 import { PhotoStrip } from '@/components/photo-strip';
 import { DraftPrompt } from '@/components/draft-prompt';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
 import { SHOP_NICHES } from '@/lib/shop';
@@ -106,7 +106,7 @@ export default function CreateScreen() {
   // Drafts (founder, Nov 24 2026): the one you reopened, and whether "Save … as a draft?" is showing.
   const [draftId, setDraftId] = useState<string | null>(null);
   const [askDraft, setAskDraft] = useState(false);
-  const toast = useToast();
+  const showToast = useToast();
   const [membersOnly, setMembersOnly] = useState(false);
   // Photo first, then the words.
   const [step, setStep] = useState<'photo' | 'edit' | 'write'>('photo');
@@ -167,6 +167,10 @@ export default function CreateScreen() {
   }, [params.goalId]);
 
   const niche = NICHES[nicheId];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   // The colored line under the niche you're posting to slides between niches.
   const nicheLine = useSlidingLine(nicheId, niche.accent);
   const needsPhoto = kind !== 'question';

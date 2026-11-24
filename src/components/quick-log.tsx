@@ -12,7 +12,7 @@ import { Eyebrow } from '@/components/discover-parts';
 import { CheckIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { diaryWords, type LogVisibility } from '@/lib/diary';
 import { postPhoto } from '@/lib/demo-photos';
 import { shortTitle } from '@/lib/format';
@@ -32,7 +32,7 @@ import type { Post } from '@/lib/types';
 export function QuickLog({ post, visible, onClose }: { post: Post | undefined; visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -84,6 +84,8 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
 
   if (!post) return null;
   const niche = niches[post.niche];
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const words = diaryWords(post.niche);
   const goals = state.goals.filter((g) => g.userId === state.me?.id && g.niche === post.niche && !g.doneAt && g.kind !== 'best');
   const ready = !!state.me && title.trim().length > 0 && rating > 0;

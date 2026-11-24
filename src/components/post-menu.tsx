@@ -9,7 +9,7 @@ import { useSavePost } from '@/components/save';
 import { useToast } from '@/components/toast';
 import { diaryWords, MAX_FAVORITES } from '@/lib/diary';
 import { SHOP_NICHES } from '@/lib/shop';
-import { useStore } from '@/lib/store';
+import { useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
 import type { Post, ReportReason } from '@/lib/types';
 
@@ -27,7 +27,10 @@ type Step = 'menu' | 'confirmDelete' | 'report';
 /** `onGone` runs when the post disappears for this viewer (deleted, hidden or reported), e.g. to leave the post screen. */
 export function PostMenu({ post, visible, onClose, onGone }: { post: Post; visible: boolean; onClose: () => void; onGone?: () => void }) {
   const router = useRouter();
-  const toast = useToast();
+  const showToast = useToast();
+  const nicheInk = useNiches()[post.niche].ink;
+  // Messages about this post come in its niche's dark color (founder, Nov 24 2026).
+  const toast = (message: string) => showToast(message, undefined, nicheInk);
   const savePost = useSavePost();
   const { state, actions, usersById } = useStore();
   const [step, setStep] = useState<Step>('menu');

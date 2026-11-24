@@ -14,7 +14,7 @@ import { MonthCalendar } from '@/components/month-calendar';
 import { Avatar } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
-import { useToast } from '@/components/toast';
+import { useToast, type ToastAction } from '@/components/toast';
 import { dayLabel, isoDay, type PlanKind, type Visibility } from '@/lib/plans';
 import { SEED_USERS } from '@/lib/seed';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
@@ -39,7 +39,7 @@ export default function NewPlanSheet() {
   const params = useLocalSearchParams<{ niche?: NicheId; edit?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
+  const showToast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
@@ -83,6 +83,10 @@ export default function NewPlanSheet() {
   };
 
   const niche = niches[nicheId];
+
+  // Messages about this niche come in its dark color (founder, Nov 24 2026).
+
+  const toast = (message: string, action?: ToastAction) => showToast(message, action, niche.ink);
   const cooking = nicheId === 'cooking';
   const ready = title.trim().length > 0 && !!state.me;
   const people = SEED_USERS.filter((u) => u.id !== state.me?.id).sort((a, b) => Number(!!state.following[b.id]) - Number(!!state.following[a.id]));
