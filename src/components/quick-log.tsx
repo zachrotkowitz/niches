@@ -176,16 +176,29 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
                   </View>
                 </View>
               )}
-              <Pressable
-                accessibilityRole="button"
-                onPress={async () => {
-                  const p = await pickPhoto();
-                  if (p) setPhoto(p);
-                }}
-                style={[styles.row, { borderBottomColor: ground.line }]}>
-                {photo ? <CheckIcon size={16} color={ground.text} strokeWidth={2.6} /> : <PlusIcon size={16} color={ground.muted} strokeWidth={2.4} />}
-                <Text style={[styles.rowText, { color: ground.text }]}>{photo ? (mine ? 'Using your post’s photo · Change' : 'Your photo added · Change') : 'Add your photo'}</Text>
-              </Pressable>
+              <View style={[styles.row, { borderBottomColor: ground.line }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={photo ? 'Change your photo' : 'Add your photo'}
+                  onPress={async () => {
+                    const p = await pickPhoto();
+                    if (p) setPhoto(p);
+                  }}
+                  style={styles.photoPick}>
+                  {photo ? (
+                    <Image source={{ uri: photo.uri }} contentFit="cover" style={styles.photoThumb} />
+                  ) : (
+                    <PlusIcon size={16} color={ground.muted} strokeWidth={2.4} />
+                  )}
+                  <Text style={[styles.rowText, { color: ground.text }]}>{photo ? (mine ? 'Using your post’s photo · Change' : 'Your photo · Change') : 'Add your photo'}</Text>
+                </Pressable>
+                {/* Take the photo off without leaving the sheet (founder, Nov 24 2026). */}
+                {photo ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="Remove your photo" onPress={() => setPhoto(null)} hitSlop={8} style={[styles.photoX, { borderColor: ground.text }]}>
+                    <CloseIcon size={12} color={ground.text} strokeWidth={2.4} />
+                  </Pressable>
+                ) : null}
+              </View>
               {goals.map((g) => {
                 const on = goalIds.includes(g.id);
                 return (
@@ -234,6 +247,9 @@ export function QuickLog({ post, visible, onClose }: { post: Post | undefined; v
 }
 
 const styles = StyleSheet.create({
+  photoPick: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
+  photoThumb: { width: 32, height: 32, borderRadius: 8 },
+  photoX: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(31,26,20,0.18)' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

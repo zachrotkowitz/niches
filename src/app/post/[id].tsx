@@ -87,7 +87,7 @@ export default function PostScreen() {
               accessibilityRole="button"
               onPress={() => setLogging(true)}
               style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{diaryWords(post.niche).did}</Text>
+              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{isMine ? diaryWords(post.niche).did : 'Add to diary'}</Text>
             </Pressable>
           </View>
         ) : null}
