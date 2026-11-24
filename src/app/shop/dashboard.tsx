@@ -40,7 +40,7 @@ export default function SellerDashboard() {
   const earned = sales.reduce((n, o) => n + net(o), 0);
   const views = mine.reduce((n, l) => n + (l.views ?? 0), 0);
   const sold = sales.reduce((n, o) => n + o.lines.reduce((m, l) => m + l.qty, 0), 0);
-  const buyRate = views ? Math.round((sold / views) * 1000) / 10 : 0;
+  const buyRate = views ? Math.round((sold / views) * 100) : 0;
   const toShip = allSales.filter((o) => o.status === 'paid' && o.lines.some((l) => l.format === 'physical'));
   const low = mine.filter((l) => l.format === 'physical' && l.stock !== undefined && l.stock <= 3);
   // Only things that have actually sold (founder, Nov 24 2026).
@@ -54,6 +54,15 @@ export default function SellerDashboard() {
     const end = Date.now() - (6 - i) * per * DAY;
     return allSales.filter((o) => o.createdAt > end - per * DAY && o.createdAt <= end).reduce((n, o) => n + net(o), 0);
   });
+  // A label under each bar (founder, Nov 24 2026): days for 7 days, the start date of each stretch otherwise.
+  const barLabels = Array.from({ length: 7 }, (_, i) => {
+    const end = new Date(Date.now() - (6 - i) * per * DAY);
+    if (i === 6 && per === 1) return 'Today';
+    if (per === 1) return end.toLocaleDateString(undefined, { weekday: 'short' });
+    return new Date(end.getTime() - (per - 1) * DAY).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  });
+  const drafts = state.listingDrafts.filter((d) => d.sellerId === meId);
+  const newest = [...mine].sort((a, b) => b.createdAt - a.createdAt);
   const top = Math.max(1, ...bars);
   const accent = niches[mine[0]?.niche ?? state.niche].accent;
 
@@ -90,6 +99,23 @@ export default function SellerDashboard() {
           </Pressable>
         </View>
 
+        {/* Drafts, titles only, right under the heading (founder picked option A, Nov 24 2026). */}
+        {drafts.length ? (
+          <View style={styles.draftCard}>
+            <Text style={[styles.draftTitle, { fontSize: 15, fontWeight: '700', color: ground.text }]}>{drafts.length} {drafts.length === 1 ? 'draft' : 'drafts'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {drafts.map((d) => (
+                <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Finish draft: ${d.title || 'Untitled'}`} onPress={() => router.push({ pathname: '/shop/new', params: { draft: d.id } })} style={styles.draftTile}>
+                  <View style={[styles.draftPhoto, { backgroundColor: '#E8E2D6' }]}>
+                    {d.photos[0] ? <Image source={{ uri: d.photos[0] }} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                  </View>
+                  <Text style={[styles.draftTitle, { color: d.title ? ground.text : ground.muted }]} numberOfLines={2}>{d.title || 'Untitled'}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
         {!mine.length ? (
           <View style={{ gap: 6, paddingTop: 10 }}>
             <Text style={[styles.emptyTitle, { color: ground.text }]}>Nothing for sale yet.</Text>
@@ -109,21 +135,22 @@ export default function SellerDashboard() {
               ]}
             />
             <View style={styles.card}>
-              {/* "Sales: $X" (founder, Nov 24 2026); still what you keep after Niches' 5%. */}
-              <View style={styles.salesRow} accessible accessibilityLabel={`Sales: ${formatPrice(earned)}`}>
-                <Text style={[styles.salesLabel, { color: ground.muted }]}>Sales:</Text>
-                <Text style={[styles.earned, { color: ground.text }]}>{formatPrice(earned)}</Text>
-              </View>
-              <View style={styles.chart} accessibilityLabel="Earnings over time">
+              {/* "Sales: $X", one size (founder, Nov 24 2026); still what you keep after Niches' 5%. */}
+              <Text accessibilityRole="header" style={[styles.earned, { color: ground.text }]}>Sales: {formatPrice(earned)}</Text>
+              <View style={styles.chart} accessibilityLabel="Sales over time">
                 {bars.map((v, i) => (
-                  <View key={i} style={[styles.bar, { height: 6 + (v / top) * 58, backgroundColor: i === 6 ? accent : `${accent}55` }]} />
+                  <View key={i} style={styles.barCol}>
+                    <View style={[styles.bar, { height: 6 + (v / top) * 58, backgroundColor: i === 6 ? accent : `${accent}55` }]} />
+                    <Text style={[styles.barLabel, { color: ground.muted }]} numberOfLines={1}>{barLabels[i]}</Text>
+                  </View>
                 ))}
               </View>
             </View>
             <View style={styles.stats}>
               {stat(String(sales.length), sales.length === 1 ? 'order' : 'orders')}
               {stat(views >= 1000 ? `${(views / 1000).toFixed(1)}k` : String(views), views === 1 ? 'view' : 'views')}
-              {stat(`${buyRate}%`, 'of views buy')}
+              {/* "6% of viewers bought" (founder, Nov 24 2026). */}
+              {!sold ? stat('No', 'buyers yet') : views ? stat(`${Math.min(100, buyRate)}%`, 'of viewers bought') : stat(String(sold), sold === 1 ? 'buyer' : 'buyers')}
             </View>
 
             {toShip.length || low.length ? (
@@ -152,6 +179,23 @@ export default function SellerDashboard() {
             </View>
             ) : null}
 
+            {/* Every listing, newest first, with price and views (founder, Nov 24 2026). */}
+            <View>
+              <Eyebrow>Your listings · {mine.length}</Eyebrow>
+              {newest.map((l) => (
+                <Pressable key={l.id} accessibilityRole="button" onPress={() => router.push({ pathname: '/shop/[id]', params: { id: l.id } })} style={[styles.best, { borderBottomColor: ground.line }]}>
+                  <View style={[styles.thumb, { backgroundColor: l.mediaColor }]}>
+                    {listingPhoto(l) ? <Image source={listingPhoto(l)} contentFit="cover" style={StyleSheet.absoluteFill} /> : null}
+                  </View>
+                  <Text style={[styles.bestTitle, { color: ground.text }]} numberOfLines={2}>{l.title}</Text>
+                  <Text style={[styles.bestNums, { color: ground.muted }]}>
+                    <Text style={{ color: ground.text, fontWeight: '700' }}>{formatPrice(l.priceCents)}</Text>{'\n'}
+                    {l.views ?? 0} {(l.views ?? 0) === 1 ? 'view' : 'views'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
             <View style={[styles.card, styles.payout]}>
               <Text style={[styles.payoutText, { color: ground.text }]}>
                 <Text style={{ fontWeight: '700' }}>Next payout</Text> · Friday
@@ -174,11 +218,15 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: fonts.displayItalic, fontSize: 26, lineHeight: 30 },
   emptyBody: { fontSize: 15, lineHeight: 21 },
   card: { padding: 14, borderRadius: 20, backgroundColor: '#FFFFFF', gap: 4 },
-  earned: { fontFamily: fonts.display, fontSize: 42, lineHeight: 46 },
-  salesRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  salesLabel: { fontSize: 17, fontWeight: '700' },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 66, marginTop: 8 },
-  bar: { flex: 1, borderRadius: 4 },
+  earned: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40 },
+  barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  barLabel: { fontSize: 10 },
+  draftCard: { padding: 14, borderRadius: 20, backgroundColor: '#FFFFFF', gap: 10 },
+  draftTile: { width: 110, gap: 5 },
+  draftPhoto: { height: 80, borderRadius: 12, overflow: 'hidden' },
+  draftTitle: { fontSize: 13, fontWeight: '600' },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 86, marginTop: 10 },
+  bar: { alignSelf: 'stretch', borderRadius: 4 },
   stats: { flexDirection: 'row', gap: 8 },
   stat: { flex: 1, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', gap: 2 },
   statNum: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30 },

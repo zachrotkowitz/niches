@@ -9,7 +9,7 @@ import { MAX_FAVORITES, seedFavorites, seedLogs, type FavoriteRef, type LogEntry
 import { seedGoals, type CheckIn, type Goal } from './goals';
 import { sampleFavorites, sampleYear } from './recap';
 import { seedPlans, type DishIdea, type Plan, type PlanItem, type Rsvp } from './plans';
-import { feeFor, seedListings, seedReviews, type CartItem, type Listing, type Order, type OrderStatus, type Review } from './shop';
+import { feeFor, seedListings, seedReviews, type CartItem, type Listing, type Order, type OrderStatus, type Review, type ListingDraft } from './shop';
 import { sampleBoards, seedBoards, type Board } from './boards';
 import { SEED_FOLLOWS, SEED_USERS, SEED_VERSION, seedComments, seedPosts, WEEK_MS } from './seed';
 import { appGround, DEFAULT_APP_GROUND, NICHE_ORDER, resolveNiches, type NicheId } from './theme';
@@ -50,6 +50,7 @@ type State = {
   recentSearches: string[];
   /** Your own reminders for plans: minutes before the plan (see reminders.ts), and the phone's notification id. */
   planReminders: Record<string, { minutes: number; notificationId?: string }>;
+  listingDrafts: ListingDraft[];
   /** Saved boards: yours, plus public ones on demo profiles. */
   boards: Board[];
   plans: Plan[];
@@ -129,6 +130,8 @@ type Action =
   | { type: 'removeSample' }
   | { type: 'setAppGround'; id: string }
   | { type: 'setRecentSearches'; list: string[] }
+  | { type: 'saveDraft'; draft: ListingDraft }
+  | { type: 'deleteDraft'; id: string }
   | { type: 'setPlanReminder'; planId: string; reminder: { minutes: number; notificationId?: string } | null }
   | { type: 'addBoard'; board: Board }
   | { type: 'mapBoard'; id: string; fn: (b: Board) => Board }
@@ -158,6 +161,7 @@ function freshState(): Persisted {
     discoverNiches: [],
     recentSearches: [],
     planReminders: {},
+    listingDrafts: [],
     boards: seedBoards(now),
     plans: seedPlans(now),
     homeMode: 'feed',
@@ -324,6 +328,10 @@ function reducer(state: State, action: Action): State {
     }
     case 'setAppGround':
       return { ...state, appGround: action.id };
+    case 'saveDraft':
+      return { ...state, listingDrafts: [action.draft, ...state.listingDrafts.filter((d) => d.id !== action.draft.id)] };
+    case 'deleteDraft':
+      return { ...state, listingDrafts: state.listingDrafts.filter((d) => d.id !== action.id) };
     case 'setPlanReminder': {
       const next = { ...state.planReminders };
       if (action.reminder) next[action.planId] = action.reminder;
@@ -692,6 +700,8 @@ function useStoreValue() {
       },
       removeSampleYear: () => dispatch({ type: 'removeSample' }),
       setAppGround: (id: string) => dispatch({ type: 'setAppGround', id }),
+      saveDraft: (draft: ListingDraft) => dispatch({ type: 'saveDraft', draft }),
+      deleteDraft: (id: string) => dispatch({ type: 'deleteDraft', id }),
       setPlanReminder: (planId: string, reminder: { minutes: number; notificationId?: string } | null) => dispatch({ type: 'setPlanReminder', planId, reminder }),
       setRecentSearches: (list: string[]) => dispatch({ type: 'setRecentSearches', list: list.slice(0, 8) }),
       /** Makes a board and returns its id. */

@@ -110,6 +110,24 @@ export function seedListings(now: number): Listing[] {
 // ——— Reviews (founder, Nov 20 2026) ———
 
 /** Only people who bought a listing can review it; one review each, which they can change. The seller can reply once. */
+/** A listing you started and saved for later (founder, Nov 24 2026). Only you see it. */
+export type ListingDraft = {
+  id: string;
+  sellerId: string;
+  niche: NicheId;
+  title: string;
+  description: string;
+  price: string;
+  shipping: string;
+  quantity: string;
+  format: ListingFormat;
+  kind: string;
+  other: string;
+  photos: string[];
+  linkedPostId?: string;
+  savedAt: number;
+};
+
 export type Review = {
   id: string;
   listingId: string;

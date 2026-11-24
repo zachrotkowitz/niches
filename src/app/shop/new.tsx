@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/discover-parts';
@@ -38,30 +38,46 @@ function toCents(text: string): number | null {
  * `postId` fills it in from one of your posts.
  */
 export default function NewListingScreen() {
-  const params = useLocalSearchParams<{ niche?: NicheId; postId?: string }>();
+  const params = useLocalSearchParams<{ niche?: NicheId; postId?: string; draft?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { state, actions } = useStore();
   const niches = useNiches();
   const ground = groundSurface(useAppGround());
-  const fromPost = params.postId ? state.posts.find((p) => p.id === params.postId && p.authorId === state.me?.id) : undefined;
+  const draft = params.draft ? state.listingDrafts.find((d) => d.id === params.draft && d.sellerId === state.me?.id) : undefined;
+  const fromPost = !draft && params.postId ? state.posts.find((p) => p.id === params.postId && p.authorId === state.me?.id) : undefined;
 
   const pick = (id?: string): NicheId | undefined => (id && SHOP_NICHES.includes(id as NicheId) ? (id as NicheId) : undefined);
-  const start = pick(fromPost?.niche) ?? pick(params.niche) ?? pick(state.niche) ?? 'cooking';
-  const [nicheId, setNicheId] = useState<NicheId>(start);
-  const [format, setFormat] = useState<ListingFormat>('physical');
-  const [kind, setKind] = useState('');
-  const [other, setOther] = useState('');
-  const [title, setTitle] = useState(fromPost ? shortTitle(fromPost.mediaLabel || fromPost.caption, 60) : '');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [shipping, setShipping] = useState('5');
-  const [quantity, setQuantity] = useState('');
+  const start = pick(draft?.niche) ?? pick(fromPost?.niche) ?? pick(params.niche) ?? pick(state.niche) ?? 'cooking';
+  // Where the form started (a draft, a post or empty), so backing out only asks "Save as draft?" after a change.
+  const [initial] = useState(() => ({
+    niche: start,
+    format: draft?.format ?? ('physical' as ListingFormat),
+    kind: draft?.kind ?? '',
+    other: draft?.other ?? '',
+    title: draft?.title ?? (fromPost ? shortTitle(fromPost.mediaLabel || fromPost.caption, 60) : ''),
+    description: draft?.description ?? '',
+    price: draft?.price ?? '',
+    shipping: draft?.shipping ?? '5',
+    quantity: draft?.quantity ?? '',
+    photos: draft?.photos ?? (fromPost?.imageUri ? [fromPost.imageUri] : []),
+    linkedPostId: draft ? draft.linkedPostId : fromPost?.id,
+  }));
+  const [nicheId, setNicheId] = useState<NicheId>(initial.niche);
+  const [format, setFormat] = useState<ListingFormat>(initial.format);
+  const [kind, setKind] = useState(initial.kind);
+  const [other, setOther] = useState(initial.other);
+  const [title, setTitle] = useState(initial.title);
+  const [description, setDescription] = useState(initial.description);
+  const [price, setPrice] = useState(initial.price);
+  const [shipping, setShipping] = useState(initial.shipping);
+  const [quantity, setQuantity] = useState(initial.quantity);
   // Several photos (founder, Nov 24 2026): the first is the cover; buyers swipe through the rest.
-  const [photos, setPhotos] = useState<string[]>(fromPost?.imageUri ? [fromPost.imageUri] : []);
+  const [photos, setPhotos] = useState<string[]>(initial.photos);
   const [shown, setShown] = useState(0);
-  const [linkedPostId, setLinkedPostId] = useState<string | undefined>(fromPost?.id);
+  const [linkedPostId, setLinkedPostId] = useState<string | undefined>(initial.linkedPostId);
+  const [askDraft, setAskDraft] = useState(false);
   const [choosingPost, setChoosingPost] = useState(false);
   const [ownWork, setOwnWork] = useState(false);
 
@@ -106,7 +122,23 @@ export default function NewListingScreen() {
     setKind('');
     if (!fromPost) setLinkedPostId(undefined);
   };
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  const now = { niche: nicheId, format, kind, other, title, description, price, shipping, quantity, photos, linkedPostId };
+  const changed = JSON.stringify(now) !== JSON.stringify(initial);
+  // Backing out after a change asks "Save as draft?" (founder, Nov 24 2026).
+  const close = () => (changed ? setAskDraft(true) : leave());
+  const saveDraft = () => {
+    if (!state.me) return;
+    actions.saveDraft({ id: draft?.id ?? `d_${Date.now().toString(36)}`, sellerId: state.me.id, ...now, savedAt: Date.now() });
+    setAskDraft(false);
+    toast('Saved to your drafts');
+    leave();
+  };
+  const dropDraft = () => {
+    if (draft) actions.deleteDraft(draft.id);
+    setAskDraft(false);
+    leave();
+  };
 
   const create = () => {
     if (!ready || !state.me || priceCents === null) return;
@@ -127,6 +159,7 @@ export default function NewListingScreen() {
       moreImageUris: photos.length > 1 ? photos.slice(1) : undefined,
       mediaLabel: title.trim(),
     });
+    if (draft) actions.deleteDraft(draft.id);
     toast(`Listed in the ${niche.label} shop`);
     router.replace({ pathname: '/shop/[id]', params: { id } });
   };
@@ -386,6 +419,24 @@ export default function NewListingScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <Modal visible={askDraft} transparent animationType="slide" onRequestClose={() => setAskDraft(false)} statusBarTranslucent>
+        {/* Nothing behind is dimmed (founder); tap above to keep editing. */}
+        <Pressable accessibilityRole="button" accessibilityLabel="Keep editing" style={{ flex: 1 }} onPress={() => setAskDraft(false)} />
+        <View accessibilityViewIsModal style={[styles.sheet, { backgroundColor: ground.ground, paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+          <View style={styles.grabber} />
+          <Text accessibilityRole="header" style={[styles.sheetTitle, { color: ground.text }]}>Save as draft?</Text>
+          <Text style={[styles.sheetBody, { color: ground.muted }]}>You can finish it later from Your shop. Only you can see drafts.</Text>
+          <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.listIt, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
+            <Text style={[styles.listItText, { color: ground.ground }]}>Save draft</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.keepEditing, { borderColor: ground.text, opacity: pressed ? 0.7 : 1 }]}>
+            <Text style={[styles.keepEditingText, { color: ground.text }]}>Keep editing</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={dropDraft} hitSlop={8} style={styles.deleteHit}>
+            <Text style={styles.deleteText}>{draft ? 'Delete the draft' : 'Delete it'}</Text>
+          </Pressable>
+        </View>
+      </Modal>
       <PhotoEditor photo={editing?.photo ?? null} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
@@ -439,4 +490,12 @@ const styles = StyleSheet.create({
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   listIt: { minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   listItText: { fontSize: 16, fontWeight: '700' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowColor: '#1F1A14', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
+  grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(31,26,20,0.18)' },
+  sheetTitle: { fontFamily: fonts.displayItalic, fontSize: 32, lineHeight: 36 },
+  sheetBody: { fontSize: 14, lineHeight: 20 },
+  keepEditing: { minHeight: 50, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  keepEditingText: { fontSize: 15, fontWeight: '700' },
+  deleteHit: { alignSelf: 'center', minHeight: 36, justifyContent: 'center' },
+  deleteText: { fontSize: 14, fontWeight: '700', color: '#A3402B', textDecorationLine: 'underline' },
 });
