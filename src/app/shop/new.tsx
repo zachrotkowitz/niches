@@ -436,7 +436,6 @@ export default function NewListingScreen() {
               <Text style={[styles.previewSub, { color: ground.muted }]} numberOfLines={1}>{niche.label} shop{priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}</Text>
             </View>
           </View>
-          <Text style={[styles.sheetBody, { color: ground.muted }]}>Finish it later from Your shop. Only you can see drafts.</Text>
           <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.listIt, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
             <Text style={[styles.listItText, { color: ground.ground }]}>Save draft</Text>
           </Pressable>
