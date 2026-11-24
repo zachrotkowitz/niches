@@ -16,6 +16,8 @@ import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { EditStep } from '@/components/photo-editor';
+import { DraftPrompt } from '@/components/draft-prompt';
+import { useToast } from '@/components/toast';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
 import { postPhoto } from '@/lib/demo-photos';
 import { SHOP_NICHES } from '@/lib/shop';
@@ -28,7 +30,7 @@ import { isoDay } from '@/lib/plans';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { setTabBarHidden } from '@/lib/tab-events';
 import { BODY_FONTS, fonts, groundSurface, NICHE_ORDER, TOUCH, type Niche, type NicheId } from '@/lib/theme';
-import type { Post, PostKind } from '@/lib/types';
+import type { Post, PostDraft, PostKind } from '@/lib/types';
 
 type Kind = 'post' | 'progress' | 'question';
 
@@ -90,6 +92,10 @@ export default function CreateScreen() {
   // Cropping or saving a filter takes a moment.
   const [working, setWorking] = useState(false);
   const [posted, setPosted] = useState<Posted | null>(null);
+  // Drafts (founder, Nov 24 2026): the one you reopened, and whether "Save … as a draft?" is showing.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [askDraft, setAskDraft] = useState(false);
+  const toast = useToast();
   const [membersOnly, setMembersOnly] = useState(false);
   // Photo first, then the words.
   const [step, setStep] = useState<'photo' | 'edit' | 'write'>('photo');
@@ -176,6 +182,8 @@ export default function CreateScreen() {
       goalId: kind === 'progress' && pickedGoal ? pickedGoal.id : undefined,
       premium: premium ? true : undefined,
     });
+    if (draftId) actions.deletePostDraft(draftId);
+    setDraftId(null);
     actions.setNiche(nicheId);
     // A soft tap to say it went through (founder, Nov 2026).
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
@@ -198,6 +206,57 @@ export default function CreateScreen() {
     setCameBack(false);
     if (params.goalId) router.setParams({ goalId: undefined });
   };
+
+  // Backing out: a saved draft always asks; a new post asks once there's something in it.
+  const hasContent = !!(caption.trim() || photo || source || goal.trim());
+  const leave = () => {
+    reset();
+    setDraftId(null);
+    setAskDraft(false);
+    router.navigate('/');
+  };
+  const tryClose = () => (draftId || hasContent ? setAskDraft(true) : leave());
+  const saveDraft = () => {
+    if (!state.me) return;
+    const pic = photo ?? source ?? undefined;
+    actions.savePostDraft({ id: draftId ?? `pd_${Date.now().toString(36)}`, authorId: state.me.id, niche: nicheId, kind, caption, goal, goalId, photo: pic ? { uri: pic.uri, width: pic.width, height: pic.height } : undefined, membersOnly, savedAt: Date.now() });
+    toast('Saved to your drafts');
+    leave();
+  };
+  const deleteDraft = () => {
+    if (draftId) actions.deletePostDraft(draftId);
+    leave();
+  };
+  const openDraft = (d: PostDraft) => {
+    reset();
+    setDraftId(d.id);
+    if (NICHES[d.niche].open) setNicheId(d.niche);
+    setKind(d.kind);
+    setCaption(d.caption);
+    setGoal(d.goal);
+    setGoalId(d.goalId);
+    setMembersOnly(d.membersOnly);
+    if (d.photo) {
+      setSource(d.photo);
+      setPhoto(d.photo);
+    }
+    setStep('write');
+  };
+  const myDrafts = state.postDrafts.filter((d) => d.authorId === state.me?.id);
+  const draftPrompt = (
+    <DraftPrompt
+      visible={askDraft}
+      saved={!!draftId}
+      title={shortTitle(caption.trim(), 40)}
+      photo={photo ?? source ?? undefined}
+      tag={kind === 'question' ? `Question · ${NICHES[nicheId].label}` : `Post · ${NICHES[nicheId].label}`}
+      tint={NICHES[nicheId].mid}
+      ink={NICHES[nicheId].ink}
+      onKeep={() => setAskDraft(false)}
+      onSave={saveDraft}
+      onDelete={deleteDraft}
+    />
+  );
 
   if (posted) return <PostedScreen posted={posted} onDone={reset} />;
   const backToPhoto = () => {
@@ -237,10 +296,10 @@ export default function CreateScreen() {
         // Once you've written something, the corner button goes back to it instead of throwing it away.
         hasDraft={caption.trim().length > 0}
         onBack={() => setStep('write')}
-        onClose={() => {
-          reset();
-          router.navigate('/');
-        }}
+        onClose={tryClose}
+        drafts={myDrafts}
+        onOpenDraft={openDraft}
+        prompt={draftPrompt}
       />
     );
   }
@@ -275,7 +334,12 @@ export default function CreateScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: TAB_BAR_SPACE }} keyboardShouldPersistTaps="handled">
           <View style={[styles.masthead, { borderBottomColor: ground.text }]}>
-            <DisplayText size={42} color={ground.text}>New post</DisplayText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -10 }}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={tryClose} style={styles.stepIcon}>
+                <CloseIcon color={ground.text} />
+              </Pressable>
+              <DisplayText size={42} color={ground.text}>New post</DisplayText>
+            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: !ready }}
@@ -460,6 +524,7 @@ export default function CreateScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       </Animated.View>
+      {draftPrompt}
     </SurfaceProvider>
   );
 }
@@ -492,7 +557,13 @@ function PhotoStep({
   onText,
   onBack,
   onClose,
+  drafts,
+  onOpenDraft,
+  prompt,
 }: {
+  drafts: PostDraft[];
+  onOpenDraft: (d: PostDraft) => void;
+  prompt: React.ReactNode;
   entering: ComponentProps<typeof Animated.View>['entering'];
   photo: PickedPhoto | null;
   framing: Framing;
@@ -572,7 +643,25 @@ function PhotoStep({
             </Pressable>
           </View>
         </View>
+
+        {/* Your saved drafts, under the photo (founder, Nov 24 2026). */}
+        {drafts.length ? (
+          <View style={{ width: w, paddingHorizontal: 12, gap: 8 }}>
+            <Text style={[styles.draftsLabel, { color: ground.muted }]}>DRAFTS · {drafts.length}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {drafts.map((d) => (
+                <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Open draft: ${d.caption.trim() || 'Untitled'}`} onPress={() => onOpenDraft(d)} style={styles.draftTile}>
+                  <View style={[styles.draftThumb, { backgroundColor: '#FFFFFF' }]}>
+                    {d.photo ? <Image source={{ uri: d.photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} /> : <Text style={[styles.draftAa, { color: ground.muted }]}>Aa</Text>}
+                  </View>
+                  <Text style={[styles.draftText, { color: d.caption.trim() ? ground.text : ground.muted }]} numberOfLines={2}>{d.caption.trim() || 'Untitled'}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
       </Animated.View>
+      {prompt}
     </SurfaceProvider>
   );
 }
@@ -709,6 +798,11 @@ const styles = StyleSheet.create({
   stepIcon: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
   emptyPreview: { alignItems: 'center', justifyContent: 'center', gap: 6 },
   emptyTitle: { fontFamily: fonts.displayItalic, fontSize: 34, lineHeight: 38 },
+  draftsLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.9 },
+  draftTile: { width: 92, gap: 5 },
+  draftThumb: { width: 92, height: 92, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  draftAa: { fontFamily: fonts.display, fontSize: 26 },
+  draftText: { fontSize: 12, fontWeight: '600', lineHeight: 15 },
   stepRow: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   rollButton: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
   rollText: { fontSize: 15, fontWeight: '700' },

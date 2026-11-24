@@ -85,3 +85,17 @@ export type Post = {
 };
 
 export type ReportReason = 'spam' | 'harassment' | 'harmful' | 'stolen' | 'other';
+
+/** A post you started and saved for later (founder, Nov 24 2026). Only you see it. */
+export type PostDraft = {
+  id: string;
+  authorId: string;
+  niche: NicheId;
+  kind: 'post' | 'progress' | 'question';
+  caption: string;
+  goal: string;
+  goalId: string | null;
+  photo?: { uri: string; width: number; height: number };
+  membersOnly: boolean;
+  savedAt: number;
+};

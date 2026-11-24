@@ -12,6 +12,7 @@ import { useToast } from '@/components/toast';
 import { postPhoto } from '@/lib/demo-photos';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
 import { PhotoEditor, withSize } from '@/components/photo-editor';
+import { DraftPrompt } from '@/components/draft-prompt';
 import { CATEGORIES, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
 import { useAppGround, useNiches, useStore } from '@/lib/store';
 import { fonts, groundSurface, type NicheId } from '@/lib/theme';
@@ -420,37 +421,18 @@ export default function NewListingScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      <Modal visible={askDraft} transparent animationType="slide" onRequestClose={() => setAskDraft(false)} statusBarTranslucent>
-        {/* Nothing behind is dimmed (founder); tap anywhere above to keep editing. */}
-        <Pressable accessibilityRole="button" accessibilityLabel="Keep editing" style={{ flex: 1 }} onPress={() => setAskDraft(false)} />
-        {/* Option A (founder, Nov 24 2026): a white card floating above the bottom, your photo across the top. */}
-        <View accessibilityViewIsModal style={[styles.popCard, { marginBottom: Math.max(insets.bottom, 14) + 10 }]}>
-          <View style={[styles.popPhoto, { backgroundColor: niche.mid }]}>
-            {photos[0] ? <Image source={{ uri: photos[0] }} contentFit="cover" style={StyleSheet.absoluteFill} /> : seen ? <Image source={seen} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={30} color={niche.ink} />}
-            <View style={styles.popTag}>
-              <Text style={styles.popTagText}>{niche.label} shop{priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}</Text>
-            </View>
-          </View>
-          <View style={styles.popBody}>
-            <Text accessibilityRole="header" style={[styles.popTitle, { color: ground.text }]}>
-              {draft ? 'Keep ' : 'Save '}
-              {title.trim() ? <Text style={{ fontFamily: fonts.displayItalic }}>{title.trim()}</Text> : 'this'}
-              {' as a draft?'}
-            </Text>
-            <View style={styles.popButtons}>
-              <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.popButton, { backgroundColor: ground.ground, opacity: pressed ? 0.75 : 1 }]}>
-                <Text style={[styles.popButtonText, { color: ground.text }]}>Keep editing</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.popButton, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
-                <Text style={[styles.popButtonText, { color: ground.ground }]}>Save draft</Text>
-              </Pressable>
-            </View>
-            <Pressable accessibilityRole="button" onPress={dropDraft} hitSlop={8} style={styles.deleteHit}>
-              <Text style={styles.deleteText}>{draft ? 'Delete the draft' : 'Delete it'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <DraftPrompt
+        visible={askDraft}
+        saved={!!draft}
+        title={title}
+        photo={photos[0] ? { uri: photos[0] } : seen}
+        tag={`${niche.label} shop${priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}`}
+        tint={niche.mid}
+        ink={niche.ink}
+        onKeep={() => setAskDraft(false)}
+        onSave={saveDraft}
+        onDelete={dropDraft}
+      />
       <PhotoEditor photo={editing?.photo ?? null} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
@@ -504,25 +486,4 @@ const styles = StyleSheet.create({
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   listIt: { minHeight: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   listItText: { fontSize: 16, fontWeight: '700' },
-  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 12, shadowColor: '#1F1A14', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: -10 }, elevation: 16 },
-  grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(31,26,20,0.18)' },
-  sheetTitle: { fontFamily: fonts.displayItalic, fontSize: 32, lineHeight: 36 },
-  sheetBody: { fontSize: 14, lineHeight: 20 },
-  keepEditing: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 18 },
-  previewPhoto: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  previewTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 24 },
-  previewSub: { fontSize: 12 },
-  keepEditingText: { fontSize: 15, fontWeight: '700' },
-  popCard: { marginHorizontal: 14, borderRadius: 28, backgroundColor: '#FFFFFF', overflow: 'hidden', shadowColor: '#1F1A14', shadowOpacity: 0.22, shadowRadius: 25, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
-  popPhoto: { height: 150, alignItems: 'center', justifyContent: 'center' },
-  popTag: { position: 'absolute', left: 14, bottom: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.92)' },
-  popTagText: { fontSize: 12, fontWeight: '700', color: '#1F1A14' },
-  popBody: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 12, gap: 14 },
-  popTitle: { fontFamily: fonts.display, fontSize: 30, lineHeight: 33 },
-  popButtons: { flexDirection: 'row', gap: 10 },
-  popButton: { flex: 1, minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  popButtonText: { fontSize: 15, fontWeight: '700' },
-  deleteHit: { alignSelf: 'center', minHeight: 36, justifyContent: 'center' },
-  deleteText: { fontSize: 14, fontWeight: '700', color: '#A3402B', textDecorationLine: 'underline' },
 });
