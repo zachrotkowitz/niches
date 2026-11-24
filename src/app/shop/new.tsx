@@ -421,30 +421,34 @@ export default function NewListingScreen() {
         </View>
       </KeyboardAvoidingView>
       <Modal visible={askDraft} transparent animationType="slide" onRequestClose={() => setAskDraft(false)} statusBarTranslucent>
-        {/* Nothing behind is dimmed (founder); tap above to keep editing. */}
+        {/* Nothing behind is dimmed (founder); tap anywhere above to keep editing. */}
         <Pressable accessibilityRole="button" accessibilityLabel="Keep editing" style={{ flex: 1 }} onPress={() => setAskDraft(false)} />
-        {/* A white sheet with a cream preview of the draft, so the two don't blend (founder, Nov 24 2026). */}
-        <View accessibilityViewIsModal style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
-          <View style={styles.grabber} />
-          <Text accessibilityRole="header" style={[styles.sheetTitle, { color: ground.text }]}>{draft ? 'Keep this draft?' : 'Save as draft?'}</Text>
-          <View style={[styles.preview, { backgroundColor: ground.ground }]}>
-            <View style={[styles.previewPhoto, { backgroundColor: niche.mid }]}>
-              {photos[0] ? <Image source={{ uri: photos[0] }} contentFit="cover" style={StyleSheet.absoluteFill} /> : seen ? <Image source={seen} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={20} color={niche.ink} />}
-            </View>
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text style={[styles.previewTitle, { color: title.trim() ? ground.text : ground.muted }]} numberOfLines={2}>{title.trim() || 'Untitled'}</Text>
-              <Text style={[styles.previewSub, { color: ground.muted }]} numberOfLines={1}>{niche.label} shop{priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}</Text>
+        {/* Option A (founder, Nov 24 2026): a white card floating above the bottom, your photo across the top. */}
+        <View accessibilityViewIsModal style={[styles.popCard, { marginBottom: Math.max(insets.bottom, 14) + 10 }]}>
+          <View style={[styles.popPhoto, { backgroundColor: niche.mid }]}>
+            {photos[0] ? <Image source={{ uri: photos[0] }} contentFit="cover" style={StyleSheet.absoluteFill} /> : seen ? <Image source={seen} contentFit="cover" style={StyleSheet.absoluteFill} /> : <CameraIcon size={30} color={niche.ink} />}
+            <View style={styles.popTag}>
+              <Text style={styles.popTagText}>{niche.label} shop{priceCents !== null ? ` · ${formatPrice(priceCents)}` : ''}</Text>
             </View>
           </View>
-          <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.listIt, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
-            <Text style={[styles.listItText, { color: ground.ground }]}>Save draft</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.keepEditing, { backgroundColor: ground.ground, opacity: pressed ? 0.7 : 1 }]}>
-            <Text style={[styles.keepEditingText, { color: ground.text }]}>Keep editing</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={dropDraft} hitSlop={8} style={styles.deleteHit}>
-            <Text style={styles.deleteText}>{draft ? 'Delete the draft' : 'Delete it'}</Text>
-          </Pressable>
+          <View style={styles.popBody}>
+            <Text accessibilityRole="header" style={[styles.popTitle, { color: ground.text }]}>
+              {draft ? 'Keep ' : 'Save '}
+              {title.trim() ? <Text style={{ fontFamily: fonts.displayItalic }}>{title.trim()}</Text> : 'this'}
+              {' as a draft?'}
+            </Text>
+            <View style={styles.popButtons}>
+              <Pressable accessibilityRole="button" onPress={() => setAskDraft(false)} style={({ pressed }) => [styles.popButton, { backgroundColor: ground.ground, opacity: pressed ? 0.75 : 1 }]}>
+                <Text style={[styles.popButtonText, { color: ground.text }]}>Keep editing</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={saveDraft} style={({ pressed }) => [styles.popButton, { backgroundColor: ground.text, opacity: pressed ? 0.85 : 1 }]}>
+                <Text style={[styles.popButtonText, { color: ground.ground }]}>Save draft</Text>
+              </Pressable>
+            </View>
+            <Pressable accessibilityRole="button" onPress={dropDraft} hitSlop={8} style={styles.deleteHit}>
+              <Text style={styles.deleteText}>{draft ? 'Delete the draft' : 'Delete it'}</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
       <PhotoEditor photo={editing?.photo ?? null} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
@@ -510,6 +514,15 @@ const styles = StyleSheet.create({
   previewTitle: { fontFamily: fonts.display, fontSize: 21, lineHeight: 24 },
   previewSub: { fontSize: 12 },
   keepEditingText: { fontSize: 15, fontWeight: '700' },
+  popCard: { marginHorizontal: 14, borderRadius: 28, backgroundColor: '#FFFFFF', overflow: 'hidden', shadowColor: '#1F1A14', shadowOpacity: 0.22, shadowRadius: 25, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
+  popPhoto: { height: 150, alignItems: 'center', justifyContent: 'center' },
+  popTag: { position: 'absolute', left: 14, bottom: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.92)' },
+  popTagText: { fontSize: 12, fontWeight: '700', color: '#1F1A14' },
+  popBody: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 12, gap: 14 },
+  popTitle: { fontFamily: fonts.display, fontSize: 30, lineHeight: 33 },
+  popButtons: { flexDirection: 'row', gap: 10 },
+  popButton: { flex: 1, minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  popButtonText: { fontSize: 15, fontWeight: '700' },
   deleteHit: { alignSelf: 'center', minHeight: 36, justifyContent: 'center' },
   deleteText: { fontSize: 14, fontWeight: '700', color: '#A3402B', textDecorationLine: 'underline' },
 });
