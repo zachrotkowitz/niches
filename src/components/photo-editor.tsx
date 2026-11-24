@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as RNImage, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,24 @@ const pageIn = (from: 'left' | 'right') =>
  * photos (founder, Nov 24 2026): frame it (pinch, drag, photo shape or
  * square), then Filters / Adjust, then Done hands back the new photo.
  */
-export function PhotoEditor({ photo, title, onCancel, onDone }: { photo: PickedPhoto | null; title: string; onCancel: () => void; onDone: (p: PickedPhoto) => void }) {
+/** Where an edited photo came from, so it can be re-cropped from the full original (founder, Nov 24 2026). */
+export type PhotoOrigin = { original: PickedPhoto; framing: Framing; edits: PhotoEdits };
+
+export function PhotoEditor({
+  photo,
+  title,
+  start,
+  onCancel,
+  onDone,
+}: {
+  /** The full original photo to frame. */
+  photo: PickedPhoto | null;
+  title: string;
+  /** The crop and look it had last time, to pick up where you left off. */
+  start?: { framing: Framing; edits: PhotoEdits };
+  onCancel: () => void;
+  onDone: (p: PickedPhoto, origin: PhotoOrigin) => void;
+}) {
   const insets = useSafeAreaInsets();
   const ground = useAppGround();
   const { width, height } = useWindowDimensions();
@@ -42,6 +59,15 @@ export function PhotoEditor({ photo, title, onCancel, onDone }: { photo: PickedP
     setCropped(null);
     setEdits(NO_EDITS);
   };
+  // Each time it opens, start from the last crop and look (or none).
+  useEffect(() => {
+    if (!photo) return;
+    setFraming(start?.framing ?? START_FRAMING);
+    setEdits(start?.edits ?? NO_EDITS);
+    setCropped(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photo]);
+  const changed = JSON.stringify(framing) !== JSON.stringify(START_FRAMING) || !isUnedited(edits);
   const close = () => (reset(), onCancel());
 
   return (
@@ -74,6 +100,12 @@ export function PhotoEditor({ photo, title, onCancel, onDone }: { photo: PickedP
               <Animated.View entering={FadeIn.duration(220).reduceMotion(ReduceMotion.System)}>
                 <CropFrame photo={photo} width={w} height={previewH} framing={framing} onChange={setFraming} />
               </Animated.View>
+              {/* Back to the whole photo, no crop and no filter (founder, Nov 24 2026). */}
+              {changed ? (
+                <Pressable accessibilityRole="button" onPress={() => (setFraming(START_FRAMING), setEdits(NO_EDITS))} hitSlop={8} style={styles.resetHit}>
+                  <Text style={[styles.resetText, { color: ground.text }]}>Reset to original</Text>
+                </Pressable>
+              ) : null}
             </View>
           </SurfaceProvider>
         ) : null}
@@ -89,8 +121,9 @@ export function PhotoEditor({ photo, title, onCancel, onDone }: { photo: PickedP
               setWorking(true);
               try {
                 const out = isUnedited(edits) ? cropped : await bakePhoto(cropped, editMatrix(edits));
+                const origin = { original: photo, framing, edits };
                 reset();
-                onDone(out);
+                onDone(out, origin);
               } finally {
                 setWorking(false);
               }
@@ -201,4 +234,6 @@ const styles = StyleSheet.create({
   filterTile: { alignItems: 'center', gap: 6 },
   filterThumb: { borderRadius: 14, borderWidth: 2.5, padding: 1.5 },
   filterName: { fontSize: 12 },
+  resetHit: { marginTop: 14, minHeight: 36, justifyContent: 'center' },
+  resetText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
 });

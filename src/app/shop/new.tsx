@@ -11,7 +11,8 @@ import { Text } from '@/components/text';
 import { useToast } from '@/components/toast';
 import { postPhoto } from '@/lib/demo-photos';
 import { pickPhoto, type PickedPhoto } from '@/lib/photos';
-import { PhotoEditor, withSize } from '@/components/photo-editor';
+import { PhotoEditor, withSize, type PhotoOrigin } from '@/components/photo-editor';
+import type { Framing, PhotoEdits } from '@/lib/photo-edit';
 import { DraftPrompt } from '@/components/draft-prompt';
 import { PhotoStrip } from '@/components/photo-strip';
 import { CATEGORIES, feeFor, formatPrice, SHOP_NICHES, type ListingFormat } from '@/lib/shop';
@@ -93,15 +94,21 @@ export default function NewListingScreen() {
   const seen = photos[shown] ? { uri: photos[shown] } : !photos.length && fromPost ? postPhoto(fromPost) : undefined;
 
   // Crop and edit like a post photo (founder, Nov 24 2026): every new photo opens the editor; Edit reopens it.
-  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null } | null>(null);
+  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null; start?: { framing: Framing; edits: PhotoEdits } } | null>(null);
+  // Each photo's full original and last crop/look, so Edit can go back to the whole photo (founder, Nov 24 2026).
+  const [origins, setOrigins] = useState<Record<string, PhotoOrigin>>((draft?.origins ?? {}) as Record<string, PhotoOrigin>);
   const addPhoto = async () => {
     if (photos.length >= MAX_PHOTOS) return;
     const picked = await pickPhoto();
     if (picked) setEditing({ photo: picked, index: null });
   };
-  const editPhoto = async (i: number) => setEditing({ photo: await withSize(photos[i]), index: i });
-  const editDone = (p: PickedPhoto) => {
+  const editPhoto = async (i: number) => {
+    const o = origins[photos[i]];
+    setEditing(o ? { photo: o.original, index: i, start: { framing: o.framing, edits: o.edits } } : { photo: await withSize(photos[i]), index: i });
+  };
+  const editDone = (p: PickedPhoto, origin: PhotoOrigin) => {
     if (!editing) return;
+    setOrigins((m) => ({ ...m, [p.uri]: origin }));
     if (editing.index === null) {
       setPhotos((ps) => [...ps, p.uri]);
       setShown(photos.length);
@@ -128,7 +135,7 @@ export default function NewListingScreen() {
   const close = () => (changed || draft ? setAskDraft(true) : leave());
   const saveDraft = () => {
     if (!state.me) return;
-    actions.saveDraft({ id: draft?.id ?? `d_${Date.now().toString(36)}`, sellerId: state.me.id, ...now, savedAt: Date.now() });
+    actions.saveDraft({ id: draft?.id ?? `d_${Date.now().toString(36)}`, sellerId: state.me.id, ...now, origins, savedAt: Date.now() });
     setAskDraft(false);
     toast('Saved to your drafts');
     leave();
@@ -421,7 +428,7 @@ export default function NewListingScreen() {
         onSave={saveDraft}
         onDelete={dropDraft}
       />
-      <PhotoEditor photo={editing?.photo ?? null} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
+      <PhotoEditor photo={editing?.photo ?? null} start={editing?.start} title="Listing photo" onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
 }

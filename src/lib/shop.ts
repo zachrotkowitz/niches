@@ -124,6 +124,8 @@ export type ListingDraft = {
   kind: string;
   other: string;
   photos: string[];
+  /** Each photo's full original and last crop/look. */
+  origins?: Record<string, import('./types').PhotoOriginData>;
   linkedPostId?: string;
   savedAt: number;
 };

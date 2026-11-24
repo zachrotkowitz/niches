@@ -99,6 +99,15 @@ export type PostDraft = {
   goalId: string | null;
   photo?: { uri: string; width: number; height: number };
   morePhotos?: string[];
+  /** Each photo's full original and last crop/look, so Edit can go back to the whole photo. */
+  origins?: Record<string, PhotoOriginData>;
   membersOnly: boolean;
   savedAt: number;
+};
+
+/** A photo's full original and the crop/look it was given (kept with drafts). */
+export type PhotoOriginData = {
+  original: { uri: string; width: number; height: number };
+  framing: { zoom: number; x: number; y: number; square: boolean };
+  edits: { filter: string; adjust: { brightness: number; contrast: number; warmth: number; saturation: number } };
 };

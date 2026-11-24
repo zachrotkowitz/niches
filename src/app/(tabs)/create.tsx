@@ -15,7 +15,7 @@ import { Text } from '@/components/text';
 import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
-import { EditStep, PhotoEditor, withSize } from '@/components/photo-editor';
+import { EditStep, PhotoEditor, withSize, type PhotoOrigin } from '@/components/photo-editor';
 import { PhotoStrip } from '@/components/photo-strip';
 import { DraftPrompt } from '@/components/draft-prompt';
 import { useToast } from '@/components/toast';
@@ -94,7 +94,9 @@ export default function CreateScreen() {
   // More photos after the first (founder, Nov 24 2026), each framed and edited like the first.
   const [more, setMore] = useState<string[]>([]);
   // The photo editor, for a new extra photo (index null) or to re-edit / replace one in place.
-  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null } | null>(null);
+  const [editing, setEditing] = useState<{ photo: PickedPhoto; index: number | null; start?: { framing: Framing; edits: PhotoEdits } } | null>(null);
+  // Each photo's full original and last crop/look, so Edit can go back to the whole photo (founder, Nov 24 2026).
+  const [origins, setOrigins] = useState<Record<string, PhotoOrigin>>({});
   // Which photo shows big on the write step; tap a thumbnail to show it (founder, Nov 24 2026).
   const [shown, setShown] = useState(0);
   const [picking, setPicking] = useState(false);
@@ -231,7 +233,7 @@ export default function CreateScreen() {
   const saveDraft = () => {
     if (!state.me) return;
     const pic = photo ?? source ?? undefined;
-    actions.savePostDraft({ id: draftId ?? `pd_${Date.now().toString(36)}`, authorId: state.me.id, niche: nicheId, kind, caption, goal, goalId, photo: pic ? { uri: pic.uri, width: pic.width, height: pic.height } : undefined, morePhotos: more.length ? more : undefined, membersOnly, savedAt: Date.now() });
+    actions.savePostDraft({ id: draftId ?? `pd_${Date.now().toString(36)}`, authorId: state.me.id, niche: nicheId, kind, caption, goal, goalId, photo: pic ? { uri: pic.uri, width: pic.width, height: pic.height } : undefined, morePhotos: more.length ? more : undefined, origins, membersOnly, savedAt: Date.now() });
     toast('Saved to your drafts');
     leave();
   };
@@ -253,6 +255,7 @@ export default function CreateScreen() {
       setPhoto(d.photo);
     }
     setMore(d.morePhotos ?? []);
+    setOrigins((d.origins ?? {}) as Record<string, PhotoOrigin>);
     setStep('write');
   };
   const myDrafts = state.postDrafts.filter((d) => d.authorId === state.me?.id);
@@ -313,7 +316,11 @@ export default function CreateScreen() {
     if (picked) setEditing({ photo: picked, index: null });
   };
   // Edit (pencil) re-opens the editor on the photo showing; Change picks a new one for that spot.
-  const editShown = async () => setEditing({ photo: shown === 0 && photo ? photo : await withSize(allPhotos[shown]), index: shown });
+  const editShown = async () => {
+    const uri = allPhotos[shown];
+    const o = origins[uri];
+    setEditing(o ? { photo: o.original, index: shown, start: { framing: o.framing, edits: o.edits } } : { photo: shown === 0 && photo ? photo : await withSize(uri), index: shown });
+  };
   const changeShown = async () => {
     if (shown === 0) {
       backToPhoto();
@@ -323,8 +330,9 @@ export default function CreateScreen() {
     const picked = await pickPhoto();
     if (picked) setEditing({ photo: picked, index: shown });
   };
-  const editDone = (p: PickedPhoto) => {
+  const editDone = (p: PickedPhoto, origin: PhotoOrigin) => {
     if (!editing) return;
+    setOrigins((m) => ({ ...m, [p.uri]: origin }));
     if (editing.index === null) {
       setMore((m) => [...m, p.uri]);
       setShown(allPhotos.length);
@@ -384,7 +392,10 @@ export default function CreateScreen() {
         onNext={async () => {
           setWorking(true);
           try {
-            setPhoto(isUnedited(edits) ? cropped : await bakePhoto(cropped, editMatrix(edits)));
+            const out = isUnedited(edits) ? cropped : await bakePhoto(cropped, editMatrix(edits));
+            // Remember the original and this crop/look, so Edit later can go back to the whole photo.
+            if (source) setOrigins((m) => ({ ...m, [out.uri]: { original: source, framing, edits } }));
+            setPhoto(out);
             setStep('write');
           } finally {
             setWorking(false);
@@ -603,7 +614,7 @@ export default function CreateScreen() {
       </KeyboardAvoidingView>
       </Animated.View>
       {draftPrompt}
-      <PhotoEditor photo={editing?.photo ?? null} title={editing?.index === null ? 'Another photo' : `Photo ${(editing?.index ?? 0) + 1}`} onCancel={() => setEditing(null)} onDone={editDone} />
+      <PhotoEditor photo={editing?.photo ?? null} start={editing?.start} title={editing?.index === null ? 'Another photo' : `Photo ${(editing?.index ?? 0) + 1}`} onCancel={() => setEditing(null)} onDone={editDone} />
     </SurfaceProvider>
   );
 }
