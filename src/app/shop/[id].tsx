@@ -87,7 +87,7 @@ export default function ListingScreen() {
     listing.category,
     listing.format === 'digital' ? 'Download right after you pay' : listing.shippingCents ? `${formatPrice(listing.shippingCents)} shipping` : 'Free shipping',
     listing.format === 'physical' ? (listing.stock === undefined ? 'Made to order' : soldOut ? 'Sold out' : `${listing.stock} left`) : 'Yours to keep',
-  ];
+  ].filter(Boolean); // Kind is optional (founder, Nov 24 2026).
 
   const addToCart = () => {
     actions.setCart([...state.cart.filter((c) => c.listingId !== listing.id), { listingId: listing.id, qty: (inCart?.qty ?? 0) + 1 }]);

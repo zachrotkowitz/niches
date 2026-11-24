@@ -84,7 +84,7 @@ function RootStack() {
         <Stack.Screen name="shop/[id]" />
         <Stack.Screen name="shop/cart" />
         <Stack.Screen name="shop/orders" />
-        <Stack.Screen name="shop/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="shop/new" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="creators/apply" />
         <Stack.Screen name="creators/studio" />
         <Stack.Screen name="creators/memberships" />
