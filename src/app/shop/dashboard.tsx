@@ -43,7 +43,8 @@ export default function SellerDashboard() {
   const buyRate = views ? Math.round((sold / views) * 1000) / 10 : 0;
   const toShip = allSales.filter((o) => o.status === 'paid' && o.lines.some((l) => l.format === 'physical'));
   const low = mine.filter((l) => l.format === 'physical' && l.stock !== undefined && l.stock <= 3);
-  const best = [...mine].sort((a, b) => b.sold - a.sold).slice(0, 3);
+  // Only things that have actually sold (founder, Nov 24 2026).
+  const best = mine.filter((l) => l.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 3);
   const payout = allSales.filter((o) => o.createdAt >= Date.now() - 7 * DAY).reduce((n, o) => n + net(o), 0);
 
   // Earnings in 7 bars: days for "7 days", groups of days otherwise.
@@ -108,8 +109,11 @@ export default function SellerDashboard() {
               ]}
             />
             <View style={styles.card}>
-              <Text style={[styles.earned, { color: ground.text }]}>{formatPrice(earned)}</Text>
-              <Text style={[styles.statLabel, { color: ground.muted }]}>You earned, after Niches’ {Math.round(FEE_RATE * 100)}%</Text>
+              {/* "Sales: $X" (founder, Nov 24 2026); still what you keep after Niches' 5%. */}
+              <View style={styles.salesRow} accessible accessibilityLabel={`Sales: ${formatPrice(earned)}`}>
+                <Text style={[styles.salesLabel, { color: ground.muted }]}>Sales:</Text>
+                <Text style={[styles.earned, { color: ground.text }]}>{formatPrice(earned)}</Text>
+              </View>
               <View style={styles.chart} accessibilityLabel="Earnings over time">
                 {bars.map((v, i) => (
                   <View key={i} style={[styles.bar, { height: 6 + (v / top) * 58, backgroundColor: i === 6 ? accent : `${accent}55` }]} />
@@ -130,6 +134,7 @@ export default function SellerDashboard() {
               </View>
             ) : null}
 
+            {best.length ? (
             <View>
               <Eyebrow>Best sellers</Eyebrow>
               {best.map((l) => (
@@ -145,6 +150,7 @@ export default function SellerDashboard() {
                 </Pressable>
               ))}
             </View>
+            ) : null}
 
             <View style={[styles.card, styles.payout]}>
               <Text style={[styles.payoutText, { color: ground.text }]}>
@@ -169,6 +175,8 @@ const styles = StyleSheet.create({
   emptyBody: { fontSize: 15, lineHeight: 21 },
   card: { padding: 14, borderRadius: 20, backgroundColor: '#FFFFFF', gap: 4 },
   earned: { fontFamily: fonts.display, fontSize: 42, lineHeight: 46 },
+  salesRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  salesLabel: { fontSize: 17, fontWeight: '700' },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 66, marginTop: 8 },
   bar: { flex: 1, borderRadius: 4 },
   stats: { flexDirection: 'row', gap: 8 },
