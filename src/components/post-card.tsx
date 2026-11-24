@@ -12,7 +12,7 @@ import { Avatar, MediaPlaceholder } from '@/components/primitives';
 import { ShopThisBar } from '@/components/shop';
 import { useSurface } from '@/components/surface';
 import { postAspect, postPhotos } from '@/lib/demo-photos';
-import { PhotoPager } from '@/components/photo-pager';
+import { PagerDots, PhotoPager } from '@/components/photo-pager';
 import { timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { colors, TOUCH } from '@/lib/theme';
@@ -26,6 +26,7 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
   const surface = useSurface();
   const active = surface.active(niche);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const { width } = useWindowDimensions();
   // Real photos keep their own shape (between 4:5 portrait and 5:4 landscape), like Instagram.
   // On a flooded screen photos sit inset with rounded corners, like prints on colored paper.
@@ -83,7 +84,8 @@ export function PostCard({ post, mediaHeight = 440, inDetail = false, onGone }: 
       {!locked && post.kind === 'photo' ? (
         post.moreImageUris?.length ? (
           <View style={[inset, { overflow: 'hidden' }]}>
-            <PhotoPager photos={postPhotos(post)} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} label={post.mediaLabel ?? 'Post'} onPress={inDetail ? undefined : open} />
+            <PhotoPager photos={postPhotos(post)} height={inDetail ? Math.min(photoHeight, 420) : photoHeight} label={post.mediaLabel ?? 'Post'} onPress={inDetail ? undefined : open} onIndex={setPhotoIndex} />
+            <PagerDots count={postPhotos(post).length} index={photoIndex} color={niche.accent} />
           </View>
         ) : (
           <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} disabled={inDetail}>

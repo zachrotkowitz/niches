@@ -13,7 +13,7 @@ import { useSavePost } from '@/components/save';
 import { ShopThisBar } from '@/components/shop';
 import { Text } from '@/components/text';
 import { postAspect, postPhotos } from '@/lib/demo-photos';
-import { PhotoPager } from '@/components/photo-pager';
+import { PagerDots, PhotoPager } from '@/components/photo-pager';
 import { shortTitle, timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
 import { fonts, TOUCH } from '@/lib/theme';
@@ -32,6 +32,7 @@ export function FeedPost({ post }: { post: Post }) {
   const niche = useNiches()[post.niche];
   const { width } = useWindowDimensions();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const savePost = useSavePost();
   const swiping = useSwipeBlocked();
 
@@ -107,7 +108,7 @@ export function FeedPost({ post }: { post: Post }) {
           <VideoPlaceholder post={post} height={height} />
         ) : (
           post.moreImageUris?.length ? (
-            <PhotoPager photos={postPhotos(post)} height={height} label={post.mediaLabel ?? 'Post'} onPress={open} />
+            <PhotoPager photos={postPhotos(post)} height={height} label={post.mediaLabel ?? 'Post'} onPress={open} onIndex={setPhotoIndex} />
           ) : (
             <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open}>
               <MediaPlaceholder post={post} height={height} showLabel={false} />
@@ -148,6 +149,7 @@ export function FeedPost({ post }: { post: Post }) {
           <BookmarkIcon size={19} filled={saved} color={saved ? '#FFFFFF' : niche.ink} />
         </Pressable>
       </View>
+      {post.moreImageUris?.length ? <PagerDots count={postPhotos(post).length} index={photoIndex} color={niche.accent} /> : null}
 
       <View style={styles.below}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} style={styles.text}>

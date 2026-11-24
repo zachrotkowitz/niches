@@ -16,6 +16,7 @@ import { CropFrame } from '@/components/crop-frame';
 import { QuickLog } from '@/components/quick-log';
 import { bakePhoto, FilteredPhoto } from '@/components/filtered-photo';
 import { EditStep, PhotoEditor, withSize } from '@/components/photo-editor';
+import { ReorderRow } from '@/components/reorder-row';
 import { DraftPrompt } from '@/components/draft-prompt';
 import { useToast } from '@/components/toast';
 import { UnderlineTabs, useSlidingLine } from '@/components/underline-tabs';
@@ -53,6 +54,8 @@ const vanish = FadeOut.duration(140).reduceMotion(ReduceMotion.System);
 const LOADING_TINT = '#E3E5E1';
 /** Photos after the first; 10 in all, like Instagram. */
 const MAX_MORE = 9;
+const THUMB = 62;
+const THUMB_GAP = 10;
 
 /** What was just shared, for the "Shared with Cooking." screen. */
 type Posted = { id: string; kind: Kind; niche: NicheId; goalId?: string; goalLabel?: string; membersOnly: boolean };
@@ -93,6 +96,8 @@ export default function CreateScreen() {
   // More photos after the first (founder, Nov 24 2026), each framed and edited like the first.
   const [more, setMore] = useState<string[]>([]);
   const [editingMore, setEditingMore] = useState<PickedPhoto | null>(null);
+  // True while a thumbnail is being dragged, so the strip doesn't scroll under your finger.
+  const [arranging, setArranging] = useState(false);
   const [picking, setPicking] = useState(false);
   // Cropping or saving a filter takes a moment.
   const [working, setWorking] = useState(false);
@@ -285,6 +290,22 @@ export default function CreateScreen() {
     setCropped(null);
     setPhoto(null);
   };
+  const allPhotos = photo ? [photo.uri, ...more] : [];
+  // A new order from dragging: the first one becomes the post's lead photo.
+  const reorderPhotos = async (keys: string[]) => {
+    if (!photo || keys.join('|') === allPhotos.join('|')) return;
+    if (keys[0] !== photo.uri) {
+      const lead = await withSize(keys[0]);
+      setSource(lead);
+      setCropped(null);
+      setPhoto(lead);
+    }
+    setMore(keys.slice(1));
+  };
+  const removeAt = async (i: number) => {
+    if (i === 0) return clearPhoto();
+    setMore((m) => m.filter((_, j) => j !== i - 1));
+  };
   const addMore = async () => {
     if (more.length >= MAX_MORE) return;
     const picked = await pickPhoto();
@@ -408,23 +429,34 @@ export default function CreateScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.moreRow} keyboardShouldPersistTaps="handled">
-                <View>
-                  <View style={[styles.moreThumb, { borderColor: ground.text }]}>
-                    <Image source={{ uri: photo.uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
-                  </View>
-                  <Text style={[styles.moreCover, { color: ground.muted }]}>First</Text>
+              {/* Hold a photo and drag it to change the order, like Instagram (founder, Nov 24 2026). The first one leads the post. */}
+              <ScrollView horizontal scrollEnabled={!arranging} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.moreRow} keyboardShouldPersistTaps="handled">
+                <View style={{ width: allPhotos.length * (THUMB + THUMB_GAP) - THUMB_GAP, height: THUMB + 18 }}>
+                  <ReorderRow
+                    slots={allPhotos.length}
+                    gap={THUMB_GAP}
+                    itemHeight={() => THUMB + 18}
+                    onDragChange={setArranging}
+                    onReorder={(keys) => void reorderPhotos(keys)}
+                    items={allPhotos.map((uri, i) => ({
+                      key: uri,
+                      label: i === 0 ? 'First photo' : `Photo ${i + 1}`,
+                      render: () => (
+                        <View>
+                          <View style={[styles.moreThumb, { borderColor: i === 0 ? ground.text : 'transparent' }]}>
+                            <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+                            {allPhotos.length > 1 ? (
+                              <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 1}`} onPress={() => void removeAt(i)} hitSlop={6} style={styles.moreX}>
+                                <CloseIcon size={10} strokeWidth={2.6} />
+                              </Pressable>
+                            ) : null}
+                          </View>
+                          <Text style={[styles.moreCover, { color: ground.muted }]}>{i === 0 ? 'First' : String(i + 1)}</Text>
+                        </View>
+                      ),
+                    }))}
+                  />
                 </View>
-                {more.map((uri, i) => (
-                  <View key={uri + i}>
-                    <View style={[styles.moreThumb, { borderColor: 'transparent' }]}>
-                      <Image source={{ uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
-                    </View>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Remove photo ${i + 2}`} onPress={() => setMore((m) => m.filter((_, j) => j !== i))} hitSlop={6} style={styles.moreX}>
-                      <CloseIcon size={11} strokeWidth={2.6} />
-                    </Pressable>
-                  </View>
-                ))}
                 {more.length < MAX_MORE ? (
                   <Pressable accessibilityRole="button" accessibilityLabel="Add another photo" onPress={addMore} style={[styles.moreThumb, styles.moreAdd, { borderColor: ground.line }]}>
                     <PlusIcon size={20} color={ground.text} />
@@ -458,8 +490,8 @@ export default function CreateScreen() {
             )
           ) : null}
 
-          {/* Type straight in, in the serif, like a headline. */}
-          <Animated.View layout={glide}>
+          {/* Type straight in, in the serif, on a white card: white means "write here" (founder, Nov 24 2026). */}
+          <Animated.View layout={glide} style={styles.captionCard}>
           <TextInput
             accessibilityLabel={kind === 'question' ? 'Your question' : 'Caption'}
             value={caption}
@@ -834,10 +866,10 @@ const styles = StyleSheet.create({
   masthead: { marginHorizontal: 20, paddingBottom: 8, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   share: { minHeight: 40, paddingHorizontal: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   shareText: { fontSize: 15, fontWeight: '700' },
-  moreRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  moreRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12, alignItems: 'flex-start' },
   moreThumb: { width: 62, height: 62, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
   moreAdd: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  moreX: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  moreX: { position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
   moreCover: { fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 3 },
   photoCard: { marginHorizontal: 20, marginTop: 18, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#1F1A14', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 4 },
   photo: { width: '100%' },
@@ -865,7 +897,8 @@ const styles = StyleSheet.create({
   filterThumb: { borderRadius: 14, borderWidth: 2.5, padding: 1.5 },
   filterName: { fontSize: 12 },
   camButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  caption: { marginHorizontal: 20, marginTop: 18, minHeight: 90, fontSize: 28, lineHeight: 32, paddingVertical: 4, textAlignVertical: 'top' },
+  captionCard: { marginHorizontal: 20, marginTop: 18, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, backgroundColor: '#FFFFFF' },
+  caption: { minHeight: 90, fontSize: 28, lineHeight: 32, paddingVertical: 4, textAlignVertical: 'top' },
   rows: { marginHorizontal: 20, marginTop: 12, borderTopWidth: 1 },
   row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1 },
   choice: { minHeight: TOUCH + 4, flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -30,6 +30,7 @@ export function ReorderRow({
   itemHeight,
   onReorder,
   renderEmpty,
+  onDragChange,
 }: {
   items: ReorderItem[];
   slots: number;
@@ -38,6 +39,8 @@ export function ReorderRow({
   itemHeight: (slotWidth: number) => number;
   onReorder: (keys: string[]) => void;
   renderEmpty?: (index: number) => ReactNode;
+  /** Told when a drag starts and ends, e.g. to stop a scrolling strip from scrolling meanwhile. */
+  onDragChange?: (dragging: boolean) => void;
 }) {
   const [width, setWidth] = useState(0);
   const slotW = width ? (width - gap * (slots - 1)) / slots : 0;
@@ -76,7 +79,7 @@ export function ReorderRow({
         : null}
       {slotW
         ? items.map((item, i) => (
-            <DraggableItem key={item.key} item={item} initialIndex={i} count={items.length} width={slotW} height={h} step={step} order={order} onDrop={onReorder} onMove={move} />
+            <DraggableItem key={item.key} item={item} initialIndex={i} count={items.length} width={slotW} slotStep={slotW + gap} height={h} step={step} order={order} onDrop={onReorder} onMove={move} onDragChange={onDragChange} />
           ))
         : null}
     </View>
@@ -88,24 +91,29 @@ function DraggableItem({
   initialIndex,
   count,
   width,
+  slotStep,
   height,
   step,
   order,
   onDrop,
   onMove,
+  onDragChange,
 }: {
   item: ReorderItem;
   initialIndex: number;
   count: number;
   width: number;
+  /** Slot width plus gap, known at render (the shared `step` is only set after mount). */
+  slotStep: number;
   height: number;
   step: SharedValue<number>;
   order: SharedValue<string[]>;
   onDrop: (keys: string[]) => void;
   onMove: (key: string, by: number) => void;
+  onDragChange?: (dragging: boolean) => void;
 }) {
   const key = item.key;
-  const x = useSharedValue(initialIndex * step.get());
+  const x = useSharedValue(initialIndex * slotStep);
   const startX = useSharedValue(0);
   const lifted = useSharedValue(0);
   const dragging = useSharedValue(false);
@@ -113,18 +121,20 @@ function DraggableItem({
 
   // Follow the slot this item is in (when another item pushes it, or after a save).
   useEffect(() => {
-    if (!dragging.get()) x.set(withSpring(initialIndex * step.get(), SPRING));
+    if (!dragging.get()) x.set(withSpring(initialIndex * slotStep, SPRING));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialIndex, width]);
+  }, [initialIndex, width, slotStep]);
 
   const lift = () => {
     justDragged.current = true;
+    onDragChange?.(true);
     if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
   const tick = () => {
     if (Platform.OS !== 'web') void Haptics.selectionAsync();
   };
   const settle = () => {
+    onDragChange?.(false);
     setTimeout(() => (justDragged.current = false), 50);
   };
 

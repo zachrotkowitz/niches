@@ -9,9 +9,10 @@ import { useSwipeExempt } from '@/components/niche-swipe';
  * multiple photos on posts, like listings). Its own swipes never turn Home's
  * niche page.
  */
-export function PhotoPager({ photos, height, label, onPress }: { photos: ImageProps['source'][]; height: number; label: string; onPress?: () => void }) {
+export function PhotoPager({ photos, height, label, onPress, onIndex }: { photos: ImageProps['source'][]; height: number; label: string; onPress?: () => void; onIndex?: (i: number) => void }) {
   const [width, setWidth] = useState(0);
-  const [index, setIndex] = useState(0);
+  const [index, setIndexRaw] = useState(0);
+  const setIndex = (i: number) => (setIndexRaw(i), onIndex?.(i));
   const exempt = useSwipeExempt();
   const settle = (x: number) => width && setIndex(Math.round(x / width));
   return (
@@ -32,17 +33,23 @@ export function PhotoPager({ photos, height, label, onPress }: { photos: ImagePr
           ))}
         </ScrollView>
       ) : null}
-      <View style={styles.dots} pointerEvents="none">
-        {photos.map((_, i) => (
-          <View key={i} style={[styles.dot, i === index ? styles.dotOn : null]} />
-        ))}
-      </View>
+    </View>
+  );
+}
+
+/** Which photo you're on, shown under the photo in the niche's color (founder, Nov 24 2026: bottom, easy to read). */
+export function PagerDots({ count, index, color }: { count: number; index: number; color: string }) {
+  return (
+    <View style={styles.dots} accessible accessibilityLabel={`Photo ${index + 1} of ${count}`}>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={[styles.dot, { backgroundColor: i === index ? color : `${color}40` }, i === index ? styles.dotOn : null]} />
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  dots: { position: 'absolute', top: 12, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' },
-  dotOn: { width: 16, backgroundColor: '#FFFFFF' },
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingTop: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  dotOn: { width: 22 },
 });
