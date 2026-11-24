@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CheckIcon, ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
 import { useToast } from '@/components/toast';
+import { DiaryEntriesSheet } from '@/components/diary-entries-sheet';
 import { PostCard } from '@/components/post-card';
 import { QuickLog } from '@/components/quick-log';
 import { diaryWords } from '@/lib/diary';
@@ -24,6 +25,7 @@ export default function PostScreen() {
   const niches = useNiches();
   const [draft, setDraft] = useState('');
   const [logging, setLogging] = useState(false);
+  const [showEntries, setShowEntries] = useState(false);
 
   const post = state.posts.find((p) => p.id === id);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -41,14 +43,8 @@ export default function PostScreen() {
   // A post's screen is flooded in its niche's color, like the feed it came from.
   const surface = floodSurface(niche);
   const isMine = !!state.me && post.authorId === state.me.id;
-  // Your newest diary entry made from this post, if any.
-  const myLog = state.logs.filter((l) => l.postId === post.id && l.userId === state.me?.id).sort((a, b) => b.createdAt - a.createdAt)[0];
-  const removeFromDiary = () => {
-    if (!myLog) return;
-    const checkIns = state.goals.flatMap((g) => g.checkIns.filter((c) => c.logId === myLog.id).map((c) => ({ goalId: g.id, checkIn: c })));
-    actions.deleteLog(myLog.id);
-    toast('Removed from your diary', { label: 'Undo', onPress: () => actions.restoreLog(myLog, checkIns) });
-  };
+  // Your diary entries made from this post, newest first.
+  const myLogs = state.logs.filter((l) => l.postId === post.id && l.userId === state.me?.id).sort((a, b) => b.createdAt - a.createdAt);
   const stats = postStats(state, post);
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
   const locked = !hasAccess(state, post);
@@ -84,34 +80,25 @@ export default function PostScreen() {
 
         {!locked ? (
           <View style={styles.diaryRow}>
+            {/* Both buttons in the niche's dark color with white words (founder, Nov 24 2026). */}
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: !!state.wantList[post.id] }}
               onPress={() => actions.toggleWant(post.id)}
-              style={({ pressed }) => [styles.diaryButton, { borderColor: niche.line, backgroundColor: state.wantList[post.id] ? '#FFFFFF' : 'rgba(255,255,255,0.35)' }, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <Text style={[styles.diaryButtonText, { color: niche.ink }]}>
-                {state.wantList[post.id] ? `On your list` : `+ ${diaryWords(post.niche).want}`}
+              style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>
+                {state.wantList[post.id] ? `✓ On your list` : `+ ${diaryWords(post.niche).want}`}
               </Text>
             </Pressable>
-            {/* "Add to diary" on every post; once it's in your diary, "Added to diary · Remove?" (founder, Nov 24 2026). */}
-            {myLog ? (
-              <View style={[styles.diaryButton, styles.addedRow, { borderColor: niche.ink, backgroundColor: '#FFFFFF' }]}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Added to diary. Open the entry" onPress={() => router.push({ pathname: '/log/[id]', params: { id: myLog.id } })} hitSlop={6} style={styles.addedPart}>
-                  <CheckIcon size={15} color={niche.ink} strokeWidth={2.6} />
-                  <Text style={[styles.diaryButtonText, { color: niche.ink, fontSize: 14 }]}>Added to diary</Text>
-                </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Remove from your diary" onPress={removeFromDiary} hitSlop={8}>
-                  <Text style={[styles.removeText, { color: niche.ink }]}>Remove?</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setLogging(true)}
-                style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-                <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>Add to diary</Text>
-              </Pressable>
-            )}
+            {/* "Add to diary" on every post; once it's in your diary, "✓ Added to diary" opens your entries from it. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={myLogs.length ? `Added to diary${myLogs.length > 1 ? `, ${myLogs.length} times` : ''}. See your entries` : 'Add to diary'}
+              onPress={() => (myLogs.length ? setShowEntries(true) : setLogging(true))}
+              style={({ pressed }) => [styles.diaryButton, styles.addedRow, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              {myLogs.length ? <CheckIcon size={15} color="#FFFFFF" strokeWidth={2.6} /> : null}
+              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{myLogs.length ? 'Added to diary' : 'Add to diary'}</Text>
+            </Pressable>
           </View>
         ) : null}
         {goal ? (
@@ -194,6 +181,19 @@ export default function PostScreen() {
       )}
     </KeyboardAvoidingView>
     <QuickLog post={post} visible={logging} onClose={() => setLogging(false)} />
+    <DiaryEntriesSheet
+      visible={showEntries}
+      entries={myLogs}
+      niche={niche}
+      onClose={() => setShowEntries(false)}
+      onOpen={(id) => (setShowEntries(false), router.push({ pathname: '/log/[id]', params: { id } }))}
+      onRemove={(id) => {
+        actions.deleteLog(id);
+        toast('Removed from your diary');
+        if (myLogs.length <= 1) setShowEntries(false);
+      }}
+      onAddAgain={() => (setShowEntries(false), setLogging(true))}
+    />
     </SurfaceProvider>
   );
 }
@@ -224,9 +224,7 @@ const styles = StyleSheet.create({
   diaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
   diaryButton: { flex: 1, minHeight: TOUCH, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   diaryButtonText: { fontSize: 15, fontWeight: '700' },
-  addedRow: { flexDirection: 'column', gap: 1, justifyContent: 'center', paddingVertical: 4 },
-  addedPart: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  removeText: { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  addedRow: { flexDirection: 'row', gap: 6 },
   goalLink: { marginHorizontal: 20, marginTop: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH + 8 },
   goalLinkLabel: { fontSize: 12, fontWeight: '600' },
   goalLinkTitle: { fontSize: 15, fontWeight: '700' },
