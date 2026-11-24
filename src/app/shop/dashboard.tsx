@@ -22,7 +22,7 @@ const DAY = 24 * 3600 * 1000;
  * Your shop: the seller dashboard (founder, Nov 20 2026; ideas from Shopify's
  * admin and eBay's Seller Hub). What you earned after Niches' 5%, a small
  * chart, orders, views and how many viewers buy, a To do list, best sellers
- * and the next payout. Only the seller ever sees these numbers.
+ * and your listings. Only the seller ever sees these numbers.
  */
 export default function SellerDashboard() {
   const router = useRouter();
@@ -45,7 +45,6 @@ export default function SellerDashboard() {
   const low = mine.filter((l) => l.format === 'physical' && l.stock !== undefined && l.stock <= 3);
   // Only things that have actually sold (founder, Nov 24 2026).
   const best = mine.filter((l) => l.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 3);
-  const payout = allSales.filter((o) => o.createdAt >= Date.now() - 7 * DAY).reduce((n, o) => n + net(o), 0);
 
   // Earnings in 7 bars: days for "7 days", groups of days otherwise.
   const span = period === 'all' ? Math.max(7, Math.ceil((Date.now() - Math.min(Date.now(), ...allSales.map((o) => o.createdAt))) / DAY) + 1) : Number(period);
@@ -150,7 +149,8 @@ export default function SellerDashboard() {
               {stat(String(sales.length), sales.length === 1 ? 'order' : 'orders')}
               {stat(views >= 1000 ? `${(views / 1000).toFixed(1)}k` : String(views), views === 1 ? 'view' : 'views')}
               {/* "6% of viewers bought" (founder, Nov 24 2026). */}
-              {!sold ? stat('No', 'buyers yet') : views ? stat(`${Math.min(100, buyRate)}%`, 'of viewers bought') : stat(String(sold), sold === 1 ? 'buyer' : 'buyers')}
+              {/* Only once someone has looked (or bought): before that, just two cards sharing the row (founder, Nov 24 2026). */}
+              {views ? stat(`${Math.min(100, buyRate)}%`, 'of viewers bought') : sold ? stat(String(sold), sold === 1 ? 'buyer' : 'buyers') : null}
             </View>
 
             {toShip.length || low.length ? (
@@ -196,13 +196,8 @@ export default function SellerDashboard() {
               ))}
             </View>
 
-            <View style={[styles.card, styles.payout]}>
-              <Text style={[styles.payoutText, { color: ground.text }]}>
-                <Text style={{ fontWeight: '700' }}>Next payout</Text> · Friday
-              </Text>
-              <Text style={[styles.payoutNum, { color: ground.text }]}>{formatPrice(payout)}</Text>
-            </View>
-            <Text style={[styles.note, { color: ground.muted }]}>Demo: payouts start when real payments do. Only you can see these numbers.</Text>
+            {/* No payout card: sellers get paid automatically, nothing to wait on (founder, Nov 24 2026). */}
+            <Text style={[styles.note, { color: ground.muted }]}>Only you can see these numbers.</Text>
           </>
         )}
       </ScrollView>
@@ -239,8 +234,5 @@ const styles = StyleSheet.create({
   thumb: { width: 42, height: 42, borderRadius: 10, overflow: 'hidden' },
   bestTitle: { flex: 1, fontFamily: fonts.display, fontSize: 19, lineHeight: 22 },
   bestNums: { fontSize: 12, textAlign: 'right' },
-  payout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  payoutText: { fontSize: 14 },
-  payoutNum: { fontFamily: fonts.display, fontSize: 24 },
   note: { fontSize: 12, lineHeight: 17 },
 });
