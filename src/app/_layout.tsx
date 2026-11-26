@@ -1,12 +1,7 @@
-import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
-import {
-  SchibstedGrotesk_400Regular,
-  SchibstedGrotesk_500Medium,
-  SchibstedGrotesk_600SemiBold,
-  SchibstedGrotesk_700Bold,
-  SchibstedGrotesk_800ExtraBold,
-  useFonts,
-} from '@expo-google-fonts/schibsted-grotesk';
+import { CormorantGaramond_500Medium, CormorantGaramond_500Medium_Italic, CormorantGaramond_600SemiBold } from '@expo-google-fonts/cormorant-garamond';
+import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold, Figtree_700Bold, Figtree_800ExtraBold, useFonts } from '@expo-google-fonts/figtree';
+import { GreatVibes_400Regular } from '@expo-google-fonts/great-vibes';
+import { HerrVonMuellerhoff_400Regular } from '@expo-google-fonts/herr-von-muellerhoff';
 import { DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -45,13 +40,16 @@ function RootStack() {
   const { state } = useStore();
   const ground = useAppGround();
   const [fontsLoaded, fontError] = useFonts({
-    InstrumentSerif_400Regular,
-    InstrumentSerif_400Regular_Italic,
-    SchibstedGrotesk_400Regular,
-    SchibstedGrotesk_500Medium,
-    SchibstedGrotesk_600SemiBold,
-    SchibstedGrotesk_700Bold,
-    SchibstedGrotesk_800ExtraBold,
+    CormorantGaramond_500Medium,
+    CormorantGaramond_500Medium_Italic,
+    CormorantGaramond_600SemiBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+    Figtree_800ExtraBold,
+    GreatVibes_400Regular,
+    HerrVonMuellerhoff_400Regular,
   });
   const ready = state.hydrated && (fontsLoaded || !!fontError);
 

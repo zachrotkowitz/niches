@@ -13,7 +13,7 @@ import { useToast } from '@/components/toast';
 import { COVER_LAYOUTS, coverCandidates, coverCount, coverFor, type CoverLayout } from '@/lib/cover';
 import { postPhoto } from '@/lib/demo-photos';
 import { useAppGround, useStore } from '@/lib/store';
-import { groundSurface, TOUCH } from '@/lib/theme';
+import { fonts, groundSurface, TOUCH } from '@/lib/theme';
 
 /**
  * "Style your cover", opened from Edit profile. Pick a layout (one, two or
@@ -206,6 +206,6 @@ const styles = StyleSheet.create({
   auto: { minHeight: TOUCH, alignItems: 'center', justifyContent: 'center' },
   autoText: { fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
   none: { margin: 20, padding: 20, borderRadius: 20, backgroundColor: '#FFFFFF', gap: 10 },
-  noneTitle: { fontSize: 26, fontFamily: 'InstrumentSerif_400Regular_Italic' },
+  noneTitle: { fontSize: 26, fontFamily: fonts.displayItalic },
   noneBody: { fontSize: 15, lineHeight: 21 },
 });

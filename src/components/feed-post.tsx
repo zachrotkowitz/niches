@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Badges } from '@/components/creator';
+import { DiaryButtons } from '@/components/diary-buttons';
 import { BookmarkIcon, CommentIcon, HeartIcon, MoreIcon } from '@/components/icons';
 import { useSwipeBlocked } from '@/components/niche-swipe';
 import { PostCard, VideoPlaceholder } from '@/components/post-card';
@@ -16,14 +17,16 @@ import { postAspect, postPhotos } from '@/lib/demo-photos';
 import { PagerDots, PhotoPager } from '@/components/photo-pager';
 import { shortTitle, timeAgo } from '@/lib/format';
 import { hasAccess, postStats, useNiches, useStore } from '@/lib/store';
-import { fonts, TOUCH } from '@/lib/theme';
+import { CARD_SHADOW, colors, fonts, TOUCH } from '@/lib/theme';
 import type { Post } from '@/lib/types';
 
 /**
- * A post in the Home feed (founder's pick, Nov 2026: option B "Gallery").
- * The photo runs nearly edge to edge with the poster's name and Save on it;
- * a serif title, the caption and Like / comments sit underneath. Questions
- * and other text posts are white cards set like a pull quote.
+ * A post in the Home feed. New look (founder, Nov 26 2026; canvas page "New
+ * look", Round 2 · 1A): every post sits on its own cream card with a soft
+ * shadow so posts never blend into the niche color. The photo fills the top of
+ * the card with the poster's name and Save on it; a serif title, the caption,
+ * Like / comments, then "+ Want to make" and "Add to diary" in the niche's dark
+ * color. Questions and other text posts are cream cards set like a pull quote.
  * Members-only posts you can't open keep the older locked layout.
  */
 export function FeedPost({ post }: { post: Post }) {
@@ -43,7 +46,7 @@ export function FeedPost({ post }: { post: Post }) {
   const liked = !!state.cheers[post.id];
   const saved = !!state.saves[post.id];
   const stats = postStats(state, post);
-  const mediaWidth = Math.min(width, 640) - 16;
+  const mediaWidth = Math.min(width, 640) - 28;
   const aspect = postAspect(post);
   const height = Math.round(mediaWidth * Math.min(1.25, Math.max(0.8, aspect ?? 1.2)));
   const open = () => !swiping() && router.push({ pathname: '/post/[id]', params: { id: post.id } });
@@ -79,7 +82,7 @@ export function FeedPost({ post }: { post: Post }) {
 
   if (post.kind === 'text') {
     return (
-      <View style={styles.quoteCard}>
+      <View style={[styles.quoteCard, { shadowColor: niche.ink }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open}>
           <Text style={[styles.quote, { color: niche.ink }]} numberOfLines={7}>“{post.caption}”</Text>
         </Pressable>
@@ -102,7 +105,8 @@ export function FeedPost({ post }: { post: Post }) {
   }
 
   return (
-    <View style={styles.post}>
+    <View style={[styles.post, { shadowColor: niche.ink }]}>
+      <View style={styles.clip}>
       <View style={[styles.media, { height, backgroundColor: post.mediaColor ?? niche.field }]}>
         {post.kind === 'video' ? (
           <VideoPlaceholder post={post} height={height} />
@@ -149,7 +153,7 @@ export function FeedPost({ post }: { post: Post }) {
           <BookmarkIcon size={19} filled={saved} color={saved ? '#FFFFFF' : niche.ink} />
         </Pressable>
       </View>
-      {post.moreImageUris?.length ? <PagerDots count={postPhotos(post).length} index={photoIndex} color={niche.accent} /> : null}
+      {post.moreImageUris?.length ? <PagerDots count={postPhotos(post).length} index={photoIndex} color={niche.second} /> : null}
 
       <View style={styles.below}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open post" onPress={open} style={styles.text}>
@@ -158,12 +162,14 @@ export function FeedPost({ post }: { post: Post }) {
               {title}
             </Text>
           ) : null}
-          {body ? <Text style={[styles.caption, { color: niche.ink }]} numberOfLines={2}>{body}</Text> : null}
+          {body ? <Text style={[styles.caption, { color: niche.inkSoft }]} numberOfLines={2}>{body}</Text> : null}
           {mine ? <Text style={[styles.mine, { color: niche.inkSoft }]}>{mine}</Text> : null}
         </Pressable>
         {buttons}
       </View>
+      <DiaryButtons post={post} guard={swiping} style={styles.diary} />
       <ShopThisBar postId={post.id} />
+      </View>
       <PostMenu post={post} visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
@@ -187,8 +193,10 @@ function titleAndBody(post: Post): { title: string; body: string } {
 }
 
 const styles = StyleSheet.create({
-  post: { marginBottom: 22 },
-  media: { marginHorizontal: 8, borderRadius: 28, overflow: 'hidden' },
+  post: { marginHorizontal: 14, marginBottom: 20, borderRadius: 24, backgroundColor: colors.card, ...CARD_SHADOW },
+  clip: { borderRadius: 24, overflow: 'hidden' },
+  media: { overflow: 'hidden' },
+  diary: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 14 },
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 130 },
   author: { position: 'absolute', left: 12, bottom: 10, right: 70, minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarRing: { borderRadius: 19, borderWidth: 1.5, borderColor: '#FFFFFF' },
@@ -196,7 +204,7 @@ const styles = StyleSheet.create({
   name: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   meta: { color: '#FFFFFF', fontSize: 12, fontWeight: '500' },
   save: { position: 'absolute', right: 12, bottom: 12, width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  below: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 20, paddingRight: 4, paddingTop: 10 },
+  below: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 16, paddingRight: 4, paddingTop: 10, paddingBottom: 8 },
   text: { flex: 1, minWidth: 0, paddingTop: 4, gap: 4 },
   title: { fontFamily: fonts.display, fontSize: 27, lineHeight: 29, letterSpacing: -0.3 },
   /** Longer titles step down a size so they fit in two or three lines instead of being cut. */
@@ -208,7 +216,7 @@ const styles = StyleSheet.create({
   comment: { minWidth: TOUCH, height: TOUCH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4 },
   count: { fontSize: 14, fontWeight: '600' },
   more: { width: 36, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  quoteCard: { marginHorizontal: 8, marginBottom: 22, paddingTop: 20, paddingLeft: 18, paddingRight: 6, paddingBottom: 8, borderRadius: 28, backgroundColor: '#FFFFFF' },
+  quoteCard: { marginHorizontal: 14, marginBottom: 20, paddingTop: 20, paddingLeft: 18, paddingRight: 6, paddingBottom: 8, borderRadius: 24, backgroundColor: colors.card, ...CARD_SHADOW },
   quote: { fontFamily: fonts.displayItalic, fontSize: 30, lineHeight: 34, letterSpacing: -0.3, paddingRight: 12 },
   quoteFoot: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   quoteAuthor: { flex: 1, minWidth: 0, minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: 10 },

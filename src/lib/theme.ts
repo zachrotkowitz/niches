@@ -15,9 +15,19 @@ export type Palette = {
   ink: string;
   /** Secondary text on the field color. */
   inkSoft: string;
+  /** The new look (Nov 26 2026): the niche's own screen color, picked by the founder. Without it, a dusty tint of the accent. */
+  flood?: string;
+  /** Words and icons in the Home header on the flood (white on Cooking's sage). Defaults to ink. */
+  onFlood?: string;
+  onFloodSoft?: string;
+  /** The niche's second color, for decoration only (photo dots, the tab bar): never for text. Defaults to the accent. */
+  second?: string;
 };
 
-export type Niche = Omit<Palette, 'id' | 'name'> & {
+export type Niche = Omit<Palette, 'id' | 'name' | 'flood' | 'onFlood' | 'onFloodSoft' | 'second'> & {
+  onFlood: string;
+  onFloodSoft: string;
+  second: string;
   id: NicheId;
   label: string;
   paletteId: string;
@@ -42,6 +52,13 @@ export function tint(hex: string, t: number): string {
 
 // Curated palettes for the Color lab. Any niche can take any palette.
 export const PALETTES: Palette[] = [
+  // The new look (founder, Nov 26 2026; canvas page "New look"). Buttons are each niche's ink.
+  // Cooking: sage fills the screen, #4D7056 accents, near-black green buttons, white header words.
+  { id: 'sage', name: 'Sage', accent: '#4D7056', field: '#E3EEE6', ink: '#1C2B20', inkSoft: '#1C2B20', flood: '#699674', onFlood: '#FFFFFF', onFloodSoft: '#F2F7F3', second: '#4D7056' },
+  // Art: tan fills the screen, caramel #B4894B for decoration (a deeper caramel for text), deep brown words and buttons.
+  { id: 'sand', name: 'Sand', accent: '#8A6431', field: '#F5EADB', ink: '#3A2810', inkSoft: '#54401F', flood: '#E7C89B', second: '#B4894B' },
+  // Photography: plain white so the photos carry the color; dark chocolate for everything else.
+  { id: 'chocolate', name: 'Chocolate', accent: '#432006', field: '#F3ECE6', ink: '#432006', inkSoft: '#6E5039', flood: '#FFFFFF', second: '#432006' },
   { id: 'basil', name: 'Basil', accent: '#1E6B47', field: '#E4F0E8', ink: '#123F2A', inkSoft: '#2E5A43' },
   { id: 'olive', name: 'Olive', accent: '#566416', field: '#EEF1DD', ink: '#343E0F', inkSoft: '#48521E' },
   { id: 'teal', name: 'Teal', accent: '#0F6B6B', field: '#DDF1F0', ink: '#0A4343', inkSoft: '#22595A' },
@@ -60,10 +77,10 @@ export const PALETTES_BY_ID: Record<string, Palette> = Object.fromEntries(PALETT
 type NicheBase = { id: NicheId; label: string; paletteId: string; open: boolean };
 
 const NICHE_BASE: Record<NicheId, NicheBase> = {
-  cooking: { id: 'cooking', label: 'Cooking', paletteId: 'basil', open: true },
+  cooking: { id: 'cooking', label: 'Cooking', paletteId: 'sage', open: true },
   // Art and Photography opened for posting (founder, Nov 2026). Gym is still coming soon.
-  art: { id: 'art', label: 'Art', paletteId: 'ultramarine', open: true },
-  photography: { id: 'photography', label: 'Photography', paletteId: 'amber', open: true },
+  art: { id: 'art', label: 'Art', paletteId: 'sand', open: true },
+  photography: { id: 'photography', label: 'Photography', paletteId: 'chocolate', open: true },
   gym: { id: 'gym', label: 'Gym', paletteId: 'raspberry', open: false },
 };
 
@@ -75,8 +92,17 @@ export function resolveNiches(overrides: Partial<Record<NicheId, string>> = {}):
   for (const id of NICHE_ORDER) {
     const base = NICHE_BASE[id];
     const paletteId = overrides[id] && PALETTES_BY_ID[overrides[id]!] ? overrides[id]! : base.paletteId;
-    const { id: _pid, name: _name, ...colors } = PALETTES_BY_ID[paletteId];
-    out[id] = { ...base, ...colors, paletteId, mid: tint(colors.accent, 0.34), line: `${colors.ink}33` };
+    const { id: _pid, name: _name, flood, onFlood, onFloodSoft, second, ...colors } = PALETTES_BY_ID[paletteId];
+    out[id] = {
+      ...base,
+      ...colors,
+      paletteId,
+      mid: flood ?? tint(colors.accent, 0.34),
+      line: `${colors.ink}33`,
+      onFlood: onFlood ?? colors.ink,
+      onFloodSoft: onFloodSoft ?? onFlood ?? colors.inkSoft,
+      second: second ?? colors.accent,
+    };
   }
   return out;
 }
@@ -93,6 +119,8 @@ export const DEFAULT_PALETTE: Record<NicheId, string> = {
 
 export const colors = {
   ground: '#FFFFFF',
+  /** Post cards in niche feeds (new look, Nov 26 2026): cream paper on the niche color. */
+  card: '#FBF8F1',
   surface: '#F4F5F2',
   text: '#14161A',
   textBody: '#2B3036',
@@ -105,22 +133,26 @@ export const colors = {
   danger: '#B42318',
 };
 
+// The new look (founder, Nov 26 2026; canvas page "New look", Round 2 · 1A with font option 2).
 export const fonts = {
-  /** Headlines and big numbers: Instrument Serif (from the "Issue" direction). */
-  display: 'InstrumentSerif_400Regular',
-  displayItalic: 'InstrumentSerif_400Regular_Italic',
-  /** The wordmark and anything that needs heavy grotesk. */
-  displayHeavy: 'SchibstedGrotesk_800ExtraBold',
+  /** Headlines and big numbers: Cormorant Garamond (free stand-in for "Derivia"). */
+  display: 'CormorantGaramond_500Medium',
+  displayItalic: 'CormorantGaramond_500Medium_Italic',
+  /** The wordmark and anything that needs a heavy sans. */
+  displayHeavy: 'Figtree_800ExtraBold',
+  /** Big niche names: an oversized Great Vibes first letter, the rest in Herr Von Muellerhoff (free look-alikes for "Holland"). */
+  scriptCap: 'GreatVibes_400Regular',
+  script: 'HerrVonMuellerhoff_400Regular',
 };
 
-/** Body text: Schibsted Grotesk, one font file per weight. */
+/** Body text: Figtree, one font file per weight. */
 export const BODY_FONTS: Record<string, string> = {
-  '400': 'SchibstedGrotesk_400Regular',
-  '500': 'SchibstedGrotesk_500Medium',
-  '600': 'SchibstedGrotesk_600SemiBold',
-  '700': 'SchibstedGrotesk_700Bold',
-  '800': 'SchibstedGrotesk_800ExtraBold',
-  '900': 'SchibstedGrotesk_800ExtraBold',
+  '400': 'Figtree_400Regular',
+  '500': 'Figtree_500Medium',
+  '600': 'Figtree_600SemiBold',
+  '700': 'Figtree_700Bold',
+  '800': 'Figtree_800ExtraBold',
+  '900': 'Figtree_800ExtraBold',
 };
 
 /**
@@ -162,6 +194,9 @@ export function floodSurface(n: Niche): Surface {
   }
   return s;
 }
+
+/** The soft lift under feed cards; set shadowColor to the niche's ink where it's used. */
+export const CARD_SHADOW = { shadowOpacity: 0.18, shadowRadius: 15, shadowOffset: { width: 0, height: 10 }, elevation: 6 } as const;
 
 /** Minimum tappable size (Apple HIG 44pt). */
 export const TOUCH = 44;

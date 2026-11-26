@@ -4,12 +4,10 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { Text } from '@/components/text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CheckIcon, ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
+import { ChevronLeftIcon, LockIcon, TrendIcon } from '@/components/icons';
 import { useToast, type ToastAction } from '@/components/toast';
-import { DiaryEntriesSheet } from '@/components/diary-entries-sheet';
+import { DiaryButtons } from '@/components/diary-buttons';
 import { PostCard } from '@/components/post-card';
-import { QuickLog } from '@/components/quick-log';
-import { diaryWords } from '@/lib/diary';
 import { Avatar, Button } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { timeAgo } from '@/lib/format';
@@ -24,8 +22,6 @@ export default function PostScreen() {
   const showToast = useToast();
   const niches = useNiches();
   const [draft, setDraft] = useState('');
-  const [logging, setLogging] = useState(false);
-  const [showEntries, setShowEntries] = useState(false);
 
   const post = state.posts.find((p) => p.id === id);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -47,8 +43,6 @@ export default function PostScreen() {
   // A post's screen is flooded in its niche's color, like the feed it came from.
   const surface = floodSurface(niche);
   const isMine = !!state.me && post.authorId === state.me.id;
-  // Your diary entries made from this post, newest first.
-  const myLogs = state.logs.filter((l) => l.postId === post.id && l.userId === state.me?.id).sort((a, b) => b.createdAt - a.createdAt);
   const stats = postStats(state, post);
   const comments = state.comments.filter((c) => c.postId === post.id).sort((a, b) => a.createdAt - b.createdAt);
   const locked = !hasAccess(state, post);
@@ -83,27 +77,7 @@ export default function PostScreen() {
         <PostCard post={post} inDetail mediaHeight={320} onGone={goBack} />
 
         {!locked ? (
-          <View style={styles.diaryRow}>
-            {/* Both buttons in the niche's dark color with white words (founder, Nov 24 2026). */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: !!state.wantList[post.id] }}
-              onPress={() => actions.toggleWant(post.id)}
-              style={({ pressed }) => [styles.diaryButton, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>
-                {state.wantList[post.id] ? `✓ On your list` : `+ ${diaryWords(post.niche).want}`}
-              </Text>
-            </Pressable>
-            {/* "Add to diary" on every post; once it's in your diary, "✓ Added to diary" opens your entries from it. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={myLogs.length ? `Added to diary${myLogs.length > 1 ? `, ${myLogs.length} times` : ''}. See your entries` : 'Add to diary'}
-              onPress={() => (myLogs.length ? setShowEntries(true) : setLogging(true))}
-              style={({ pressed }) => [styles.diaryButton, styles.addedRow, { backgroundColor: niche.ink, borderColor: niche.ink, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-              {myLogs.length ? <CheckIcon size={15} color="#FFFFFF" strokeWidth={2.6} /> : null}
-              <Text style={[styles.diaryButtonText, { color: '#FFFFFF' }]}>{myLogs.length ? 'Added to diary' : 'Add to diary'}</Text>
-            </Pressable>
-          </View>
+          <DiaryButtons post={post} style={styles.diaryRow} />
         ) : null}
         {goal ? (
           <Pressable
@@ -184,20 +158,6 @@ export default function PostScreen() {
       </View>
       )}
     </KeyboardAvoidingView>
-    <QuickLog post={post} visible={logging} onClose={() => setLogging(false)} />
-    <DiaryEntriesSheet
-      visible={showEntries}
-      entries={myLogs}
-      niche={niche}
-      onClose={() => setShowEntries(false)}
-      onOpen={(id) => (setShowEntries(false), router.push({ pathname: '/log/[id]', params: { id } }))}
-      onRemove={(id) => {
-        actions.deleteLog(id);
-        toast('Removed from your diary');
-        if (myLogs.length <= 1) setShowEntries(false);
-      }}
-      onAddAgain={() => (setShowEntries(false), setLogging(true))}
-    />
     </SurfaceProvider>
   );
 }
@@ -226,9 +186,6 @@ const styles = StyleSheet.create({
   statHidden: { fontSize: 17, lineHeight: 30, color: colors.textMuted },
   statLabel: { fontSize: 12, color: colors.textMuted },
   diaryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
-  diaryButton: { flex: 1, minHeight: TOUCH, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  diaryButtonText: { fontSize: 15, fontWeight: '700' },
-  addedRow: { flexDirection: 'row', gap: 6 },
   goalLink: { marginHorizontal: 20, marginTop: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: TOUCH + 8 },
   goalLinkLabel: { fontSize: 12, fontWeight: '600' },
   goalLinkTitle: { fontSize: 15, fontWeight: '700' },

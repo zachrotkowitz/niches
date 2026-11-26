@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { StyleSheet, Text as RNText, type TextProps } from 'react-native';
+import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
 
 import { BODY_FONTS } from '@/lib/theme';
 
@@ -7,17 +7,22 @@ import { BODY_FONTS } from '@/lib/theme';
 const InsideText = createContext(false);
 
 /**
- * Text in Schibsted Grotesk. Custom fonts ship one file per weight, so the
+ * Text in Figtree. Custom fonts ship one file per weight, so the
  * fontWeight in a style picks the matching file (and the synthetic weight is
  * turned off so it isn't bolded twice). An explicit fontFamily wins.
  */
 export function Text({ style, children, ...rest }: TextProps) {
   const nested = useContext(InsideText);
   const flat = StyleSheet.flatten(style) ?? {};
-  let extra = null;
+  let extra: TextStyle | null = null;
   if (!flat.fontFamily && (!nested || flat.fontWeight !== undefined)) {
     const w = flat.fontWeight === 'bold' ? '700' : flat.fontWeight === 'normal' || flat.fontWeight === undefined ? '400' : String(flat.fontWeight);
     extra = { fontFamily: BODY_FONTS[w] ?? BODY_FONTS['400'], fontWeight: 'normal' as const };
+  }
+  // Cormorant's numbers are old-style by default (a 0 reads as an o); headings and stats want lining figures.
+  if ((flat.fontFamily ?? '').startsWith('CormorantGaramond') && !flat.fontVariant?.includes('lining-nums')) {
+    const before = Array.isArray(flat.fontVariant) ? flat.fontVariant : [];
+    extra = { ...extra, fontVariant: [...before, 'lining-nums'] as TextStyle['fontVariant'] };
   }
   return (
     <RNText {...rest} style={extra ? [style, extra] : style}>

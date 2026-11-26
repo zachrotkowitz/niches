@@ -44,6 +44,8 @@ type State = {
   nicheRequests: string[];
   /** Palettes chosen in the Color lab. */
   palettes: Partial<Record<NicheId, string>>;
+  /** Which look the saved Color lab choices were made for; older choices are cleared so the new look shows. */
+  lookVersion?: number;
   /** Niches shown on Discover. Empty means all. */
   discoverNiches: NicheId[];
   /** Discover searches, newest first. */
@@ -162,6 +164,7 @@ function freshState(): Persisted {
     notify: {},
     nicheRequests: [],
     palettes: {},
+    lookVersion: LOOK_VERSION,
     discoverNiches: [],
     recentSearches: [],
     planReminders: {},
@@ -188,6 +191,9 @@ function freshState(): Persisted {
 }
 
 /** Loads saved state and adds any demo content introduced since it was saved. */
+/** Bump when a new look changes the default niche colors. */
+const LOOK_VERSION = 2;
+
 function migrate(saved: Partial<Persisted>): Persisted {
   const fresh = freshState();
   const merged: Persisted = { ...fresh, ...saved };
@@ -204,6 +210,11 @@ function migrate(saved: Partial<Persisted>): Persisted {
       return f && p.authorId !== merged.me?.id ? { ...p, caption: f.caption, mediaLabel: f.mediaLabel } : p;
     });
     merged.seedVersion = SEED_VERSION;
+  }
+  // The new look (Nov 26 2026) brings new default colors; palettes picked in the Color lab before it would hide them.
+  if ((saved.lookVersion ?? 1) < LOOK_VERSION) {
+    merged.palettes = {};
+    merged.lookVersion = LOOK_VERSION;
   }
   return merged;
 }
