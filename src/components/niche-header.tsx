@@ -16,6 +16,10 @@ import { fonts, NICHE_ORDER, TOUCH } from '@/lib/theme';
 const ROW = 44;
 /** Height of the big niche name; this is what folds away as you scroll. */
 const TITLE = 126;
+/** The biggest the niche name gets, so the whole script (its tall first letter included) fits in TITLE without being cut. */
+const BIG_NAME = 70;
+/** The name in the slim bar after scrolling: it must fit the 44pt row. */
+const COMPACT_NAME = 24;
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -52,7 +56,8 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
   // 0 at the top of the feed, 1 once the big name has folded away.
   const big = useAnimatedStyle(() => {
     const p = Math.min(1, Math.max(0, scroll.get() / TITLE));
-    return { height: TITLE * (1 - p), opacity: interpolate(p, [0, 0.6], [1, 0], 'clamp') };
+    // The name keeps its top edge and fades as the row folds, so the tall first letter is never sliced off at the top.
+    return { height: TITLE * (1 - p), opacity: interpolate(p, [0, 0.45], [1, 0], 'clamp') };
   });
   const eyebrow = useAnimatedStyle(() => ({ opacity: interpolate(scroll.get() / TITLE, [0, 0.5], [1, 0], 'clamp') }));
   const compact = useAnimatedStyle(() => ({ opacity: interpolate(scroll.get() / TITLE, [0.5, 1], [0, 1], 'clamp') }));
@@ -63,7 +68,7 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
   const inShop = hasShop && state.homeMode === 'shop';
   // In the shop the big title is just "Cooking shop" (founder, Nov 20 2026).
   const title = inShop ? `${niche.label} shop` : niche.label;
-  const titleSize = Math.min(74, Math.floor((Math.min(width, 640) - 110) / (title.length * SCRIPT_EM)));
+  const titleSize = Math.min(BIG_NAME, Math.floor((Math.min(width, 640) - 110) / (title.length * SCRIPT_EM)));
   const cartCount = state.cart.reduce((n, c) => n + c.qty, 0);
   const now = new Date();
   const fresh = state.posts.filter((p) => p.niche === niche.id && inFeeds(state, p) && now.getTime() - p.createdAt < FRESH_WINDOW_MS).length;
@@ -116,7 +121,7 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
           <Animated.View style={[styles.leftLayer, compact]}>
             {/* Also covers the date line at the top of the feed, so tapping there opens the niche list too. */}
             <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={open} style={styles.compact}>
-              <NicheName name={title} size={26} color={niche.onFlood} style={styles.compactTitle} />
+              <NicheName name={title} size={COMPACT_NAME} color={niche.onFlood} style={styles.compactTitle} />
               {chevron(16)}
               <View style={{ marginLeft: 6 }}>{dashes}</View>
             </Pressable>
@@ -175,11 +180,11 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
         <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={open} style={styles.bigButton}>
           {/* The title fades to its new words when you open or leave the shop. */}
           <Animated.View key={title} entering={FadeIn.duration(220)} style={styles.bigTitle}>
-            <NicheName name={title} size={titleSize} color={niche.onFlood} style={{ lineHeight: TITLE }} />
+            <NicheName name={title} size={titleSize} color={niche.onFlood} />
           </Animated.View>
           <View style={{ marginTop: 30 }}>{chevron(20)}</View>
         </Pressable>
-        <View style={{ paddingBottom: 22 }}>{dashes}</View>
+        <View style={{ height: TITLE, justifyContent: 'flex-end', paddingBottom: 22 }}>{dashes}</View>
       </Animated.View>
       <Animated.View style={[styles.rule, { backgroundColor: niche.line }, rule]} />
 
@@ -235,10 +240,10 @@ const styles = StyleSheet.create({
   leftLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center' },
   meta: { fontSize: 13, fontWeight: '500', letterSpacing: 0.5 },
   compact: { height: ROW, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', maxWidth: '100%' },
-  compactTitle: { flexShrink: 1, lineHeight: 44 },
+  compactTitle: { flexShrink: 1 },
   icons: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  bigRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 20, overflow: 'hidden' },
+  bigRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, overflow: 'hidden' },
   bigButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: TITLE, flexShrink: 1 },
   bigTitle: { flexShrink: 1 },
   dashes: { flexDirection: 'row', gap: 5, alignItems: 'center' },

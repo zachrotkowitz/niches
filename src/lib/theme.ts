@@ -53,8 +53,8 @@ export function tint(hex: string, t: number): string {
 // Curated palettes for the Color lab. Any niche can take any palette.
 export const PALETTES: Palette[] = [
   // The new look (founder, Nov 26 2026; canvas page "New look"). Buttons are each niche's ink.
-  // Cooking: sage fills the screen, #4D7056 accents, near-black green buttons, white header words.
-  { id: 'sage', name: 'Sage', accent: '#4D7056', field: '#E3EEE6', ink: '#1C2B20', inkSoft: '#1C2B20', flood: '#699674', onFlood: '#FFFFFF', onFloodSoft: '#F2F7F3', second: '#4D7056' },
+  // Cooking: light sage #8AB19B fills the screen (founder, Nov 27 2026; was #699674), #4D7056 accents, near-black green buttons, white header words.
+  { id: 'sage', name: 'Sage', accent: '#4D7056', field: '#E3EEE6', ink: '#1C2B20', inkSoft: '#1C2B20', flood: '#8AB19B', onFlood: '#FFFFFF', onFloodSoft: '#F2F7F3', second: '#4D7056' },
   // Art: tan fills the screen, caramel #B4894B for decoration (a deeper caramel for text), deep brown words and buttons.
   { id: 'sand', name: 'Sand', accent: '#8A6431', field: '#F5EADB', ink: '#3A2810', inkSoft: '#54401F', flood: '#E7C89B', second: '#B4894B' },
   // Photography: plain white so the photos carry the color; dark chocolate for everything else.
