@@ -12,19 +12,28 @@ import { fonts } from '@/lib/theme';
  * each at its font's natural height. Squeezing both sizes into one line height
  * cut off the top of the big letter on iPhone (founder, Nov 27 2026).
  *
- * Herr Von Muellerhoff's "t" reads as an "i" and its "r" as a squiggle ("Art"
- * looked like "Ari"), so lowercase r and t are drawn in Great Vibes instead
- * (founder, Nov 27 2026).
+ * Script letters reach past the edges of their own text box (the loop of an
+ * "o", the tail of a "g" or "y"), and iPhone cuts off anything outside the box.
+ * So each text gets extra room on every side (`pad`), taken back with negative
+ * margins so the layout doesn't move (founder's screenshots, Nov 27 2026).
+ *
+ * Short names ("Art") are drawn all in Great Vibes: Herr Von Muellerhoff's
+ * "rt" read as "i" plus a squiggle. Longer names keep Herr Von Muellerhoff
+ * whole, so its letters stay joined (swapping single letters broke the joins).
  */
 export function NicheName({ name, size, color, style }: { name: string; size: number; color: string; style?: StyleProp<ViewStyle> }) {
   const first = name.slice(0, 1);
-  const rest = name.slice(1).split(/([rt])/).filter(Boolean);
+  const rest = name.slice(1);
+  const short = rest.length <= 3;
+  const capSize = Math.round(size * CAP_SCALE);
+  const pad = (n: number) => {
+    const p = Math.ceil(n * 0.35);
+    return { paddingHorizontal: p, marginHorizontal: -p, paddingVertical: Math.ceil(n * 0.12), marginVertical: -Math.ceil(n * 0.12) };
+  };
   return (
     <View accessible accessibilityRole="header" accessibilityLabel={name} style={[styles.row, style]}>
-      <Text style={[styles.cap, { fontSize: Math.round(size * CAP_SCALE), color, marginRight: 1 }]}>{first}</Text>
-      <Text style={[styles.rest, { fontSize: size, color }]}>
-        {rest.map((part, i) => (part === 't' || part === 'r' ? <Text key={i} style={styles.cap}>{part}</Text> : part))}
-      </Text>
+      <Text style={[styles.cap, pad(capSize), { fontSize: capSize, color }]}>{first}</Text>
+      <Text style={[short ? styles.cap : styles.rest, pad(size), { fontSize: size, color, marginLeft: -Math.ceil(size * 0.35) + (short ? -Math.round(size * 0.04) : 1) }]}>{rest}</Text>
     </View>
   );
 }
