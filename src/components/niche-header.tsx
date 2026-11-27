@@ -6,7 +6,7 @@ import Animated, { Easing, FadeIn, FadeInUp, FadeOut, ReduceMotion, interpolate,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BagIcon, BellIcon, CalendarIcon, CheckIcon, ChevronLeftIcon, GridLayoutIcon, PostsLayoutIcon } from '@/components/icons';
-import { NicheName, SCRIPT_EM } from '@/components/niche-name';
+import { NicheName, nicheNameWidth } from '@/components/niche-name';
 import { Text } from '@/components/text';
 import { FRESH_WINDOW_MS } from '@/lib/seed';
 import { SHOP_NICHES } from '@/lib/shop';
@@ -68,7 +68,7 @@ export function NicheHeader({ position, scrolls }: { position: SharedValue<numbe
   const inShop = hasShop && state.homeMode === 'shop';
   // In the shop the big title is just "Cooking shop" (founder, Nov 20 2026).
   const title = inShop ? `${niche.label} shop` : niche.label;
-  const titleSize = Math.min(BIG_NAME, Math.floor((Math.min(width, 640) - 110) / (title.length * SCRIPT_EM)));
+  const titleSize = Math.min(BIG_NAME, Math.floor((Math.min(width, 640) - 110) / nicheNameWidth(title)));
   const cartCount = state.cart.reduce((n, c) => n + c.qty, 0);
   const now = new Date();
   const fresh = state.posts.filter((p) => p.niche === niche.id && inFeeds(state, p) && now.getTime() - p.createdAt < FRESH_WINDOW_MS).length;

@@ -8,7 +8,7 @@ import { usePullRefresh } from '@/components/pull-refresh';
 import { DropInSearch, useDropInSearch } from '@/components/drop-in-search';
 import { BackLink, EndNote, Eyebrow, PersonRow, SearchBar, SectionTitle } from '@/components/discover-parts';
 import { FeedGrid } from '@/components/feed-grid';
-import { NicheName, SCRIPT_EM } from '@/components/niche-name';
+import { NicheName, nicheNameWidth } from '@/components/niche-name';
 import { Button, DisplayText } from '@/components/primitives';
 import { SurfaceProvider } from '@/components/surface';
 import { Text } from '@/components/text';
@@ -100,7 +100,7 @@ export default function DiscoverNicheScreen() {
         <View style={styles.head}>
           <Eyebrow>{weekOfLabel()}</Eyebrow>
           {niche ? (
-            <NicheName name={niche.label} size={Math.min(76, Math.floor(300 / (niche.label.length * SCRIPT_EM)))} color={niche.onFlood} />
+            <NicheName name={niche.label} size={Math.min(76, Math.floor(300 / nicheNameWidth(niche.label)))} color={niche.onFlood} />
           ) : (
             <DisplayText size={44} color={surface.text}>
               This week’s <Text style={{ fontFamily: fonts.displayItalic }}>favorites</Text>
